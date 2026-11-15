@@ -22,8 +22,8 @@ test('low memory warns rather than silently freezing CPU with massive model',()=
 });
 test('user controls response length, no arbitrary 48 or 96 token limit',()=>{
  assert.equal(normalizeLocalTokenBudget(300),300);
- assert.equal(normalizeLocalTokenBudget(2048),512);
- assert.equal(COLIBRI_LOCAL_POLICY.maxNewTokens,512);
+ assert.equal(normalizeLocalTokenBudget(2048),1024);
+ assert.equal(COLIBRI_LOCAL_POLICY.maxNewTokens,1024);
  assert.equal(COLIBRI_LOCAL_POLICY.free,true);
 });
 test('still refuses to download a neural model without consent',()=>{
