@@ -21,7 +21,8 @@ test('modelo Qwen 0.5B é isolado e opcional no Web Worker, sem bloqueio da inte
  const worker=read('public/workers/blackhole-qwen-0.5b.worker.mjs');
  const view=read('app/superagente/page.jsx');
  assert.match(worker,/Qwen2\.5-0\.5B-Instruct/);
- assert.match(worker,/device:'webgpu'/);
+ assert.match(worker,/device==='webgpu'/);
+ assert.match(worker,/create\('wasm'\)/);
  assert.match(worker,/Worker|onmessage/);
  assert.match(view,/Qwen 0\.5B/);
 });
