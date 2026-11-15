@@ -14,7 +14,7 @@ test('no universal WebGPU restriction remains in client Qwen execution',()=>{
 test('agents can request more than 48 tokens without a paid PredictLM endpoint',()=>{
  const panel=read('components/office-legal-agent-panel.jsx');
  const workbench=read('components/openbot-workbench.jsx');
- assert.match(panel,/maxTokens:384/);
+ assert.match(panel,/maxTokens:512/);
  assert.match(workbench,/tokenBudget/);
  assert.match(workbench,/createLegalDocumentHtml/);
  assert.match(workbench,/createLegalTimelineSvg/);
