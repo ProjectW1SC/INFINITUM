@@ -9,17 +9,17 @@ test('Colibri Local routes entirely offline without a separate model unless requ
  assert.equal(x.needsServer,false);
  assert.equal(x.autoSend,false);
 });
-test('Colibri Local opts in to Qwen only for writing and if browser is compatible',()=>{
+test('Colibri Local uses quantized Qwen over CPU when WebGPU is absent',()=>{
  const base={prompt:'Reescreva esta informação em linguagem simples',allowLocalModel:true,device:{webgpu:true,memoryGb:8}};
  assert.equal(planColibriLocal(base).engine,'qwen');
  assert.equal(planColibriLocal({...base,allowLocalModel:false}).engine,'rules');
- assert.equal(planColibriLocal({...base,device:{webgpu:false,memoryGb:8}}).engine,'rules');
- assert.equal(planColibriLocal({...base,device:{webgpu:true,memoryGb:4}}).engine,'rules');
- assert.equal(planColibriLocal({...base,device:{webgpu:true,memoryGb:0}}).engine,'rules');
+ assert.equal(planColibriLocal({...base,device:{webgpu:false,memoryGb:8}}).engine,'qwen');
+ assert.equal(planColibriLocal({...base,device:{webgpu:true,memoryGb:4}}).engine,'qwen');
+ assert.equal(planColibriLocal({...base,device:{webgpu:true,memoryGb:0}}).engine,'qwen');
 });
 test('Colibri Local never treats disk cache as GPU/RAM replacement',()=>{
- assert.equal(COLIBRI_LOCAL_POLICY.maxNewTokens<=48,true);
- assert.equal(COLIBRI_LOCAL_POLICY.requiresWebGpu,true);
+ assert.equal(COLIBRI_LOCAL_POLICY.maxNewTokens>=1024,true);
+ assert.equal(COLIBRI_LOCAL_POLICY.requiresWebGpu,false);
  assert.equal(COLIBRI_LOCAL_POLICY.free,true);
  assert.equal(COLIBRI_LOCAL_POLICY.cacheRole,'weights_only');
 });
