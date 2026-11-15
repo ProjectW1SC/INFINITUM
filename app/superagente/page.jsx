@@ -4,7 +4,7 @@ import Link from 'next/link';
 import {Plus,Search,BriefcaseBusiness,BookOpen,Layers3,PlugZap,Send,Copy,ShieldCheck,Bot,PanelLeftClose,PanelLeftOpen,FileText,Scale,Clock3} from 'lucide-react';
 import SecuredWorkspace from '../../components/secured-workspace';
 import {OFFICE_AGENTS} from '../../lib/office-core.mjs';
-import {runBlackholeQwen,stopBlackholeQwen} from '../../lib/blackhole-local-llm.mjs';
+import {runBlackholeQwen,stopBlackholeQwen,getQwenCacheStatus} from '../../lib/blackhole-local-llm.mjs';
 import {offlineBlackholeReply} from '../../lib/blackhole-chat.mjs';
 import {requestedOfficialQuery} from '../../lib/superagent-official-query.mjs';
 const ACTIONS=[
@@ -25,7 +25,13 @@ function Console({db,session}){
  const [allowEngineFallback,setAllowEngineFallback]=useState(false);
  const [preferredMotor,setPreferredMotor]=useState('auto');
  const [modelProgress,setModelProgress]=useState('');
+ const [cacheInfo,setCacheInfo]=useState(null);
  useEffect(()=>()=>stopBlackholeQwen(),[]);
+ useEffect(()=>{
+  let active=true;
+  getQwenCacheStatus().then(result=>{if(active)setCacheInfo(result)}).catch(()=>{});
+  return()=>{active=false};
+ },[]);
  const load=useCallback(async()=>{
   const {data,error}=await db.from('office_agent_runs').select('id,task,result,created_at,status').eq('owner_id',session.user.id)
    .eq('agent','superagente').order('created_at',{ascending:false}).limit(45);
@@ -52,7 +58,8 @@ function Console({db,session}){
      const out=await runBlackholeQwen(q,messages.slice(-2).map(x=>({role:x.role,content:x.content})),progress=>{
       setModelProgress(progress.status==='progress'?'Baixando Qwen: '+progress.progress+'%':String(progress.message||'Gerando resposta local...'));
      },{consent:true,preferCpu:true,maxTokens:512});
-     payload={ok:true,reply:out.reply,model:out.model,notice:'Resposta gerada no navegador com Qwen 0,5B via CPU/WebAssembly. Nenhum conteúdo foi enviado a APIs remotas de IA.'};
+     payload={ok:true,reply:out.reply,model:out.model,notice:'Resposta gerada localmente. O modelo permanecerá carregado para outras perguntas até ficar inativo.'};
+     getQwenCacheStatus().then(setCacheInfo).catch(()=>{});
     }catch(localError){
      // Não envia a pergunta a outra IA sem autorização explícita.
      payload={ok:true,reply:offlineBlackholeReply(q),model:'regras-locais',
@@ -105,7 +112,11 @@ function Console({db,session}){
       <div className="office-ai-model-choice"><button type="button" onClick={()=>{setEngine('evidencias');setTab('nova')}} aria-pressed={engine==='evidencias'}><ShieldCheck size={18}/> Motor de evidências · imediato</button>
        <button type="button" onClick={()=>{chooseEngine('qwen');setTab('nova')}} aria-pressed={engine==='qwen'}><Bot size={18}/> Qwen 0,5B · CPU local grátis</button>
        <button type="button" onClick={()=>{setEngine('online');setTab('nova')}} aria-pressed={engine==='online'}><Layers3 size={18}/> IA online gratuita · OpenRouter</button>
-       <p>O Qwen funciona pela CPU/WebAssembly e começa selecionado, sem cota diária de perguntas. Os pesos são baixados no primeiro pedido; em aparelhos com pouco espaço ou memória, o processamento pode ser lento.</p>
+       <p>O Qwen funciona pela CPU/WebAssembly e começa selecionado, sem cota diária de perguntas. Os pesos ficam no cache do navegador após o primeiro download e a CPU utiliza uma thread. Não use links temporários da Vercel: cada domínio tem um cache próprio.</p>
+       <p>Cache local: {cacheInfo?.cachedFiles>0?cacheInfo.cachedFiles+' arquivo(s) do Qwen encontrado(s) neste domínio; o pacote completo será confirmado ao carregar.':'nenhum arquivo identificado neste domínio.'} {' '}
+        {cacheInfo?.persisted?'Armazenamento persistente autorizado.':'Armazenamento persistente depende das permissões do navegador.'}
+        {' '}Use sempre <a href="https://agentinfinitum.vercel.app/superagente">agentinfinitum.vercel.app</a> para manter o mesmo cache.
+       </p>
        <Link className="inf-btn" href="/pecas">Abrir elaboração de peças</Link></div></>}
     {tab==='conectores'&&<><h1>Conectores</h1><p>Fontes oficiais DataJud e DJEN, WhatsApp Cloud API e conector público Infinitum autorizado.</p>
       <div className="office-ai-links"><Link className="inf-btn" href="/integracoes">Integrações externas</Link><Link className="inf-btn" href="/processos">Consultas judiciais</Link><Link className="inf-btn" href="/whatsapp">WhatsApp</Link></div></>}
