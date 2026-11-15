@@ -7,7 +7,9 @@ test('INFINITUM starts Colibri Local with zero remote connection and strict user
  assert.match(ui,/useState\('colibri-local'\)/);
  assert.match(ui,/planColibriLocal/);
  assert.match(ui,/value="colibri-local"/);
- assert.match(ui,/maxTokens:48/);
+ assert.match(ui,/maxTokens:tokenBudget/);
  assert.match(ui,/stopBlackholeQwen/);
+ assert.match(ui,/createLegalTimelineSvg/);
+ assert.match(ui,/createLegalDocumentHtml/);
  assert.match(read('lib/blackhole-local-llm.mjs'),/maxTokens\s*:/);
 });
