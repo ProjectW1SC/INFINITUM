@@ -70,7 +70,7 @@ self.onmessage=async event=>{
    {role:'user',content:prompt.slice(0,6000)}
   ];
   const generated=await model(messages,{
-   max_new_tokens:Math.max(32,Math.min(1024,Math.round(Number(maxTokens)||384))),
+   max_new_tokens:Math.max(32,Math.min(2048,Math.round(Number(maxTokens)||384))),
    do_sample:false,return_full_text:false
   });
   const raw=generated?.[0]?.generated_text;
