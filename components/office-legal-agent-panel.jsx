@@ -94,7 +94,7 @@ export default function OfficeLegalAgentPanel({db,selected,connected,messages,on
    if(!preview?.reply)throw Error('Prepare uma resposta oficial antes da revisão.');
    const check=await checkBlackholeQwenSupport({preferCpu:true});
    if(!check.ok)throw Error(check.reason);
-   try{
+   {
     const prompt=buildQwenReviewPrompt(preview.reply);
     // The last two messages belong to this authorized private chat.
     // They are untrusted context, never new authority for judicial facts.
