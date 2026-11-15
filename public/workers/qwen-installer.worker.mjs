@@ -24,6 +24,19 @@ const emit=(status,extra={})=>{
  try{bc?.postMessage(value)}catch{}
 };
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+// Some model CDNs do not expose Content-Range or respond with 200 to a range.
+// This safe fallback streams the complete ONNX into CacheStorage IN A WORKER,
+// never into JS RAM or into a Vercel function. Resume requires range support.
+async function cacheWholeModel(response){
+ if(!response?.ok)throw Error('O servidor não ofereceu os pesos do Qwen.');
+ const size=Number(response.headers.get('content-length')||0);
+ if(size>1024*1024*1024)throw Error('O arquivo do modelo excedeu o limite seguro.');
+ const cache=await caches.open(cacheKey);
+ emit('preparing',{message:'O fornecedor não disponibilizou retomada por partes. Salvando os pesos diretamente no disco, em segundo plano.'});
+ await cache.put(MODEL_URL,response);
+ emit('complete',{cached:true,message:'Qwen salvo no cache do navegador e pronto para ser carregado.'});
+ return {nativeCached:true};
+}
 const fetchRange=async(start,end)=>{
  controller=new AbortController();
  try{
@@ -52,10 +65,18 @@ async function probeModel(){
  try{
   const r=await fetch(MODEL_URL,{mode:'cors',credentials:'omit',redirect:'follow',
    cache:'no-store',headers:{Range:'bytes=0-0'},signal:controller.signal});
+  if(r.status===200)return await cacheWholeModel(r);
   if(r.status!==206){try{await r.body?.cancel()}catch{}
-   throw Error('O servidor do modelo não permite retomada por partes.')}
+   throw Error('O servidor do modelo recusou a transferência.')}
   const m=String(r.headers.get('content-range')||'').match(/^bytes 0-0\/(\d+)$/);
-  if(!m)throw Error('Não foi possível confirmar o tamanho total dos pesos.');
+  if(!m){
+   // A partial response with hidden Content-Range cannot be resumed safely.
+   // Fetch without Range so CacheStorage can stream directly to disk.
+   try{await r.body?.cancel()}catch{}
+   const whole=await fetch(MODEL_URL,{mode:'cors',credentials:'omit',
+    redirect:'follow',cache:'no-store',signal:controller.signal});
+   return await cacheWholeModel(whole);
+  }
   const total=Number(m[1]);
   if(!Number.isSafeInteger(total)||total<128*1024*1024||total>1024*1024*1024)
    throw Error('Tamanho remoto do Qwen não foi validado.');
@@ -97,6 +118,7 @@ async function runInstaller(){
    }
   }catch{}
   const remote=await probeModel();
+  if(remote.nativeCached)return;
   const old=await getQwenManifest();
   if(old&&(old.url!==MODEL_URL||old.totalBytes!==remote.total||
     (old.etag&&remote.etag&&old.etag!==remote.etag))){
