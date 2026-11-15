@@ -1,6 +1,6 @@
 'use client';
 import {useEffect} from 'react';
-import {canPrefetchQwen,QWEN_PREINSTALL_ORIGIN} from '../lib/qwen-preinstall-policy.mjs';
+import {canPrefetchQwen,QWEN_PREINSTALL_ORIGIN,chooseQwenDownloadConcurrency} from '../lib/qwen-preinstall-policy.mjs';
 import {getQwenCacheStatus} from '../lib/blackhole-local-llm.mjs';
 
 // No model inference, wasm compilation or 512MB buffering on the UI thread.
@@ -59,10 +59,13 @@ export default function QwenPreinstallBootstrap(){
     });
     current.addEventListener('error',release);
     renew=setInterval(()=>{if(stopped)return;lease()},30000);
-    current.postMessage({type:'start'});
+    current.postMessage({type:'start',concurrency:chooseQwenDownloadConcurrency({
+      memoryGb:Number(navigator.deviceMemory||0),saveData:conn?.saveData===true,
+      effectiveType:conn?.effectiveType||'4g',downlink:Number(conn?.downlink||0)
+    })});
    }catch{release()}
   };
-  const initial=setTimeout(start,10000);
+  const initial=setTimeout(start,3500);
   const onOnline=()=>{if(!installer&&!stopped)start()};
   window.addEventListener('online',onOnline);
   return()=>{
