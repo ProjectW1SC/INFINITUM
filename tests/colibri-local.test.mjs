@@ -18,7 +18,7 @@ test('Colibri Local uses quantized Qwen over CPU when WebGPU is absent',()=>{
  assert.equal(planColibriLocal({...base,device:{webgpu:true,memoryGb:0}}).engine,'qwen');
 });
 test('Colibri Local never treats disk cache as GPU/RAM replacement',()=>{
- assert.equal(COLIBRI_LOCAL_POLICY.maxNewTokens>=1024,true);
+ assert.equal(COLIBRI_LOCAL_POLICY.maxNewTokens>=2048,true);
  assert.equal(COLIBRI_LOCAL_POLICY.requiresWebGpu,false);
  assert.equal(COLIBRI_LOCAL_POLICY.free,true);
  assert.equal(COLIBRI_LOCAL_POLICY.cacheRole,'weights_only');
