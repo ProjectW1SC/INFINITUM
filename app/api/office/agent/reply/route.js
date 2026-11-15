@@ -62,7 +62,6 @@ async function verifyPrepared(db,user,company,jid,providerId){
  const sentAfter=chat.rows.some(x=>x.is_from_me&&Date.parse(x.timestamp)>=Date.parse(chat.chosen.timestamp));
  return {grant,p,chat,source,sentAfter,skills:selectOfficeAgentSkills({question:chat.chosen.content,action:'preview'})};
 }
-const ctx={};
 export async function POST(request){
  try{
   const {user,db}=await officeAuth(request);
@@ -133,7 +132,7 @@ export async function POST(request){
    if(!resp.ok||!result?.ok)invalid('Consulta oficial não concluída: '+String(result?.error||'fonte indisponível').slice(0,150),
      [400,401,403,409,429].includes(resp.status)?resp.status:503);
    return officeJson({ok:true,notice:'Consulta oficial concluída. Confira fonte, data e conteúdo antes do atendimento.',
-     processNumber:number,official:JSON.parse(JSON.stringify(result).slice(0,24000)),skills:['judicial-research']});
+     processNumber:number,official:{source:result.source||null,checkedAt:result.checkedAt||null,notice:result.notice||null,fromCache:result.fromCache===true,stale:result.stale===true,items:Array.isArray(result.items)?result.items.slice(0,8).map(item=>({codigo:item.codigo||null,nome:String(item.nome||item.descricao||'').slice(0,250),dataHora:item.dataHora||item.data||null})):[]},skills:['judicial-research']});
   }
   if(action!=='preview'&&action!=='send')invalid('Ação do agente não permitida.',400);
   const messageId=String(data.inbound_message_id||'');
@@ -185,22 +184,25 @@ export async function POST(request){
   }catch(error){
    // Delivery can be accepted by WhatsApp even when the response times out.
    // Keep reserved/uncertain and NEVER retry automatically.
-   const end=await db.rpc('finalize_office_agent_reply',{
-     p_id:reservationId,p_status:'uncertain',p_provider_message_id:null}).catch(()=>null);
+   try{await db.rpc('finalize_office_agent_reply',{p_id:reservationId,p_status:'uncertain',p_provider_message_id:null});}catch{}
    return officeJson({ok:false,uncertain:true,notice:'Envio sem confirmação. Não tente repetir automaticamente. Confira a conversa no WhatsApp.',
      reason:String(error?.message||'Falha da conexão').slice(0,150),reservationId},503);
   }
-  if(status!=='accepted')invalid('Transportador não confirmou aceitação. Não reenviar automaticamente.',503);
+  if(status!=='accepted'){
+   try{await db.rpc('finalize_office_agent_reply',{p_id:reservationId,p_status:'uncertain',p_provider_message_id:null});}catch{}
+   invalid('Transportador não confirmou aceitação. Não reenviar automaticamente.',503);
+  }
   const finish=await db.rpc('finalize_office_agent_reply',{
     p_id:reservationId,p_status:'accepted',p_provider_message_id:transport.messageId||null});
   // Memory is a small, optional operator note; archive history remains the source.
-  const memory=await db.from('office_agent_chat_memory').upsert({
+  let memory={error:true};
+  try{memory=await db.from('office_agent_chat_memory').upsert({
     owner_id:user.id,empresa_id:company,jid,
     summary:('Último contato sobre o processo '+checked.p.protocolo_ref+
       '. A resposta foi aceita pelo transporte em '+new Date().toLocaleDateString('pt-BR')+
       '. Fonte: DataJud, consultada em '+checked.source.sourceAt+'.').slice(0,1000),
     last_inbound_message_id:messageId,updated_at:date(),expires_at:new Date(Date.now()+60*86400000).toISOString()
-  },{onConflict:'owner_id,jid'}).catch(()=>({error:true}));
+  },{onConflict:'owner_id,jid'});}catch{}
   return officeJson({ok:true,accepted:true,delivered:false,read:false,messageId:transport.messageId||null,
     reservationId,recorded:!finish.error&&finish.data===true,
     memorySaved:!memory.error,notice:'WA.Auto aceitou a resposta ao cliente autorizado. Isso não confirma entrega ou leitura.'});
