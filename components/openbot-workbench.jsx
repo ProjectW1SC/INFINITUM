@@ -25,6 +25,20 @@ export default function OpenBotWorkbench({db,session}){
   let present=true;
   getQwenCacheStatus().then(info=>{if(present)setCacheInfo(info)}).catch(()=>{});
   return()=>{present=false};
+ },[]); 
+ useEffect(()=>{
+  if(typeof BroadcastChannel==='undefined')return;
+  const channel=new BroadcastChannel('infinitum-qwen-preinstall');
+  let lastRead=0;
+  channel.onmessage=event=>{
+   if(event.data?.type!=='qwen-preinstall')return;
+   const now=Date.now();
+   if(event.data.status==='complete'||now-lastRead>5000){
+    lastRead=now;
+    getQwenCacheStatus().then(setCacheInfo).catch(()=>{});
+   }
+  };
+  return()=>channel.close();
  },[]);
  async function generate(){
   if(!prompt.trim()||busy)return;
@@ -141,7 +155,9 @@ export default function OpenBotWorkbench({db,session}){
     Nenhum servidor PredictLM pago é necessário. Os pesos ficam salvos no cache deste domínio após o primeiro download;
     quando o navegador autoriza armazenamento persistente, evita exclusão automática dos arquivos. A CPU usa uma thread.
     Os templates de peças e diagramas são gerados por código; nenhum documento é protocolado automaticamente.
-    {' '}Cache: {cacheInfo?.cachedFiles>0?cacheInfo.cachedFiles+' arquivo(s) encontrados neste domínio':'ainda sem arquivos identificados'}.
+    {' '}Cache: {cacheInfo?.complete?'Qwen já preparado no disco':
+    cacheInfo?.preinstallChunks>0?cacheInfo.preinstallChunks+' de '+cacheInfo.preinstallTotalChunks+' partes salvas; a preparação continuará após F5':
+    cacheInfo?.cachedFiles>0?cacheInfo.cachedFiles+' arquivos pequenos preparados':'preparação automática iniciada ao abrir o domínio fixo'}.
     {' '}{cacheInfo?.persisted?'Persistência autorizada.':'Persistência sujeita às regras do navegador.'}
     {' '}Acesse o <a href="https://agentinfinitum.vercel.app/agentes">domínio fixo do INFINITUM</a> para reutilizar os arquivos.</p>
    <label>Motor de inteligência
