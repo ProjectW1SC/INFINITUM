@@ -13,7 +13,7 @@ test('local Qwen use has no daily token or request quota',()=>{
 test('AI daily usage is unlimited and response length is a per-generation hardware control',()=>{
  const ui=read('components/openbot-workbench.jsx');
  assert.match(ui,/Sem cota di[aá]ria de tokens ou perguntas/);
- assert.match(ui,/>2048 tokens</);
+ assert.match(ui,/\[128,256,384,512,768,1024,1536,2048\]/);
  assert.match(read('public/workers/blackhole-qwen-0.5b.worker.mjs'),/Math\.min\(2048,/);
 });
 test('unlimited AI usage does not remove legal WhatsApp anti-spam controls',()=>{
