@@ -20,11 +20,11 @@ function Console({db,session}){
  const [prompt,setPrompt]=useState(''),[messages,setMessages]=useState([]),[history,setHistory]=useState([]);
  const [tab,setTab]=useState('nova'),[expanded,setExpanded]=useState(false);
  const [busy,setBusy]=useState(false),[notice,setNotice]=useState(''),[search,setSearch]=useState('');
- const [engine,setEngine]=useState('evidencias');
+ const [engine,setEngine]=useState('qwen');
  const [externalAiConsent,setExternalAiConsent]=useState(false);
  const [allowEngineFallback,setAllowEngineFallback]=useState(false);
  const [preferredMotor,setPreferredMotor]=useState('auto');
- const [qwenConsent,setQwenConsent]=useState(false),[modelProgress,setModelProgress]=useState('');
+ const [qwenConsent,setQwenConsent]=useState(true),[modelProgress,setModelProgress]=useState('');
  useEffect(()=>()=>stopBlackholeQwen(),[]);
  const load=useCallback(async()=>{
   const {data,error}=await db.from('office_agent_runs').select('id,task,result,created_at,status').eq('owner_id',session.user.id)
@@ -38,11 +38,10 @@ function Console({db,session}){
  ]);setTab('nova');setNotice('Conversa recuperada do histórico do CRM.')}
  function chooseAction(q){setPrompt(q);setTab('nova')}
  async function chooseEngine(next){
-  if(next!=='qwen'){setEngine(next);setNotice('');return}
-  setNotice('Verificando compatibilidade com WebGPU...');
-  const support=await checkBlackholeQwenSupport();
-  if(!support.ok){setEngine('evidencias');setNotice(support.reason+' Modo de respostas rápidas selecionado.');return}
-  setEngine('qwen');setNotice('WebGPU detectado. O Qwen só será baixado com sua autorização.');
+  setEngine(next);
+  setNotice(next==='qwen'
+   ?'Qwen 0,5B local ativo, usando CPU/WebAssembly por padrão. O primeiro pedido carrega os pesos. Sem servidor ou WebGPU.'
+   :'');
  }
  async function ask(e){e?.preventDefault();const q=prompt.trim();if(!q||busy)return;
   setBusy(true);setNotice('');setModelProgress('');
@@ -52,11 +51,10 @@ function Console({db,session}){
     try{
      const out=await runBlackholeQwen(q,messages.slice(-2).map(x=>({role:x.role,content:x.content})),progress=>{
       setModelProgress(progress.status==='progress'?'Baixando Qwen: '+progress.progress+'%':String(progress.message||'Gerando resposta local...'));
-     },{consent:qwenConsent});
-     payload={ok:true,reply:out.reply,model:out.model,notice:'Resposta gerada no navegador com Qwen 0.5B (WebGPU). Não foi enviado conteúdo a APIs de IA.'};
+     },{consent:true,preferCpu:true,maxTokens:512});
+     payload={ok:true,reply:out.reply,model:out.model,notice:'Resposta gerada no navegador com Qwen 0,5B via CPU/WebAssembly. Nenhum conteúdo foi enviado a APIs remotas de IA.'};
     }catch(localError){
      // Não envia a pergunta a outra IA sem autorização explícita.
-     setEngine('evidencias');
      payload={ok:true,reply:offlineBlackholeReply(q),model:'regras-locais',
       notice:'Qwen local indisponível: '+String(localError.message||'falha').slice(0,180)+'. Usado o modo de regras locais, sem consultar serviços de IA.'};
     }
@@ -94,7 +92,7 @@ function Console({db,session}){
   </aside>
   <div className="office-ai-main">
    <header className="office-ai-header"><div><small>BLACKHOLE · INTELIGÊNCIA JURÍDICA</small><strong>Assistente jurídico</strong></div>
-    <span className="office-ai-engine"><span/> {engine==='qwen'?'Qwen 0.5B · modelo local WebGPU':engine==='online'?'IA gratuita online · requer autorização':'Motor de evidências · sem custo de tokens'}</span></header>
+    <span className="office-ai-engine"><span/> {engine==='qwen'?'Qwen 0,5B · CPU local':engine==='online'?'IA gratuita online · requer autorização':'Motor de evidências · sem custo de tokens'}</span></header>
    {activeTab?<div className="office-ai-content">
     {tab==='historico'&&<><h1>Buscar conversas</h1><p>Atividades que foram efetivamente registradas na carteira privada.</p>
      <input className="inf-search" aria-label="Pesquisar no histórico" placeholder="Buscar pedido" value={search} onChange={e=>setSearch(e.target.value)}/>
@@ -103,11 +101,11 @@ function Console({db,session}){
     {tab==='habilidades'&&<><h1>Habilidades e mini agentes</h1><p>Cada especialista encaminha seu pedido ao motor de análise verificável. Nenhuma ação é executada sem autorização.</p>
       <div className="office-agent-grid">{OFFICE_AGENTS.map(x=><button className="office-agent-card" type="button" key={x.id} onClick={()=>chooseAction('Analise a carteira como especialista de '+x.name+'. Objetivo: '+x.role+'. Aponte somente o que estiver comprovado nos registros disponíveis.')}>
        <strong>{x.name}</strong><p>{x.role}</p><small>{x.mode}</small></button>)}</div></>}
-    {tab==='modelos'&&<><h1>Motores de IA e LexisPredict</h1><p>Roteamento de motores somente com credenciais do servidor e autorização do operador. Colibri → MiniCPM → MiniMax → Claude → Groq → xAI → OpenRouter → Gemini. A análise jurídica determinística permanece local.</p><p>O mecanismo local rápido não baixa modelos. O Qwen exige WebGPU e autorização do download. A IA gratuita online só recebe mensagens após autorização explícita.</p>
+    {tab==='modelos'&&<><h1>Motores de IA e LexisPredict</h1><p>Roteamento de motores somente com credenciais do servidor e autorização do operador. Colibri → MiniCPM → MiniMax → Claude → Groq → xAI → OpenRouter → Gemini. A análise jurídica determinística permanece local.</p><p>O mecanismo local rápido não baixa modelos. O Qwen utiliza CPU/WebAssembly por padrão e já está selecionado, sem WebGPU obrigatório. O primeiro uso carrega os pesos quantizados no navegador. A IA online só recebe mensagens após autorização explícita.</p>
       <div className="office-ai-model-choice"><button type="button" onClick={()=>{setEngine('evidencias');setTab('nova')}} aria-pressed={engine==='evidencias'}><ShieldCheck size={18}/> Motor de evidências · imediato</button>
-       <button type="button" onClick={()=>{chooseEngine('qwen');setTab('nova')}} aria-pressed={engine==='qwen'}><Bot size={18}/> Qwen 0.5B · no navegador (WebGPU)</button>
+       <button type="button" onClick={()=>{chooseEngine('qwen');setTab('nova')}} aria-pressed={engine==='qwen'}><Bot size={18}/> Qwen 0,5B · CPU local grátis</button>
        <button type="button" onClick={()=>{setEngine('online');setTab('nova')}} aria-pressed={engine==='online'}><Layers3 size={18}/> IA online gratuita · OpenRouter</button>
-       <p>O modelo Qwen não será carregado automaticamente nem rodará na CPU se não existir GPU compatível. A primeira carga baixa centenas de megabytes de pesos.</p>
+       <p>O Qwen funciona pela CPU/WebAssembly e começa selecionado, sem cota diária de perguntas. Os pesos são baixados no primeiro pedido; em aparelhos com pouco espaço ou memória, o processamento pode ser lento.</p>
        <Link className="inf-btn" href="/pecas">Abrir elaboração de peças</Link></div></>}
     {tab==='conectores'&&<><h1>Conectores</h1><p>Fontes oficiais DataJud e DJEN, WhatsApp Cloud API e conector público Infinitum autorizado.</p>
       <div className="office-ai-links"><Link className="inf-btn" href="/integracoes">Integrações externas</Link><Link className="inf-btn" href="/processos">Consultas judiciais</Link><Link className="inf-btn" href="/whatsapp">WhatsApp</Link></div></>}
@@ -129,7 +127,7 @@ function Console({db,session}){
       onChange={e=>setPrompt(e.target.value)}
       onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();ask()}}}
       placeholder="Ex.: consulte DJEN e DataJud do processo 0000000-00.2026.8.26.0001"/>
-      <div className="office-ai-composer-foot"><span><ShieldCheck size={13}/> {engine==='qwen'?'Qwen 0.5B · WebGPU':engine==='online'?'IA online · somente com autorização':'Motor de evidências gratuito'}</span><button type="submit" disabled={busy||!prompt.trim()||(engine==='online'&&!externalAiConsent&&!requestedOfficialQuery(prompt))||(engine==='qwen'&&!qwenConsent&&!requestedOfficialQuery(prompt))}><Send size={15}/>{busy?'Analisando...':'Analisar'}</button></div>
+      <div className="office-ai-composer-foot"><span><ShieldCheck size={13}/> {engine==='qwen'?'Qwen 0,5B · CPU/WebAssembly':engine==='online'?'IA online · somente com autorização':'Motor de evidências gratuito'}</span><button type="submit" disabled={busy||!prompt.trim()||(engine==='online'&&!externalAiConsent&&!requestedOfficialQuery(prompt))}><Send size={15}/>{busy?'Analisando...':'Analisar'}</button></div>
     </form>
     <div className="blackhole-chat-models" role="group" aria-label="Selecionar o motor da conversa">
       <button type="button" aria-pressed={engine==='evidencias'} onClick={()=>setEngine('evidencias')}>Respostas rápidas · sem IA generativa</button>
@@ -139,7 +137,7 @@ function Console({db,session}){
     {engine==='online'&&<label className="office-ai-consent"><input type="checkbox" checked={externalAiConsent} onChange={e=>setExternalAiConsent(e.target.checked)}/> Autorizo o envio desta conversa ao modelo online gratuito (pode haver limites e tratamento pelo provedor).</label>}
     {engine==='online'&&externalAiConsent&&<label className="office-ai-consent"><input type="checkbox" checked={allowEngineFallback} onChange={e=>setAllowEngineFallback(e.target.checked)}/> Autorizo cascata LexisPredict/PredictLM: esta conversa poderá ser enviada a provedores remotos configurados, em sequência, se houver falha.</label>}
      {engine==='online'&&externalAiConsent&&allowEngineFallback&&<label className="office-ai-consent office-motor-preference"><span>Motor preferido</span><select aria-label="Selecionar motor preferido" value={preferredMotor} onChange={e=>setPreferredMotor(e.target.value)}><option value="auto">Automático · Lexis + PredictLM</option><option value="predictlm">PredictLM · se configurado</option>{['colibri','minicpm','minimax','claude','groq','xai','openrouter','gemini'].map(id=><option value={id} key={id}>{id.toUpperCase()} · se configurado</option>)}</select></label>}
-    {engine==='qwen'&&<label className="office-ai-consent"><input type="checkbox" checked={qwenConsent} onChange={e=>setQwenConsent(e.target.checked)}/> Autorizo baixar os pesos do Qwen para este navegador. Exige WebGPU e memória suficiente; sem fallback CPU.</label>}
+    {engine==='qwen'&&<p className="office-ai-disclaimer">Qwen local por CPU/WebAssembly já ativo para suas perguntas; o modelo é carregado quando você envia a primeira solicitação. Não depende de WebGPU nem servidor pago. Sem limite diário artificial de perguntas.</p>}
     {modelProgress&&<p className="office-ai-progress" role="status">{modelProgress}</p>}
     <p className="office-ai-disclaimer">Para consultar, escreva "Consulte DJEN do processo" e o CNJ de 20 dígitos. A busca usa as fontes oficiais com acesso autorizado ao processo, mesmo quando o motor de IA está selecionado. Os resultados do DataJud não são publicações DJEN.</p>
    </div>
