@@ -196,7 +196,7 @@ export default function OpenBotWorkbench({db,session}){
     {timelineSvg&&<img alt="Linha do tempo ilustrativa, sem verificação judicial" style={{maxWidth:'100%',borderRadius:8}}
       src={'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(timelineSvg)}/>}
    </details>
-   {notice&&<p className="inf-note" role="status">{notice}</p>
+   {notice&&<p className="inf-note" role="status">{notice}</p>}
   </div>
  </section>;
 }
