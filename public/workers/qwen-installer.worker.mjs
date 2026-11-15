@@ -5,6 +5,7 @@ import {
  getQwenManifest,setQwenManifest,listQwenChunkIndexes,saveQwenChunk,
  clearQwenModelChunks,getQwenPreinstallStatus
 } from './qwen-preinstall-store.mjs';
+import {downloadQwenChunks} from './qwen-download-core.mjs';
 const ORIGIN='https://huggingface.co/onnx-community/Qwen2.5-0.5B-Instruct/resolve/main/';
 const MODEL_URL=ORIGIN+'onnx/model_quantized.onnx';
 const CHUNK_BYTES=8*1024*1024;
@@ -12,10 +13,13 @@ const cacheKey='transformers-cache';
 const smallFiles=['config.json','generation_config.json','tokenizer.json',
  'tokenizer_config.json','special_tokens_map.json','merges.txt','vocab.json'];
 let running=false,paused=false,controller=null;
+const rangeControllers=new Set();
+let desiredConcurrency=2;
+const abortAll=()=>{controller?.abort();for(const request of rangeControllers)request.abort()};
 let bc=null;
 try{bc=new BroadcastChannel('infinitum-qwen-preinstall');
  bc.onmessage=event=>{
-  if(event.data?.type==='pause'){paused=true;controller?.abort()}
+  if(event.data?.type==='pause'){paused=true;abortAll()}
   if(event.data?.type==='resume')paused=false;
  }}catch{}
 const emit=(status,extra={})=>{
@@ -38,11 +42,12 @@ async function cacheWholeModel(response){
  return {nativeCached:true};
 }
 const fetchRange=async(start,end)=>{
- controller=new AbortController();
+ const request=new AbortController();
+ rangeControllers.add(request);
  try{
   const resp=await fetch(MODEL_URL,{
    mode:'cors',credentials:'omit',redirect:'follow',cache:'no-store',
-   headers:{Range:'bytes='+start+'-'+end},signal:controller.signal
+   headers:{Range:'bytes='+start+'-'+end},signal:request.signal
   });
   if(resp.status!==206){
    try{await resp.body?.cancel()}catch{}
@@ -58,7 +63,7 @@ const fetchRange=async(start,end)=>{
   const bytes=new Uint8Array(await resp.arrayBuffer());
   if(bytes.byteLength!==end-start+1)throw Error('O bloco transferido está incompleto.');
   return {bytes,total,etag:resp.headers.get('etag')||''};
- }finally{controller=null}
+ }finally{rangeControllers.delete(request)}
 };
 async function probeModel(){
  controller=new AbortController();
@@ -129,20 +134,22 @@ async function runInstaller(){
    etag:remote.etag,complete:false});
   const completed=new Set(await listQwenChunkIndexes());
   emit('progress',{downloadedChunks:completed.size,totalChunks:chunkCount,
-   message:'Qwen sendo preparado no disco. Você pode continuar usando o CRM.'});
-  for(let index=0;index<chunkCount;index++){
-   if(paused)break;
-   if(completed.has(index))continue;
-   const start=index*CHUNK_BYTES,end=Math.min(remote.total-1,start+CHUNK_BYTES-1);
-   const {bytes,total}=await fetchRange(start,end);
-   if(total!==remote.total)throw Error('Versão do modelo alterada durante a transferência.');
-   await saveQwenChunk(index,bytes);
-   completed.add(index);
-   emit('progress',{downloadedChunks:completed.size,totalChunks:chunkCount,
-    progress:Math.round(100*completed.size/chunkCount),
-    message:'Preparação Qwen: '+completed.size+' de '+chunkCount+' blocos salvos no disco.'});
-   // Yield between downloads to reduce contention with browser/CRM.
-   await delay(350);
+   message:'Qwen sendo preparado em '+desiredConcurrency+' conexões. Blocos salvos no disco.'});
+  // Parallel, bounded transfers remove the former 350ms per-chunk delay.
+  // Each request is limited to 8 MiB and all workers stop on the first error.
+  if(!paused){
+   await downloadQwenChunks({
+    totalBytes:remote.total,completed,concurrency:desiredConcurrency,
+    readRange:async part=>fetchRange(part.start,part.end),
+    writeChunk:saveQwenChunk,
+    isPaused:()=>paused,
+    onAbort:abortAll,
+    onProgress:({downloadedChunks,totalChunks})=>{
+     emit('progress',{downloadedChunks,totalChunks,
+      progress:Math.round(100*downloadedChunks/totalChunks),
+      message:'Qwen: '+downloadedChunks+'/'+totalChunks+' blocos salvos. Transferência paralela, sem carregar IA na CPU.'});
+    }
+   });
   }
   if(!paused&&completed.size===chunkCount){
    const status=await getQwenPreinstallStatus();
@@ -160,6 +167,9 @@ async function runInstaller(){
  }finally{running=false;controller=null}
 }
 self.onmessage=event=>{
- if(event.data?.type==='start'){if(!running)runInstaller()}
- if(event.data?.type==='pause'){paused=true;controller?.abort()}
+ if(event.data?.type==='start'){
+  desiredConcurrency=Math.max(1,Math.min(3,Math.round(Number(event.data?.concurrency)||2)));
+  if(!running)runInstaller();
+ }
+ if(event.data?.type==='pause'){paused=true;abortAll()}
 };
