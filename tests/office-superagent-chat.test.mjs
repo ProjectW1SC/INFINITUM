@@ -18,9 +18,10 @@ test('Qwen é verificado antes da seleção e falhas não enviam conteúdo para 
  const ui=read('app/superagente/page.jsx');
  const local=read('lib/blackhole-local-llm.mjs');
  const worker=read('public/workers/blackhole-qwen-0.5b.worker.mjs');
- assert.match(ui,/checkBlackholeQwenSupport/);
+ assert.match(ui,/\[engine,setEngine\]=useState\('qwen'\)/);
+ assert.match(ui,/consent:true,preferCpu:true/);
  assert.match(ui,/offlineBlackholeReply\(q\)/);
- assert.match(ui,/setEngine\('evidencias'\)/);
+ assert.match(ui,/onClick=\{\(\)=>setEngine\('evidencias'\)\}/);
  assert.match(local,/requestAdapter/);
  assert.match(local,/if\(!support.ok\)throw/);
  assert.match(worker,/device==='webgpu'/);
