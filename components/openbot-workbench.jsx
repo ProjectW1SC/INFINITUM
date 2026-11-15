@@ -12,8 +12,8 @@ export default function OpenBotWorkbench({db,session}){
  const [draft,setDraft]=useState('');
  const [source,setSource]=useState('');
  const [engine,setEngine]=useState('colibri-local');
- const [consent,setConsent]=useState(false);
- const [preferCpu,setPreferCpu]=useState(false),[tokenBudget,setTokenBudget]=useState(384);
+ const [consent,setConsent]=useState(true);
+ const [preferCpu,setPreferCpu]=useState(true),[tokenBudget,setTokenBudget]=useState(384);
  const [mode,setMode]=useState('texto'),[kind,setKind]=useState('manifestacao');
  const [timelineEvents,setTimelineEvents]=useState(''),[timelineSvg,setTimelineSvg]=useState('');
  const [busy,setBusy]=useState(false),[notice,setNotice]=useState('');
@@ -130,23 +130,22 @@ export default function OpenBotWorkbench({db,session}){
    </label>
    <p className="office-hint">Roteamento: {OPENBOT_COWORKERS.find(x=>x.id===plan.role)?.label} · revisão humana obrigatória.
     A IA não consulta nem envia automaticamente dados confidenciais da carteira.
-    A Vercel hospeda o aplicativo; a inferência Qwen usa WebGPU quando disponível ou CPU/WebAssembly.
+    A Vercel hospeda o aplicativo; Qwen roda na CPU/WebAssembly por padrão, sem WebGPU. O uso de GPU é opcional.
     Nenhum servidor PredictLM pago é necessário. O modelo é baixado no primeiro uso e pode ser lento na CPU.
     Os templates de peças e diagramas são gerados por código; nenhum documento é protocolado automaticamente.</p>
    <label>Motor de inteligência
     <select value={engine} onChange={e=>{setEngine(e.target.value);setDraft('');setApproved(false)}}>
-     <option value="colibri-local">Qwen preferencial · GPU ou CPU (sem servidor)</option>
+     <option value="colibri-local">Qwen local · CPU padrão, grátis e ativo</option>
      <option value="deterministico">Motor PredictLM/LexisPredict determinístico · sem modelo</option>
-     <option value="qwen">Qwen 0,5B · CPU/WebAssembly também disponível</option>
+     <option value="qwen">Qwen 0,5B · CPU/WebAssembly</option>
     </select>
    </label>
    {(engine==='qwen'||engine==='colibri-local')&&<label><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/>
-    Autorizar carregamento do Qwen 0,5B neste navegador. Não exige WebGPU; pode funcionar pela CPU com WebAssembly.
-    O primeiro uso baixa os pesos quantizados. Desmarcado: usar apenas regras locais.
+    Qwen local ativo por padrão. O primeiro pedido baixa os pesos quantizados para o cache e processa pela CPU. Desmarque para usar apenas regras leves.
    </label>}
    {(engine==='qwen'||engine==='colibri-local')&&<div className="office-action-row">
-    <label><input type="checkbox" checked={preferCpu} onChange={e=>setPreferCpu(e.target.checked)}/>
-     Forçar CPU/WebAssembly (mais lento, sem exigir WebGPU)
+    <label><input type="checkbox" checked={!preferCpu} onChange={e=>setPreferCpu(!e.target.checked)}/>
+     Usar GPU opcionalmente (CPU é o padrão)
     </label>
     <label>Tamanho da resposta por geração
      <select value={tokenBudget} onChange={e=>setTokenBudget(Number(e.target.value))}>
