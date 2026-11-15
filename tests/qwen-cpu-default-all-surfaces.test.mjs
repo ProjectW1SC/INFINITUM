@@ -17,7 +17,7 @@ test('Qwen is selected by default in both agent screens with local execution pre
  assert.match(workbench,/useState\(true\).*setConsent|\[consent,setConsent\]=useState\(true\)/);
  assert.match(workbench,/\[preferCpu,setPreferCpu\]=useState\(true\)/);
  assert.match(superagent,/\[engine,setEngine\]=useState\('qwen'\)/);
- assert.match(superagent,/\[qwenConsent,setQwenConsent\]=useState\(true\)/);
+ assert.match(superagent,/consent:true,preferCpu:true/);
  assert.match(legal,/\[consentQwen,setConsentQwen\]=useState\(true\)/);
 });
 test('no WebGPU consent interstitial blocks Qwen, no online provider called without opt-in',()=>{
