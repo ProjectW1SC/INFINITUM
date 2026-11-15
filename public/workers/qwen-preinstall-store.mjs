@@ -1,4 +1,4 @@
-// Stored under the CRM origin, independent of Supabase login state.
+// Stored under the CRM origin; independent of user login or logout.
 // Only fixed, public Qwen model bytes; NEVER store client/process data here.
 export const QWEN_PREINSTALL_DB='infinitum-qwen-preinstall-v1';
 export const MODEL_CHUNK_STORE='chunks';
