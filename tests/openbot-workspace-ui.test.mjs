@@ -7,8 +7,10 @@ test('INFINITUM adds original OpenBot coworker panel inside authenticated agents
  assert.match(ui,/checkBlackholeQwenSupport/);
  assert.match(ui,/SecuredWorkspace|office_agent_runs/);
  assert.match(ui,/ZAPFAST_SINGLE_SESSION_URL/);
- assert.match(ui,/externalAiConsent/);
- assert.match(ui,/preferredMotor:'colibri'/);
+ assert.match(ui,/buildQwenReviewPrompt/);
+ assert.match(ui,/assessQwenReview/);
+ assert.match(ui,/planColibriLocal/);
+ assert.doesNotMatch(ui,/\\/api\\/superagente/);
  assert.match(ui,/human|revis[aã]o|Revis/i);
  assert.doesNotMatch(ui,/sendMessage\(|api\/send|sendViaWaAuto\(/);
 });
