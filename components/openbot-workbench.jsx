@@ -61,7 +61,7 @@ export default function OpenBotWorkbench({db,session}){
         }
       }catch(error){
         setNotice('IA local não concluiu: '+String(error.message||error).slice(0,180)+'. O rascunho estruturado foi preservado.');
-      }finally{stopBlackholeQwen();}
+      }
     }else{
       setNotice(!consent?'Rascunho disponível sem IA generativa. Autorize o Qwen para geração local.':
         'Qwen não carregado: '+(profile.reason||route.notice)+'. Rascunho determinístico mantido.');
