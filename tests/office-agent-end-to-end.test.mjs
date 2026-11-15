@@ -16,7 +16,9 @@ test('server exposes authenticated narrow research, preview, consent and idempot
  assert.doesNotMatch(src,/SERVICE_ROLE_KEY|setInterval|sendBulk|Promise\.all\(.*send/);
 });
 test('UI offers concrete agent research, reply and memory but not mass sends',()=>{
- const ui=read('components/wa-auto-inbox.jsx');
+ const inbox=read('components/wa-auto-inbox.jsx');
+ assert.match(inbox,/OfficeLegalAgentPanel/);
+ const ui=read('components/office-legal-agent-panel.jsx');
  assert.match(ui,/prepareLegalAgentReply/);
  assert.match(ui,/authorizeLegalAgentContact/);
  assert.match(ui,/sendLegalAgentReply/);
