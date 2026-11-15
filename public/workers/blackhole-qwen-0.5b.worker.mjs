@@ -2,7 +2,9 @@
  * GPU is optional; when unavailable we use ONNX WebAssembly on one CPU
  * thread. This is NOT JustVugg Colibri's native disk/RAM weight streaming.
  */
+import {getQwenModelResponse,getQwenPreinstallStatus} from './qwen-preinstall-store.mjs';
 const MODEL='onnx-community/Qwen2.5-0.5B-Instruct';
+const MODEL_Q8_URL='https://huggingface.co/'+MODEL+'/resolve/main/onnx/model_quantized.onnx';
 let generator=null,deviceUsed=null,loading=null,running=false;
 const emit=(requestId,status,extra={})=>self.postMessage({requestId,status,...extra});
 async function loadLibrary(requestId){
@@ -28,6 +30,28 @@ async function initialize(requestId,device='wasm',allowCpuFallback=true){
   lib.env.useBrowserCache=true;
   lib.env.useWasmCache=true;
   lib.env.cacheKey='transformers-cache';
+  // The original cache remains intact for metadata, old q4 weights and WASM.
+  // The q8 ONNX may be stored in independent 8MiB IndexedDB chunks, allowing
+  // background resume after page refresh without a duplicate 512MB download.
+  if(typeof caches!=='undefined'){
+   const standard=await caches.open('transformers-cache');
+   lib.env.useCustomCache=true;
+   lib.env.customCache={
+    async match(request){
+     const url=typeof request==='string'?request:String(request?.url||'');
+     const native=await standard.match(request);
+     if(native)return native;
+     if(url===MODEL_Q8_URL)return getQwenModelResponse(MODEL_Q8_URL);
+     return undefined;
+    },
+    async put(request,response){
+     const url=typeof request==='string'?request:String(request?.url||'');
+     // Do not double-cache the same large model once chunks are complete.
+     if(url===MODEL_Q8_URL&&await getQwenModelResponse(MODEL_Q8_URL))return;
+     return standard.put(request,response);
+    }
+   };
+  }
   if(lib.env?.backends?.onnx?.wasm){
    lib.env.backends.onnx.wasm.numThreads=1;
   }
@@ -54,14 +78,25 @@ async function initialize(requestId,device='wasm',allowCpuFallback=true){
     const keys=(await cached.keys()).map(x=>x.url);
     if(keys.some(x=>x.includes('/onnx/model_quantized.onnx')))return 'q8';
     if(keys.some(x=>x.includes('/onnx/model_q4.onnx')))return 'q4';
+    if((await getQwenPreinstallStatus()).complete)return 'q8';
    }catch{}
    return 'q8';
   };
   const create=async chosen=>{
    const dtype=await chooseDtype(chosen);
    emit(requestId,'loading',{message:chosen==='wasm'?
-    'Qwen CPU: carregando a versão quantizada mais leve disponível no cache ('+dtype+').':
+    'Qwen CPU: abrindo pesos preparados no armazenamento local ('+dtype+').':
     'Qwen GPU: carregando pesos quantizados do cache.'});
+   if(chosen==='wasm'&&dtype==='q8'){
+    let previous=false;
+    try{previous=!!(await (await caches.open('transformers-cache')).match(MODEL_Q8_URL))}catch{}
+    const state=await getQwenPreinstallStatus();
+    if(!previous&&!state.complete){
+     throw Error(state.downloadedChunks>0
+      ?'Qwen sendo instalado em segundo plano ('+state.downloadedChunks+'/'+state.totalChunks+' blocos). A resposta leve continua disponível.'
+      :'Qwen será preparado em segundo plano no domínio principal. A resposta leve continua disponível sem esperar o download.');
+    }
+   }
    const model=await lib.pipeline('text-generation',MODEL,{dtype,device:chosen,progress_callback});
    generator=model;deviceUsed=chosen;
    return model;
