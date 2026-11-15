@@ -18,3 +18,11 @@ test('Integracoes indicam o estado real do WA.Auto',()=>{
 });
 
 test('QR pronto do Baileys não é recodificado como texto',()=>{const ui=file('components/wa-auto-inbox.jsx');assert.ok(ui.includes('data:image'));assert.ok(ui.includes('setQrImage(String(connection.qr))'));assert.match(ui,/4000/);});
+
+
+test('WA.Auto offers the existing ZapFast session without silently making a second QR',()=>{
+ const ui=file('components/wa-auto-inbox.jsx');
+ assert.match(ui,/ZAPFAST_SINGLE_SESSION_URL/);
+ assert.match(ui,/Mesmo número|mesmo número/);
+ assert.match(ui,/target="_blank"/);
+});
