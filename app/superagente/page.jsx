@@ -4,7 +4,7 @@ import Link from 'next/link';
 import {Plus,Search,BriefcaseBusiness,BookOpen,Layers3,PlugZap,Send,Copy,ShieldCheck,Bot,PanelLeftClose,PanelLeftOpen,FileText,Scale,Clock3} from 'lucide-react';
 import SecuredWorkspace from '../../components/secured-workspace';
 import {OFFICE_AGENTS} from '../../lib/office-core.mjs';
-import {runBlackholeQwen,stopBlackholeQwen,checkBlackholeQwenSupport} from '../../lib/blackhole-local-llm.mjs';
+import {runBlackholeQwen,stopBlackholeQwen} from '../../lib/blackhole-local-llm.mjs';
 import {offlineBlackholeReply} from '../../lib/blackhole-chat.mjs';
 import {requestedOfficialQuery} from '../../lib/superagent-official-query.mjs';
 const ACTIONS=[
@@ -24,7 +24,7 @@ function Console({db,session}){
  const [externalAiConsent,setExternalAiConsent]=useState(false);
  const [allowEngineFallback,setAllowEngineFallback]=useState(false);
  const [preferredMotor,setPreferredMotor]=useState('auto');
- const [qwenConsent,setQwenConsent]=useState(true),[modelProgress,setModelProgress]=useState('');
+ const [modelProgress,setModelProgress]=useState('');
  useEffect(()=>()=>stopBlackholeQwen(),[]);
  const load=useCallback(async()=>{
   const {data,error}=await db.from('office_agent_runs').select('id,task,result,created_at,status').eq('owner_id',session.user.id)
