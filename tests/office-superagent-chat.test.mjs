@@ -23,6 +23,7 @@ test('Qwen é verificado antes da seleção e falhas não enviam conteúdo para 
  assert.match(ui,/setEngine\('evidencias'\)/);
  assert.match(local,/requestAdapter/);
  assert.match(local,/if\(!support.ok\)throw/);
- assert.match(worker,/device:'webgpu'/);
+ assert.match(worker,/device==='webgpu'/);
+ assert.match(worker,/create\('wasm'\)/);
  assert.doesNotMatch(worker,/device:\s*'cpu'/);
 });
