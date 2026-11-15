@@ -1,0 +1,175 @@
+'use client';
+import {useCallback,useEffect,useMemo,useState} from 'react';
+import {runBlackholeQwen,stopBlackholeQwen,checkBlackholeQwenSupport} from '../lib/blackhole-local-llm.mjs';
+import {buildQwenReviewPrompt,assessQwenReview} from '../lib/qwen-review-guard.mjs';
+
+// The parent inbox already authenticates and archives messages. This child
+// operates on the SAME owner-scoped WA.Auto session: no second QR or client token.
+export default function OfficeLegalAgentPanel({db,selected,connected,messages,onSent}){
+ const [expanded,setExpanded]=useState(false);
+ const [busy,setBusy]=useState('');
+ const [status,setStatus]=useState('');
+ const [q,setQ]=useState(''),[cases,setCases]=useState([]);
+ const [chosenCase,setChosenCase]=useState(null),[identityProof,setIdentityProof]=useState('');
+ const [preview,setPreview]=useState(null),[reviewed,setReviewed]=useState('');
+ const [memory,setMemory]=useState('');
+ const [consentQwen,setConsentQwen]=useState(false),[humanConfirmed,setHumanConfirmed]=useState(false);
+ const jid=selected?.jid||'';
+ const valid=/^[1-9][0-9]{9,14}@s\.whatsapp\.net$/.test(jid)&&!selected?.is_group;
+ const lastInbound=useMemo(()=>(Array.isArray(messages)?messages:[])
+  .filter(x=>!x.is_from_me&&Boolean(x.provider_message_id||x.id))
+  .sort((a,b)=>Date.parse(b.timestamp||'')-Date.parse(a.timestamp||''))[0]||null,[messages]);
+ const inboundId=String(lastInbound?.provider_message_id||lastInbound?.id||'');
+ const call=useCallback(async data=>{
+  const auth=await db.auth.getSession(),token=auth.data?.session?.access_token;
+  if(!token)throw Error('Faça login no CRM antes de usar o agente.');
+  const response=await fetch('/api/office/agent/reply',{method:'POST',headers:{
+   'Content-Type':'application/json',Authorization:'Bearer '+token
+  },body:JSON.stringify({...data,jid}),cache:'no-store'});
+  const out=await response.json().catch(()=>({error:'A API do agente não retornou JSON válido.'}));
+  if(!response.ok||!out.ok)throw Error(out.error||out.notice||out.reason||'Operação não confirmada.');
+  return out;
+ },[db,jid]);
+ useEffect(()=>{
+  setPreview(null);setReviewed('');setCases([]);setChosenCase(null);setHumanConfirmed(false);setMemory('');
+  setStatus('');setIdentityProof('');setConsentQwen(false);
+  return()=>stopBlackholeQwen();
+ },[jid]);
+ async function run(name,operation){
+  if(busy)return;
+  setBusy(name);setStatus('');
+  try{await operation()}
+  catch(error){setStatus('Não concluído: '+String(error.message||error).slice(0,220))}
+  finally{setBusy('')}
+ }
+ function prepareLegalAgentReply(){
+  return run('preview',async()=>{
+   if(!inboundId)throw Error('Escolha uma conversa com mensagem recebida e arquivada.');
+   const value=await call({action:'preview',inbound_message_id:inboundId});
+   setPreview({...value,inbound_message_id:inboundId});
+   setReviewed('');setHumanConfirmed(false);
+   setMemory(value.contextNote||'');
+   setStatus(value.notice||'Prévia pronta; confira os autos.');
+  });
+ }
+ function authorizeLegalAgentContact(){
+  return run('authorize',async()=>{
+   if(!chosenCase)throw Error('Selecione o processo após confirmar a identidade.');
+   if(identityProof.trim().length<15)throw Error('Registre como verificou a identidade e a autorização.');
+   const res=await call({action:'authorize',processo_id:chosenCase.id,evidence:identityProof.trim()});
+   setStatus(res.notice);
+  });
+ }
+ function researchLegalAgentCase(){
+  return run('research',async()=>{
+   const res=await call({action:'research',source:'auto'});
+   const summary=(res.official?.notice||'Consulta concluída').slice(0,300);
+   setStatus(summary+' Atualize a prévia antes de enviar.');
+   setPreview(null);setReviewed('');setHumanConfirmed(false);
+  });
+ }
+ function saveLegalAgentMemory(){
+  return run('memory',async()=>{
+   const r=await call({action:'memory',summary:memory.slice(0,1000)});
+   setStatus(r.notice);
+  });
+ }
+ function searchLegalCases(){
+  return run('cases',async()=>{
+   const r=await call({action:'cases',q:q.trim().slice(0,60)});
+   setCases(r.cases||[]);setChosenCase(null);
+   setStatus((r.cases||[]).length+' processo(s) localizado(s). Confirme a identidade antes de autorizar.');
+  });
+ }
+ async function polishWithQwen(){
+  return run('qwen',async()=>{
+   if(!preview?.reply||!consentQwen)throw Error('Autorize a inferência no navegador.');
+   const check=await checkBlackholeQwenSupport();
+   if(!check.ok)throw Error(check.reason);
+   try{
+    const prompt=buildQwenReviewPrompt(preview.reply);
+    const res=await runBlackholeQwen(prompt,[],info=>setStatus(String(info?.message||'Qwen analisando...').slice(0,160)),
+     {consent:true,maxTokens:48,timeoutMs:180000});
+    const judged=assessQwenReview(preview.reply,res.reply);
+    if(!judged.ok){
+     setReviewed('');setStatus('Qwen sugeriu alteração que não preservou os fatos ('+judged.reason+'). Prévia oficial mantida.');
+    }else{
+     setReviewed(judged.text);setHumanConfirmed(false);
+     setStatus('Qwen melhorou a redação. Confira o texto revisado antes de autorizar o envio.');
+    }
+   }finally{stopBlackholeQwen()}
+  });
+ }
+ function sendLegalAgentReply(){
+  return run('send',async()=>{
+   if(!connected)throw Error('WA.Auto está desconectado. Nenhum envio realizado.');
+   if(!humanConfirmed)throw Error('Confirme individualmente que revisou o texto e o destinatário.');
+   if(!preview?.inbound_message_id)throw Error('Prepare a resposta e confira a fonte primeiro.');
+   const text=reviewed||preview.reply;
+   const r=await call({action:'send',inbound_message_id:preview.inbound_message_id,
+     confirm_send:true,reviewed_text:text,human_reviewed:true});
+   setStatus(r.notice||'WA.Auto aceitou. Entrega não confirmada.');
+   setPreview(null);setReviewed('');setHumanConfirmed(false);
+   if(typeof onSent==='function')onSent();
+  });
+ }
+ if(!selected)return null;
+ return <details open={expanded} onToggle={e=>setExpanded(e.currentTarget.open)}
+  style={{padding:'12px 15px',background:'var(--surface,#25212c)',borderTop:'1px solid #7c6b8044',maxHeight:490,overflowY:'auto'}}>
+  <summary style={{cursor:'pointer',fontWeight:700}}>Agente jurídico · pesquisa, Qwen, memória e WhatsApp</summary>
+  {!valid?<p role="status" style={{marginTop:10}}>Esta conversa usa grupo ou identificador LID. Para proteger o sigilo, a resposta automática do agente fica bloqueada até haver identificação segura do destinatário. Você ainda pode usar o atendimento manual.</p>:<>
+   <p style={{margin:'10px 0',fontSize:12}}>Somente clientes autorizados e perguntas processuais privadas. O agente consulta fontes oficiais, lembra as últimas oito mensagens da conversa e exige confirmação para cada envio. Nenhum disparo em massa.</p>
+   <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
+    <button type="button" className="wa-button ghost" disabled={!!busy||!inboundId} onClick={prepareLegalAgentReply}>Preparar resposta processual</button>
+    <button type="button" className="wa-button ghost" disabled={!!busy} onClick={researchLegalAgentCase}>Pesquisar DataJud + DJEN</button>
+   </div>
+   <div style={{padding:10,border:'1px solid #8885',borderRadius:10,marginBottom:12}}>
+    <strong>Autorizar contato por processo</strong>
+    <p style={{fontSize:12,margin:'6px 0'}}>Se ainda não houver vínculo, confira a identidade com os dados internos antes de registrar esta autorização.</p>
+    <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+     <input aria-label="Pesquisar cliente no LexisPredict" value={q} onChange={e=>setQ(e.target.value)}
+      placeholder="Nome do cliente no cadastro" maxLength={60} style={{flex:'1 1 170px',padding:6,minWidth:0}}/>
+     <button type="button" className="wa-button ghost" disabled={!!busy||q.trim().length<3} onClick={searchLegalCases}>Buscar</button>
+    </div>
+    {cases.length>0&&<div style={{display:'grid',gap:4,marginTop:7}}>{cases.map(p=><button
+     type="button" className="wa-button ghost" key={p.id}
+     style={{textAlign:'left',opacity:chosenCase?.id===p.id?1:0.8}}
+     onClick={()=>setChosenCase(p)}>{chosenCase?.id===p.id?'Selecionado: ':''}{p.cliente||'Cliente'} · {p.protocolo_ref||p.id}</button>)}</div>}
+    <textarea aria-label="Comprovação da identidade do cliente" rows={2} maxLength={600}
+     value={identityProof} onChange={e=>setIdentityProof(e.target.value)}
+     style={{width:'100%',padding:7,marginTop:7}} placeholder="Como você confirmou a identidade e autorização? Não insira documentos sigilosos aqui."/>
+    <button type="button" className="wa-button" disabled={!!busy||!chosenCase||identityProof.trim().length<15}
+     onClick={authorizeLegalAgentContact}>Registrar autorização deste contato</button>
+   </div>
+   {preview&&<div style={{padding:12,border:'1px solid #8885',borderRadius:10,marginBottom:12}}>
+    <strong>Prévia · {preview.source} ({preview.sourceAt?new Date(preview.sourceAt).toLocaleDateString('pt-BR'):'sem data'})</strong>
+    <p style={{whiteSpace:'pre-wrap',fontSize:13}}>{reviewed||preview.reply}</p>
+    {preview.contextNote&&<small>Memória interna disponível, não incluída automaticamente na resposta.</small>}
+    <p style={{fontSize:11}}>Origem: processo {preview.caseNumber}. Qwen não confirma movimentações judiciais; texto alterado exige revisão humana.</p>
+    <label style={{display:'flex',gap:6,alignItems:'center'}}>
+     <input type="checkbox" checked={consentQwen} onChange={e=>setConsentQwen(e.target.checked)}/>
+     Permitir Qwen 0,5B no navegador para melhorar o texto (WebGPU, download opcional)
+    </label>
+    <div style={{display:'flex',gap:8,flexWrap:'wrap',margin:'8px 0'}}>
+     <button type="button" className="wa-button ghost" disabled={!!busy||!consentQwen} onClick={polishWithQwen}>Revisar com Qwen</button>
+     {reviewed&&<button type="button" className="wa-button ghost" onClick={()=>{setReviewed('');setHumanConfirmed(false)}}>Usar texto oficial</button>}
+    </div>
+    <label style={{display:'flex',gap:6,alignItems:'center'}}>
+     <input type="checkbox" checked={humanConfirmed} onChange={e=>setHumanConfirmed(e.target.checked)}/>
+     Conferi destinatário, histórico, fonte e texto. Autorizo somente esta resposta.
+    </label>
+    <button type="button" className="wa-button" disabled={!!busy||!connected||!humanConfirmed||!preview.allowedToSend}
+     onClick={sendLegalAgentReply}>Enviar esta resposta ao cliente autorizado</button>
+    {!preview.allowedToSend&&<p>Outro funcionário já respondeu; envio pelo agente bloqueado.</p>}
+   </div>}
+   <div style={{padding:10,border:'1px solid #8885',borderRadius:10}}>
+    <strong>Memória curta da conversa</strong><p style={{fontSize:12}}>Além das últimas oito mensagens já arquivadas, uma anotação de até 1.000 caracteres, com prazo de 60 dias e limite de 200 conversas por operador.</p>
+    <textarea aria-label="Memória curta do cliente" rows={2} maxLength={1000} value={memory}
+     style={{width:'100%',padding:7}} onChange={e=>setMemory(e.target.value)}
+     placeholder="Resumo fiel das dúvidas e do último retorno, sem dados desnecessários."/>
+    <button type="button" className="wa-button ghost" disabled={!!busy} onClick={saveLegalAgentMemory}>Salvar memória limitada</button>
+   </div>
+   {status&&<p role="status" style={{margin:'10px 0',fontSize:12}}>{status}</p>}
+  </>}
+ </details>;
+}
