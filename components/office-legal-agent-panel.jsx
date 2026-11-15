@@ -13,6 +13,7 @@ export default function OfficeLegalAgentPanel({db,selected,connected,messages,on
  const [chosenCase,setChosenCase]=useState(null),[identityProof,setIdentityProof]=useState('');
  const [preview,setPreview]=useState(null),[reviewed,setReviewed]=useState('');
  const [memory,setMemory]=useState('');
+ const [diagnostics,setDiagnostics]=useState(null);
  const [consentQwen,setConsentQwen]=useState(false),[humanConfirmed,setHumanConfirmed]=useState(false);
  const jid=selected?.jid||'';
  const valid=/^[1-9][0-9]{9,14}@s\.whatsapp\.net$/.test(jid)&&!selected?.is_group;
@@ -32,7 +33,7 @@ export default function OfficeLegalAgentPanel({db,selected,connected,messages,on
  },[db,jid]);
  useEffect(()=>{
   setPreview(null);setReviewed('');setCases([]);setChosenCase(null);setHumanConfirmed(false);setMemory('');
-  setStatus('');setIdentityProof('');setConsentQwen(false);
+  setStatus('');setIdentityProof('');setConsentQwen(false);setDiagnostics(null);
   return()=>stopBlackholeQwen();
  },[jid]);
  async function run(name,operation){
@@ -41,6 +42,13 @@ export default function OfficeLegalAgentPanel({db,selected,connected,messages,on
   try{await operation()}
   catch(error){setStatus('Não concluído: '+String(error.message||error).slice(0,220))}
   finally{setBusy('')}
+ }
+ function diagnosePredictLmLegalAgent(){
+  return run('diagnostics',async()=>{
+    const result=await call({action:'diagnostics'});
+    setDiagnostics(result);
+    setStatus('Diagnóstico dos cores obtido. A disponibilidade real do Qwen depende do seu navegador.');
+  });
  }
  function prepareLegalAgentReply(){
   return run('preview',async()=>{
@@ -127,7 +135,15 @@ export default function OfficeLegalAgentPanel({db,selected,connected,messages,on
    <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:10}}>
     <button type="button" className="wa-button ghost" disabled={!!busy||!inboundId} onClick={prepareLegalAgentReply}>Preparar resposta processual</button>
     <button type="button" className="wa-button ghost" disabled={!!busy} onClick={researchLegalAgentCase}>Pesquisar DataJud + DJEN</button>
+    <button type="button" className="wa-button ghost" disabled={!!busy} onClick={diagnosePredictLmLegalAgent}>Diagnosticar motores PredictLM</button>
    </div>
+   {diagnostics&&<div style={{padding:10,border:'1px solid #8885',borderRadius:10,marginBottom:12}}>
+    <strong>PredictLM · diagnóstico de motores</strong>
+    <p style={{fontSize:12}}>{diagnostics.cores?.length||0} controles determinísticos de análise. 
+      PredictLM remoto: {diagnostics.externalPredictLmConfigured?'configurado (execução não testada)':'não configurado'}.
+      Qwen: depende de autorização, WebGPU e memória deste aparelho.</p>
+    <p style={{fontSize:11}}>{diagnostics.notice}</p>
+   </div>}
    <div style={{padding:10,border:'1px solid #8885',borderRadius:10,marginBottom:12}}>
     <strong>Autorizar contato por processo</strong>
     <p style={{fontSize:12,margin:'6px 0'}}>Se ainda não houver vínculo, confira a identidade com os dados internos antes de registrar esta autorização.</p>
@@ -159,6 +175,12 @@ export default function OfficeLegalAgentPanel({db,selected,connected,messages,on
     </details>}
     {preview.contextNote&&<small>Memória interna disponível, mas não equivale a informação judicial confirmada.</small>}
     <p style={{fontSize:11}}>Origem: processo {preview.caseNumber}. Qwen não confirma movimentações judiciais; texto alterado exige revisão humana.</p>
+    {preview.predictLmReview&&<p style={{fontSize:11}}>
+      <strong>Atenção jurídica · PredictLM:</strong> {preview.predictLmReview.tier} · {preview.predictLmReview.verification}.
+      {preview.predictLmReview.signals?.length?
+        ' Sinais: '+preview.predictLmReview.signals.map(x=>x.id).join(', '):' Sem alerta sensível.'}
+      {' '}Esta análise é determinística e não substitui a movimentação oficial.
+    </p>}
     <label style={{display:'flex',gap:6,alignItems:'center'}}>
      <input type="checkbox" checked={consentQwen} onChange={e=>setConsentQwen(e.target.checked)}/>
      Permitir Qwen 0,5B no navegador para melhorar o texto (WebGPU, download opcional)
