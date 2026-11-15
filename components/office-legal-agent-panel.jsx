@@ -102,7 +102,7 @@ export default function OfficeLegalAgentPanel({db,selected,connected,messages,on
       role:m.role==='cliente'?'user':'assistant',content:String(m.text||'').slice(0,180)
     }));
     const res=await runBlackholeQwen(prompt,shortHistory,info=>setStatus(String(info?.message||'Qwen analisando...').slice(0,160)),
-     {consent:true,maxTokens:48,timeoutMs:180000});
+     {consent:true,maxTokens:384,timeoutMs:600000});
     const judged=assessQwenReview(preview.reply,res.reply);
     if(!judged.ok){
      setReviewed('');setStatus('Qwen sugeriu alteração que não preservou os fatos ('+judged.reason+'). Prévia oficial mantida.');
@@ -141,7 +141,7 @@ export default function OfficeLegalAgentPanel({db,selected,connected,messages,on
     <strong>PredictLM · diagnóstico de motores</strong>
     <p style={{fontSize:12}}>{diagnostics.cores?.length||0} controles determinísticos de análise. 
       PredictLM remoto: {diagnostics.externalPredictLmConfigured?'configurado (execução não testada)':'não configurado'}.
-      Qwen: depende de autorização, WebGPU e memória deste aparelho.</p>
+      Qwen: depende de autorização e memória disponível; pode executar em CPU/WebAssembly quando não houver WebGPU.</p>
     <p style={{fontSize:11}}>{diagnostics.notice}</p>
    </div>}
    <div style={{padding:10,border:'1px solid #8885',borderRadius:10,marginBottom:12}}>
@@ -183,7 +183,7 @@ export default function OfficeLegalAgentPanel({db,selected,connected,messages,on
     </p>}
     <label style={{display:'flex',gap:6,alignItems:'center'}}>
      <input type="checkbox" checked={consentQwen} onChange={e=>setConsentQwen(e.target.checked)}/>
-     Permitir Qwen 0,5B no navegador para melhorar o texto (WebGPU, download opcional)
+     Permitir Qwen 0,5B local na GPU ou CPU/WebAssembly para melhorar o texto (pesos baixados apenas quando autorizado)
     </label>
     <div style={{display:'flex',gap:8,flexWrap:'wrap',margin:'8px 0'}}>
      <button type="button" className="wa-button ghost" disabled={!!busy||!consentQwen} onClick={polishWithQwen}>Revisar com Qwen</button>
