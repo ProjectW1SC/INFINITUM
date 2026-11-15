@@ -34,8 +34,8 @@ export default function OfficeLegalAgentPanel({db,selected,connected,messages,on
  useEffect(()=>{
   setPreview(null);setReviewed('');setCases([]);setChosenCase(null);setHumanConfirmed(false);setMemory('');
   setStatus('');setIdentityProof('');setConsentQwen(true);setDiagnostics(null);
-  return()=>stopBlackholeQwen();
  },[jid]);
+ useEffect(()=>()=>stopBlackholeQwen(),[]);
  async function run(name,operation){
   if(busy)return;
   setBusy(name);setStatus('');
@@ -110,7 +110,7 @@ export default function OfficeLegalAgentPanel({db,selected,connected,messages,on
      setReviewed(judged.text);setHumanConfirmed(false);
      setStatus('Qwen melhorou a redação. Confira o texto revisado antes de autorizar o envio.');
     }
-   }finally{stopBlackholeQwen()}
+   }
   });
  }
  function sendLegalAgentReply(){
