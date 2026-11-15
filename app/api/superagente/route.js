@@ -8,6 +8,7 @@ import {formatProcessNumber} from '../../../lib/processos-oficiais.mjs';
 import {configuredLexisMotors,runLexisCascade} from '../../../lib/lexis-motor-cascade.mjs';
 import {predictLmConfig,runPredictLmChat} from '../../../lib/predictlm-gateway.mjs';
 import {qualityGate} from '../../../lib/lexis-predictlm-quality.mjs';
+import {planPredictLmLegalCores} from '../../../lib/predictlm-office-cores.mjs';
 import {validateBlackholePrompt,offlineBlackholeReply,configuredBlackholeProvider,generativeBlackholeReply,requiresPortfolio} from '../../../lib/blackhole-chat.mjs';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 const json=(body,status=200)=>NextResponse.json(body,{status,headers:{'Cache-Control':'no-store,private'}});
@@ -22,6 +23,11 @@ export async function POST(request){
   if(error||!user||!await checkCrmAccess(db,user))return json({ok:false,error:'Conta sem acesso à carteira.'},403);
   const body=await request.json();
   let prompt;try{prompt=validateBlackholePrompt(body?.prompt)}catch(e){return json({ok:false,error:e.message},400)}
+  const core=planPredictLmLegalCores({prompt});
+  // Local PredictLM reasoning signals; they never invoke a paid provider.
+  const predictLmLocalCore={route:core.route,tier:core.tier,
+    requiresHumanReview:core.requiresHumanReview,usesPaidProvider:false,
+    verification:core.verification,policy:core.policy};
   // Consulta sob solicitacao explicita: reutiliza a autorizacao, fontes, cache e
   // backoff da propria rota manual. Nunca pede que o modelo invente publicacoes.
   const official=requestedOfficialQuery(prompt);
@@ -35,7 +41,7 @@ export async function POST(request){
    if(response.status===401||response.status===403||officialResult.code==='crm_access')
     return json({ok:false,error:officialResult.error||'Processo fora da carteira autorizada.'},response.status===401?401:403);
    const report=reportOfficialQuery({number:formatProcessNumber(official.number),source:official.source,result:officialResult});
-   return json({ok:true,...report,model:'consulta-oficial',isGenerativeModel:false,
+   return json({ok:true,...report,predictLmLocalCore,model:'consulta-oficial',isGenerativeModel:false,
     notice:officialResult.ok?report.notice:
      'Consulta judicial nao confirmada: '+String(officialResult.error||'fonte indisponivel').slice(0,180)+'. Nenhum dado foi inventado.'});
   }
@@ -79,16 +85,16 @@ export async function POST(request){
     }
     const gate=qualityGate(answer.reply);
     if(!gate.ok)throw Error('Resposta do modelo bloqueada por inconsistência; revisão necessária.');
-    return json({ok:true,reply:gate.text,model:answer.model,engine:answer.engine,
+    return json({ok:true,reply:gate.text,predictLmLocalCore,model:answer.model,engine:answer.engine,
      isGenerativeModel:true,notice:'Motor utilizado: '+answer.engine+'. Confira fundamentos jurídicos e fontes antes de agir.'});
    }catch(e){
     const fallback=offlineBlackholeReply(prompt);
-    return json({ok:true,reply:fallback,model:'regras-locais',isGenerativeModel:false,
+    return json({ok:true,reply:fallback,predictLmLocalCore,model:'regras-locais',isGenerativeModel:false,
      notice:'O motor remoto não concluiu: '+String(e.message||'indisponível').slice(0,160)+
       '. Foi usado o modo local; nenhuma consulta judicial ou ação externa foi simulada.'});
    }
   }
-  if(!requiresPortfolio(prompt))return json({ok:true,reply:offlineBlackholeReply(prompt),model:'regras-locais',isGenerativeModel:false,notice:'Resposta local. Nenhuma fonte judicial foi consultada.'});
+  if(!requiresPortfolio(prompt))return json({ok:true,reply:offlineBlackholeReply(prompt),predictLmLocalCore,model:'regras-locais',isGenerativeModel:false,notice:'Resposta local. Nenhuma fonte judicial foi consultada.'});
   const number=targetCNJ(prompt),formatted=number?formatProcessNumber(number):null;
   let processQ=db.from('office_cases').select('id,process_number,title,subject,status,client_id').limit(formatted?5:250);
   if(formatted)processQ=processQ.eq('process_number',formatted);
@@ -100,7 +106,7 @@ export async function POST(request){
   // Erro parcial de leitura não é sinônimo de carteira vazia. Para conversa simples,
   // ainda devolve uma resposta transparente sem prender o usuário.
   if(errors.length){
-   return json({ok:true,reply:offlineBlackholeReply(prompt),model:'regras-locais',isGenerativeModel:false,
+   return json({ok:true,reply:offlineBlackholeReply(prompt),predictLmLocalCore,model:'regras-locais',isGenerativeModel:false,
     notice:'Não foi possível ler todos os registros; nenhuma informação da carteira foi presumida.'});
   }
   const allowedNumbers=[...new Set((p.data||[]).map(x=>x.process_number).filter(Boolean))];
@@ -108,9 +114,9 @@ export async function POST(request){
    .select('process_number,source,checked_at,payload')
    .in('process_number',allowedNumbers.slice(0,200)).order('checked_at',{ascending:false}).limit(200):
    {data:[],error:null};
-  if(snaps.error)return json({ok:true,reply:offlineBlackholeReply(prompt),model:'regras-locais',isGenerativeModel:false,notice:'Histórico judicial indisponível. Nenhuma consulta foi presumida.'});
+  if(snaps.error)return json({ok:true,reply:offlineBlackholeReply(prompt),predictLmLocalCore,model:'regras-locais',isGenerativeModel:false,notice:'Histórico judicial indisponível. Nenhuma consulta foi presumida.'});
   const review=buildSuperAgentReview(prompt,{processes:p.data||[],snapshots:snaps.data||[],clients:c.data||[],leads:l.data||[]});
-  return json({ok:true,reply:offlineBlackholeReply(prompt,{review}),review,model:'motor-de-evidencias',isGenerativeModel:false,
+  return json({ok:true,reply:offlineBlackholeReply(prompt,{review}),review,predictLmLocalCore,model:'motor-de-evidencias',isGenerativeModel:false,
    notice:provider?'Modelo externo não utilizado porque não houve consentimento de envio.':'Modelo generativo não configurado; resposta do motor local verificável. Nenhuma ação externa foi executada.'});
  }catch(e){return json({ok:false,error:e.message||'Falha do superagente.'},502)}
 }
