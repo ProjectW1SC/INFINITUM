@@ -10,7 +10,7 @@ test('Office legal route uses PredictLM legal signals and never promotes blocked
  assert.match(route,/predictLmCoreCatalog/);
  assert.match(route,/requiresHumanReview/);
  assert.match(route,/action==='diagnostics'/);
- assert.match(route,/verification:'verified'/);
+ assert.match(route,/verification:checked.predictLmReview.verification/);
 });
 test('UI shows PredictLM core analysis and diagnostics but never adds an unauthorized send endpoint',()=>{
  const panel=file('components/office-legal-agent-panel.jsx');
