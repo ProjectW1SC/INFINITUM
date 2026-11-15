@@ -44,6 +44,12 @@ export async function POST(request){
   const predictlm=body?.allowEngineFallback===true?predictLmConfig(process.env):null;
   const preferredMotor=['auto','colibri','minicpm','minimax','claude','groq','xai','openrouter','gemini','predictlm']
    .includes(body?.preferredMotor)?body.preferredMotor:'auto';
+  // Motor escolhido explicitamente não pode trocar de fornecedor quando
+  // as credenciais Colibri/Modelo não estão configuradas.
+  if(body?.externalAiConsent===true&&body?.allowEngineFallback===true&&
+    preferredMotor!=='auto'&&preferredMotor!=='predictlm'&&
+    !cascaded.some(m=>m.id===preferredMotor))
+    return json({ok:false,error:'Motor '+preferredMotor+' não está configurado e validado neste servidor.'},503);
   // Provedores recebem somente a mensagem/histórico fornecidos explicitamente.
   // Carteira, snapshots, números e nomes não são enviados por esta rota.
   if((provider||cascaded.length||predictlm)&&body?.externalAiConsent===true){
@@ -61,7 +67,7 @@ export async function POST(request){
      ];
      if(preferredMotor!=='auto'&&!cascaded.some(m=>m.id===preferredMotor))
       throw Error('Motor '+preferredMotor+' não configurado no servidor.');
-     try{answer=await runLexisCascade(messages,{motors:ordered,allowFallback:true});}
+     try{answer=await runLexisCascade(messages,{motors:ordered,allowFallback:preferredMotor==='auto'});}
      catch(e){
       if(!predictlm||preferredMotor!=='auto')throw e;
       answer=await runPredictLmChat(messages,{config:predictlm});
