@@ -4,13 +4,14 @@ import {OPENBOT_COWORKERS,planAgentTask,ZAPFAST_SINGLE_SESSION_URL} from '../lib
 import {runBlackholeQwen,stopBlackholeQwen,checkBlackholeQwenSupport} from '../lib/blackhole-local-llm.mjs';
 import {offlineBlackholeReply} from '../lib/blackhole-chat.mjs';
 import {planColibriLocal} from '../lib/colibri-local.mjs';
+import {buildQwenReviewPrompt,assessQwenReview} from '../lib/qwen-review-guard.mjs';
 
 export default function OpenBotWorkbench({db,session}){
  const [prompt,setPrompt]=useState('');
  const [draft,setDraft]=useState('');
  const [source,setSource]=useState('');
  const [engine,setEngine]=useState('colibri-local');
- const [consent,setConsent]=useState(false),[externalAiConsent,setExternalAiConsent]=useState(false);
+ const [consent,setConsent]=useState(false);
  const [busy,setBusy]=useState(false),[notice,setNotice]=useState('');
  const [approved,setApproved]=useState(false),[reviewNote,setReviewNote]=useState('');
  const plan=useMemo(()=>planAgentTask(prompt),[prompt]);
@@ -21,53 +22,41 @@ export default function OpenBotWorkbench({db,session}){
   setBusy(true);setDraft('');setApproved(false);setSource('');setNotice('');
   try{
    let answer,model;
-   if(engine==='colibri-local'){
-    // Local Colibri is a free CPU-side policy router, not the upstream
-    // Colibri remote API. It never downloads Qwen unless explicitly asked.
-    let profile={ok:false,reason:'Motor não solicitado'};
+   if(engine==='colibri-local'||engine==='qwen'){
+    const authoritative=offlineBlackholeReply(userText);
+    answer=authoritative;
+    model='Motor determinístico · sem consulta judicial';
+    let profile={ok:false,reason:'Qwen não autorizado'};
     if(consent)profile=await checkBlackholeQwenSupport();
     const route=planColibriLocal({prompt:userText,allowLocalModel:consent,
       device:{webgpu:profile.ok,memoryGb:Number(navigator?.deviceMemory||0)}});
     if(route.engine==='qwen'){
       try{
-        const out=await runBlackholeQwen(userText,[],p=>setNotice(p.message||p.status),
+        const polishPrompt=buildQwenReviewPrompt(authoritative);
+        const out=await runBlackholeQwen(polishPrompt,[],p=>setNotice(p.message||p.status),
           {consent:true,maxTokens:48,timeoutMs:180000});
-        answer=out.reply;model='Colibri Local / Qwen 0,5B (WebGPU)';
+        const checked=assessQwenReview(authoritative,out.reply);
+        if(checked.ok){
+          answer=checked.text;
+          model='Qwen 0,5B revisou a redação · fatos do motor determinístico';
+          setNotice('Revisão de linguagem feita no navegador. Os fatos continuam sujeitos à consulta oficial e à revisão humana.');
+        }else{
+          model='Motor determinístico · alteração do Qwen rejeitada';
+          setNotice('O Qwen não preservou integralmente fatos, números ou ressalvas ('+checked.reason+'). Rascunho original mantido.');
+        }
       }catch(error){
-        // No online providers, no silent retries or CPU-weight loading.
-        answer=offlineBlackholeReply(userText);model='Colibri Local / regras';
-        setNotice('O Qwen foi interrompido para proteger o aparelho. '+String(error.message||error).slice(0,100));
+        setNotice('Qwen indisponível: '+String(error.message||error).slice(0,150)+'. Rascunho determinístico preservado.');
       }finally{stopBlackholeQwen();}
     }else{
-      answer=offlineBlackholeReply(userText);model='Colibri Local / regras';
+      setNotice('Qwen não carregado: '+(profile.reason||'autorize o modelo e use WebGPU com pelo menos 8 GB de memória')+'. Motor leve utilizado.');
     }
-   }else if(engine==='qwen'){
-    if(!consent)throw Error('Autorize o Qwen 0,5B no navegador. O modelo não roda automaticamente.');
-    const profile=await checkBlackholeQwenSupport();
-    if(!profile.ok)throw Error(profile.reason);
-    try{
-      const out=await runBlackholeQwen(userText,[],p=>setNotice(p.message||p.status),{consent:true,maxTokens:48});
-      answer=out.reply;model=out.model;
-    }finally{stopBlackholeQwen();}
-   }else if(engine==='colibri'){
-    if(!externalAiConsent)throw Error('Autorize expressamente o envio desta pergunta para o Colibri externo.');
-    const {data:{session:current}}=await db.auth.getSession();
-    if(!current?.access_token)throw Error('Sessão do INFINITUM expirada. Entre novamente.');
-    const response=await fetch('/api/superagente',{method:'POST',headers:{
-     'Content-Type':'application/json',Authorization:'Bearer '+current.access_token
-    },body:JSON.stringify({prompt:userText,externalAiConsent:true,allowEngineFallback:true,
-       preferredMotor:'colibri',messages:[]}),cache:'no-store'});
-    const payload=await response.json().catch(()=>({}));
-    if(!response.ok||!payload.ok)throw Error(payload.error||'Colibri indisponível');
-    if(payload.engine!=='colibri')throw Error('Colibri não respondeu. Nenhum outro provedor foi aceito como substituto.');
-    answer=payload.reply;model='Colibri / '+payload.model;
    }else{
     answer=offlineBlackholeReply(userText);model='Regras e evidências locais';
    }
    if(typeof answer!=='string'||!answer.trim())throw Error('Motor não retornou texto verificável.');
    setDraft(answer.slice(0,2600));
    setSource(model);
-   setNotice('Rascunho pronto. A origem do motor é exibida; nenhuma consulta judicial ou envio WhatsApp foi realizado.');
+   if(engine==='deterministico')setNotice('Rascunho determinístico pronto. Nenhuma consulta judicial ou mensagem WhatsApp foi enviada.');
   }catch(error){setNotice('Não foi possível gerar: '+String(error.message||error).slice(0,240))}
   finally{setBusy(false)}
  }
@@ -111,30 +100,25 @@ export default function OpenBotWorkbench({db,session}){
    </label>
    <p className="office-hint">Roteamento: {OPENBOT_COWORKERS.find(x=>x.id===plan.role)?.label} · revisão humana obrigatória.
     A IA não consulta nem envia automaticamente dados confidenciais da carteira.
-    Colibri Local coordena CPU (regras) e cache do disco (pesos); o disco não substitui a RAM.
-    Nenhum modelo inicia sem autorização.</p>
+    A Vercel hospeda a interface, mas não executa o Qwen nem o Colibri nativo. O Qwen é carregado no navegador com sua autorização e só melhora a redação; não confirma fatos judiciais.
+    O disco armazena o modelo em cache, mas não substitui a RAM.</p>
    <label>Motor de inteligência
     <select value={engine} onChange={e=>{setEngine(e.target.value);setDraft('');setApproved(false)}}>
-     <option value="colibri-local">Colibri Local · grátis, sem servidor (modo econômico)</option>
-     <option value="deterministico">Superagente determinístico · sem download</option>
-     <option value="qwen">Qwen2.5 0,5B · local no navegador (WebGPU)</option>
-     <option value="colibri">Colibri externo · exige servidor próprio</option>
+     <option value="colibri-local">Qwen preferencial · revisar respostas (sem servidor)</option>
+     <option value="deterministico">Somente regras determinísticas (sem modelo)</option>
+     <option value="qwen">Revisão Qwen 0,5B · WebGPU (sem servidor)</option>
     </select>
    </label>
    {(engine==='qwen'||engine==='colibri-local')&&<label><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/>
-    Permitir Qwen 0,5B somente para redação, se houver WebGPU e pelo menos 8 GB de RAM. Desmarcado: Colibri Local usa apenas regras leves, sem baixar modelo.
-   </label>}
-   {engine==='colibri'&&<label><input type="checkbox" checked={externalAiConsent}
-     onChange={e=>setExternalAiConsent(e.target.checked)}/>
-    Autorizo enviar somente o texto acima ao servidor Colibri, se estiver configurado. Não usar outro provedor.
+    Autorizar que o Qwen 0,5B revise as respostas, inclusive determinísticas, neste navegador. Exige WebGPU, memória suficiente e download inicial dos pesos para o cache. Desmarcado: usar somente regras, sem baixar modelo.
    </label>}
    <div className="office-action-row"><button type="button" className="inf-btn primary" onClick={generate}
-     disabled={busy||!prompt.trim()||(engine==='qwen'&&!consent)||(engine==='colibri'&&!externalAiConsent)}>
+     disabled={busy||!prompt.trim()}>
      {busy?'Executando...':'Gerar rascunho para revisão'}
    </button>
    {busy&&(engine==='qwen'||engine==='colibri-local')&&<button type="button" className="inf-btn" onClick={()=>{stopBlackholeQwen();setBusy(false)}}>Parar IA local</button>}
    </div>
-   {draft&&<div className="inf-note"><strong>Rascunho · {source}</strong><p style={{whiteSpace:'pre-wrap'}}>{draft}</p>
+   {draft&&<div className="inf-note"><strong>Rascunho para revisão humana · {source}</strong><p style={{whiteSpace:'pre-wrap'}}>{draft}</p>
     <p>NÃO é uma atualização oficial do tribunal. Não pode ser enviada automaticamente.</p>
     <label>Motivo e responsável pela revisão<textarea rows={2} value={reviewNote} maxLength={450}
       onChange={e=>setReviewNote(e.target.value)} placeholder="Descreva o que foi conferido nos autos e a decisão do operador."/></label>
