@@ -31,6 +31,20 @@ function Console({db,session}){
   let active=true;
   getQwenCacheStatus().then(result=>{if(active)setCacheInfo(result)}).catch(()=>{});
   return()=>{active=false};
+ },[]); 
+ useEffect(()=>{
+  if(typeof BroadcastChannel==='undefined')return;
+  const channel=new BroadcastChannel('infinitum-qwen-preinstall');
+  let lastRead=0;
+  channel.onmessage=event=>{
+   if(event.data?.type!=='qwen-preinstall')return;
+   const now=Date.now();
+   if(event.data.status==='complete'||now-lastRead>5000){
+    lastRead=now;
+    getQwenCacheStatus().then(setCacheInfo).catch(()=>{});
+   }
+  };
+  return()=>channel.close();
  },[]);
  const load=useCallback(async()=>{
   const {data,error}=await db.from('office_agent_runs').select('id,task,result,created_at,status').eq('owner_id',session.user.id)
@@ -113,7 +127,10 @@ function Console({db,session}){
        <button type="button" onClick={()=>{chooseEngine('qwen');setTab('nova')}} aria-pressed={engine==='qwen'}><Bot size={18}/> Qwen 0,5B · CPU local grátis</button>
        <button type="button" onClick={()=>{setEngine('online');setTab('nova')}} aria-pressed={engine==='online'}><Layers3 size={18}/> IA online gratuita · OpenRouter</button>
        <p>O Qwen funciona pela CPU/WebAssembly e começa selecionado, sem cota diária de perguntas. Os pesos ficam no cache do navegador após o primeiro download e a CPU utiliza uma thread. Não use links temporários da Vercel: cada domínio tem um cache próprio.</p>
-       <p>Cache local: {cacheInfo?.cachedFiles>0?cacheInfo.cachedFiles+' arquivo(s) do Qwen encontrado(s) neste domínio; o pacote completo será confirmado ao carregar.':'nenhum arquivo identificado neste domínio.'} {' '}
+       <p>Cache local: {cacheInfo?.complete?'Qwen disponível no disco.':
+    cacheInfo?.preinstallChunks>0?'Qwen sendo preparado: '+cacheInfo.preinstallChunks+' de '+cacheInfo.preinstallTotalChunks+' partes salvas. Pode fechar o navegador e continuar depois.':
+    cacheInfo?.cachedFiles>0?cacheInfo.cachedFiles+' arquivos pequenos já presentes; pesos em preparação antecipada.':
+    'o INFINITUM iniciará a preparação automática neste domínio fixo quando houver espaço suficiente.'} {' '}
         {cacheInfo?.persisted?'Armazenamento persistente autorizado.':'Armazenamento persistente depende das permissões do navegador.'}
         {' '}Use sempre <a href="https://agentinfinitum.vercel.app/superagente">agentinfinitum.vercel.app</a> para manter o mesmo cache.
        </p>
