@@ -150,9 +150,10 @@ export default function OpenBotWorkbench({db,session}){
     </label>
     <label>Tamanho da resposta por geração
      <select value={tokenBudget} onChange={e=>setTokenBudget(Number(e.target.value))}>
-      {[128,256,384,512,768,1024].map(n=><option key={n} value={n}>{n} tokens</option>)}
+      {[128,256,384,512,768,1024,1536,2048].map(n=><option key={n} value={n}>{n} tokens</option>)}
      </select>
     </label>
+    <p className="office-hint">Sem cota diária de tokens ou perguntas da IA local. O tamanho é por resposta e pode ser ajustado; respostas longas podem levar mais tempo na CPU.</p>
    </div>
    }
    <div className="office-action-row"><button type="button" className="inf-btn primary" onClick={generate}
