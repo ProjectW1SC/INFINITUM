@@ -194,15 +194,22 @@ export async function POST(request){
   }
   const finish=await db.rpc('finalize_office_agent_reply',{
     p_id:reservationId,p_status:'accepted',p_provider_message_id:transport.messageId||null});
-  // Memory is a small, optional operator note; archive history remains the source.
+  // Keep the operator's handwritten note intact. Do not overwrite the
+  // customer's conversation memory with auto-generated content on every send.
   let memory={error:true};
-  try{memory=await db.from('office_agent_chat_memory').upsert({
-    owner_id:user.id,empresa_id:company,jid,
-    summary:('Último contato sobre o processo '+checked.p.protocolo_ref+
-      '. A resposta foi aceita pelo transporte em '+new Date().toLocaleDateString('pt-BR')+
-      '. Fonte: DataJud, consultada em '+checked.source.sourceAt+'.').slice(0,1000),
-    last_inbound_message_id:messageId,updated_at:date(),expires_at:new Date(Date.now()+60*86400000).toISOString()
-  },{onConflict:'owner_id,jid'});}catch{}
+  try{
+    const prior=await db.from('office_agent_chat_memory').select('summary')
+      .eq('owner_id',user.id).eq('empresa_id',company).eq('jid',jid).limit(1).maybeSingle();
+    if(!prior.error){
+      const summary=prior.data?.summary||('Última resposta processual aceita pelo transporte em '+
+        new Date().toLocaleDateString('pt-BR')+'. Fonte: DataJud.').slice(0,1000);
+      memory=await db.from('office_agent_chat_memory').upsert({
+        owner_id:user.id,empresa_id:company,jid,summary,
+        last_inbound_message_id:messageId,updated_at:date(),
+        expires_at:new Date(Date.now()+60*86400000).toISOString()
+      },{onConflict:'owner_id,jid'});
+    }
+  }catch{}
   return officeJson({ok:true,accepted:true,delivered:false,read:false,messageId:transport.messageId||null,
     reservationId,recorded:!finish.error&&finish.data===true,
     memorySaved:!memory.error,notice:'WA.Auto aceitou a resposta ao cliente autorizado. Isso não confirma entrega ou leitura.'});
