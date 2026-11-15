@@ -1,6 +1,7 @@
 'use client';
 import {useCallback,useEffect,useMemo,useState} from 'react';
 import {archiveChats,archiveMessages,mergeChats,mergeMessages,messageState} from '../lib/wa-auto-archive.mjs';
+import {ZAPFAST_SINGLE_SESSION_URL} from '../lib/openbot-workspace-policy.mjs';
 import {ArrowLeft,CheckCircle2,ChevronDown,ExternalLink,Link2Off,LoaderCircle,MessageCircle,MessageSquare,Plus,RefreshCw,Search,Send,Settings2,ShieldCheck,Smartphone,Users,Wifi,WifiOff,X} from 'lucide-react';
 const stamp=value=>{if(!value)return '';const d=new Date(value);return Number.isNaN(d.getTime())?'':d.toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'})};
 const tiny=value=>String(value||'').trim().slice(0,220);
@@ -178,6 +179,7 @@ export default function WaAutoInbox({db,userId}){
  return <main className="wa-workspace">
   <header className="wa-heading"><div><small>PROJECTW1SC / COMUNICAÇÃO</small><h1>WhatsApp <span>Workspace</span></h1><p>Uma sessão WhatsApp por usuário do CRM. Cada pessoa vincula seu próprio aparelho pelo QR Code; não existe número fixo do escritório.</p></div>
    <div className="wa-heading-actions">
+    <a className="wa-button ghost" href={ZAPFAST_SINGLE_SESSION_URL} target="_blank" rel="noopener noreferrer" title="Abrir sessão já vinculada no ZapFast, sem gerar outro QR Code"><ExternalLink size={15}/> ZapFast · sessão existente</a>
     <span className={'wa-state '+(connected?'online':'offline')}><span className="wa-dot"/>{connected?'WhatsApp conectado':status?.configured?'Desconectado':'Aguardando configuração'}</span>
     <button className="wa-icon-btn" aria-label="Atualizar WhatsApp" type="button" disabled={!!busy} onClick={refresh}><RefreshCw size={17}/></button>
     <button className="wa-button" type="button" onClick={()=>setShowConnect(v=>!v)}><Smartphone size={16}/> Conexão</button>
@@ -198,7 +200,7 @@ export default function WaAutoInbox({db,userId}){
       {connected&&<button type="button" className="wa-button danger" disabled={!!busy} onClick={()=>{if(window.confirm('Desvincular o aparelho desta sessão WhatsApp?'))action('logout')}}><Link2Off size={16}/> Desvincular</button>}
      </div>
      </div>}
-     <div className="wa-disclaimer"><ShieldCheck size={15}/> Não criamos uma segunda sessão no navegador. O WA.Auto mantém o WhatsApp conectado no serviço cloud. Nada é enviado automaticamente.</div>
+     <div className="wa-disclaimer"><ShieldCheck size={15}/> Mesmo número: use somente uma conexão ativa, WA.Auto ou ZapFast. O botão acima abre a sessão do ZapFast existente; não vincule o mesmo número novamente no WA.Auto. Nenhum envio automático foi autorizado.</div>
   </section>}
   <section className="wa-chat-layout" aria-label="Central de conversas">
    <aside className={'wa-contacts '+(current?'wa-mobile-hidden':'')}>
