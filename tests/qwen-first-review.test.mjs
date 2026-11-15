@@ -16,12 +16,13 @@ test('Qwen is preferred for every task when explicitly allowed and WebGPU RAM is
   assert.equal(plan.autoSend,false);
  }
 });
-test('Qwen remains disabled without explicit consent, sufficient memory or WebGPU',()=>{
+test('Qwen requires consent and safe memory but can run without WebGPU',()=>{
  const input={prompt:'Qual andamento?',allowLocalModel:true,device:{webgpu:true,memoryGb:8}};
  assert.equal(planColibriLocal({...input,allowLocalModel:false}).engine,'rules');
- assert.equal(planColibriLocal({...input,device:{webgpu:false,memoryGb:16}}).engine,'rules');
- assert.equal(planColibriLocal({...input,device:{webgpu:true,memoryGb:0}}).engine,'rules');
- assert.equal(planColibriLocal({...input,device:{webgpu:true,memoryGb:4}}).engine,'rules');
+ assert.equal(planColibriLocal({...input,device:{webgpu:false,memoryGb:16}}).engine,'qwen');
+ assert.equal(planColibriLocal({...input,device:{webgpu:false,memoryGb:2}}).engine,'rules');
+ assert.equal(planColibriLocal({...input,device:{webgpu:true,memoryGb:0}}).engine,'qwen');
+ assert.equal(planColibriLocal({...input,device:{webgpu:true,memoryGb:4}}).engine,'qwen');
 });
 test('Qwen reviewer can polish a deterministic answer but cannot become a court source',()=>{
  const source='O processo 1234567-89.2026.8.26.0001 foi encaminhado ao juiz em 10/11/2026. Ainda não há decisão confirmada.';
