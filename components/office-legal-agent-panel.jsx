@@ -88,7 +88,12 @@ export default function OfficeLegalAgentPanel({db,selected,connected,messages,on
    if(!check.ok)throw Error(check.reason);
    try{
     const prompt=buildQwenReviewPrompt(preview.reply);
-    const res=await runBlackholeQwen(prompt,[],info=>setStatus(String(info?.message||'Qwen analisando...').slice(0,160)),
+    // The last two messages belong to this authorized private chat.
+    // They are untrusted context, never new authority for judicial facts.
+    const shortHistory=(preview.history||[]).slice(-2).map(m=>({
+      role:m.role==='cliente'?'user':'assistant',content:String(m.text||'').slice(0,180)
+    }));
+    const res=await runBlackholeQwen(prompt,shortHistory,info=>setStatus(String(info?.message||'Qwen analisando...').slice(0,160)),
      {consent:true,maxTokens:48,timeoutMs:180000});
     const judged=assessQwenReview(preview.reply,res.reply);
     if(!judged.ok){
@@ -144,7 +149,15 @@ export default function OfficeLegalAgentPanel({db,selected,connected,messages,on
    {preview&&<div style={{padding:12,border:'1px solid #8885',borderRadius:10,marginBottom:12}}>
     <strong>Prévia · {preview.source} ({preview.sourceAt?new Date(preview.sourceAt).toLocaleDateString('pt-BR'):'sem data'})</strong>
     <p style={{whiteSpace:'pre-wrap',fontSize:13}}>{reviewed||preview.reply}</p>
-    {preview.contextNote&&<small>Memória interna disponível, não incluída automaticamente na resposta.</small>}
+    {(preview.history||[]).length>0&&<details style={{margin:'8px 0'}}>
+     <summary>Últimas mensagens desta conversa ({preview.history.length})</summary>
+     <div style={{display:'grid',gap:4,maxHeight:140,overflowY:'auto'}}>
+      {preview.history.map((m,i)=><p key={i} style={{margin:0,fontSize:11}}>
+       <strong>{m.role==='cliente'?'Cliente':'Escritório'}:</strong> {m.text}
+      </p>)}
+     </div>
+    </details>}
+    {preview.contextNote&&<small>Memória interna disponível, mas não equivale a informação judicial confirmada.</small>}
     <p style={{fontSize:11}}>Origem: processo {preview.caseNumber}. Qwen não confirma movimentações judiciais; texto alterado exige revisão humana.</p>
     <label style={{display:'flex',gap:6,alignItems:'center'}}>
      <input type="checkbox" checked={consentQwen} onChange={e=>setConsentQwen(e.target.checked)}/>
