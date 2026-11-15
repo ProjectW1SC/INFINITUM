@@ -6,7 +6,8 @@ test('preinstaller runs after CRM loads, only on fixed production origin, withou
  const layout=read('app/layout.jsx'),bootstrap=read('components/qwen-preinstall-bootstrap.jsx');
  assert.match(layout,/QwenPreinstallBootstrap/);
  assert.match(bootstrap,/QWEN_PREINSTALL_ORIGIN/);
- assert.match(bootstrap,/setTimeout\(start,10000\)/);
+ assert.match(bootstrap,/setTimeout\(start,3500\)/);
+ assert.match(bootstrap,/chooseQwenDownloadConcurrency/);
  assert.match(bootstrap,/\/workers\/qwen-installer\.worker\.mjs/);
  assert.doesNotMatch(bootstrap,/runBlackholeQwen\(/);
  assert.doesNotMatch(bootstrap,/pipeline\(/);
@@ -16,8 +17,8 @@ test('Qwen background installer uses verified single-range requests with no whol
  assert.match(installer,/headers:\{Range:'bytes='\+start\+'-'\+end\}/);
  assert.match(installer,/resp\.status!==206/);
  assert.match(installer,/resp\.body\?\.cancel\(\)/);
- assert.match(installer,/await saveQwenChunk\(index,bytes\)/);
- assert.match(installer,/if\(completed\.has\(index\)\)continue/);
+ assert.match(installer,/writeChunk:saveQwenChunk/);
+ assert.match(installer,/await downloadQwenChunks\(/);
  assert.match(installer,/getQwenManifest/);
  assert.doesNotMatch(installer,/pipeline\(|runBlackholeQwen\(/);
 });
