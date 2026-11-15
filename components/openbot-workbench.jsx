@@ -1,7 +1,7 @@
 'use client';
 import {useEffect,useMemo,useState} from 'react';
 import {OPENBOT_COWORKERS,planAgentTask,ZAPFAST_SINGLE_SESSION_URL} from '../lib/openbot-workspace-policy.mjs';
-import {runBlackholeQwen,stopBlackholeQwen,checkBlackholeQwenSupport} from '../lib/blackhole-local-llm.mjs';
+import {runBlackholeQwen,stopBlackholeQwen,checkBlackholeQwenSupport,getQwenCacheStatus} from '../lib/blackhole-local-llm.mjs';
 import {offlineBlackholeReply} from '../lib/blackhole-chat.mjs';
 import {planColibriLocal} from '../lib/colibri-local.mjs';
 import {buildQwenReviewPrompt,assessQwenReview} from '../lib/qwen-review-guard.mjs';
@@ -18,8 +18,14 @@ export default function OpenBotWorkbench({db,session}){
  const [timelineEvents,setTimelineEvents]=useState(''),[timelineSvg,setTimelineSvg]=useState('');
  const [busy,setBusy]=useState(false),[notice,setNotice]=useState('');
  const [approved,setApproved]=useState(false),[reviewNote,setReviewNote]=useState('');
+ const [cacheInfo,setCacheInfo]=useState(null);
  const plan=useMemo(()=>planAgentTask(prompt),[prompt]);
  useEffect(()=>()=>stopBlackholeQwen(),[]);
+ useEffect(()=>{
+  let present=true;
+  getQwenCacheStatus().then(info=>{if(present)setCacheInfo(info)}).catch(()=>{});
+  return()=>{present=false};
+ },[]);
  async function generate(){
   if(!prompt.trim()||busy)return;
   const userText=prompt.trim().slice(0,6000);
@@ -45,6 +51,7 @@ export default function OpenBotWorkbench({db,session}){
           :buildQwenReviewPrompt(authoritative);
         const out=await runBlackholeQwen(generatorPrompt,[],p=>setNotice(p.message||p.status),
           {consent:true,maxTokens:tokenBudget,timeoutMs:600000,preferCpu});
+        getQwenCacheStatus().then(setCacheInfo).catch(()=>{});
         if(isPetition){
           answer=authoritative+'\n\n--- SUGESTÃO DO QWEN (NÃO VERIFICADA — ADVOGADO DEVE CONFERIR) ---\n'+out.reply;
           model='Minuta estruturada + Qwen '+out.device+' · revisão obrigatória';
@@ -131,8 +138,12 @@ export default function OpenBotWorkbench({db,session}){
    <p className="office-hint">Roteamento: {OPENBOT_COWORKERS.find(x=>x.id===plan.role)?.label} · revisão humana obrigatória.
     A IA não consulta nem envia automaticamente dados confidenciais da carteira.
     A Vercel hospeda o aplicativo; Qwen roda na CPU/WebAssembly por padrão, sem WebGPU. O uso de GPU é opcional.
-    Nenhum servidor PredictLM pago é necessário. O modelo é baixado no primeiro uso e pode ser lento na CPU.
-    Os templates de peças e diagramas são gerados por código; nenhum documento é protocolado automaticamente.</p>
+    Nenhum servidor PredictLM pago é necessário. Os pesos ficam salvos no cache deste domínio após o primeiro download;
+    quando o navegador autoriza armazenamento persistente, evita exclusão automática dos arquivos. A CPU usa uma thread.
+    Os templates de peças e diagramas são gerados por código; nenhum documento é protocolado automaticamente.
+    {' '}Cache: {cacheInfo?.cachedFiles>0?cacheInfo.cachedFiles+' arquivo(s) encontrados neste domínio':'ainda sem arquivos identificados'}.
+    {' '}{cacheInfo?.persisted?'Persistência autorizada.':'Persistência sujeita às regras do navegador.'}
+    {' '}Acesse o <a href="https://agentinfinitum.vercel.app/agentes">domínio fixo do INFINITUM</a> para reutilizar os arquivos.</p>
    <label>Motor de inteligência
     <select value={engine} onChange={e=>{setEngine(e.target.value);setDraft('');setApproved(false)}}>
      <option value="colibri-local">Qwen local · CPU padrão, grátis e ativo</option>
