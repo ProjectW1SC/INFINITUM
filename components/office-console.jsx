@@ -12,6 +12,7 @@ import {runBlackholeQwen} from '../lib/blackhole-local-llm.mjs';
 import PrestigeDashboard from './prestige-dashboard';
 import {PrestigeClients,PrestigeCases} from './prestige-office-lists';
 import BlackholeHermesAgent from './blackhole-hermes-agent';
+import OpenBotWorkbench from './openbot-workbench';
 import BlackholeOfficialHearings from './blackhole-official-hearings';
 import {withAuthDeadline} from '../lib/auth-deadline.mjs';
 import {loadOfficeCollections} from '../lib/office-paginated-data.mjs';
@@ -368,6 +369,7 @@ function OfficeUI({area,db,session}){
     <strong style={{marginTop:9}}>{x.name}</strong><p>{x.role}</p>
     <Link className="inf-btn" href={x.id==='mini'?'/agentes#mini-triagem':x.id==='hermes'?'/scanner':x.id==='pecas'||x.id==='pesquisa'?'/pecas':x.id==='tribunais'?'/processos':x.id==='prazos'||x.id==='audiencias'?'/prazos':x.id==='whatsapp'||x.id==='posvenda'?'/whatsapp':x.id==='leads'?'/leads':'/relatorios'}>Abrir área</Link>
    </article>)}</div>
+   <OpenBotWorkbench db={db} session={session}/>
    <BlackholeHermesAgent db={db} session={session}/>
    <div className="inf-panel" id="mini-triagem"><h2>Mini Agent · análise operacional automática</h2><p>O Supabase executa uma triagem diária sem computador aberto, guardando pendências e retornos na trilha de auditoria. Use o botão para uma revisão adicional sob demanda.</p>
     <div className="office-action-row"><button className="inf-btn primary" onClick={runMini} disabled={busy}><Bot size={14}/> Executar triagem</button></div>
