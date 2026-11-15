@@ -4,6 +4,8 @@ import {waAutoOperation} from '../../../../../lib/wa-auto-bridge.mjs';
 import {routeInboundQuestion,buildVerifiedReply,prepareConversationMemory,validateReplyTarget,canReleaseLegalReply} from '../../../../../lib/office-legal-reply.mjs';
 import {assessQwenReview} from '../../../../../lib/qwen-review-guard.mjs';
 import {selectOfficeAgentSkills} from '../../../../../lib/office-agent-skills.mjs';
+import {planPredictLmLegalCores,classifyPredictLmFailure,predictLmCoreCatalog} from '../../../../../lib/predictlm-office-cores.mjs';
+import {predictLmConfig} from '../../../../../lib/predictlm-gateway.mjs';
 import {GET as consultOfficialProcess} from '../../../processos/consulta/route.js';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -57,10 +59,16 @@ async function verifyPrepared(db,user,company,jid,providerId){
  const type=routeInboundQuestion(chat.chosen.content,{jid,fromMe:false});
  if(type==='ignore')invalid('Mensagem fora do assunto processual. O agente não responderá.',422);
  if(type==='human_review')invalid('Assunto sensível ou administrativo: encaminhe para atendimento humano.',409);
+ const predictLmReview=planPredictLmLegalCores({
+   prompt:chat.chosen.content,movement:p.datajud_ultimo_nome,source:'DataJud',
+   officialConfirmed:p.datajud_last_ok,checkedAt:p.datajud_consultado_em
+ });
+ if(predictLmReview.requiresHumanReview)invalid('PredictLM identificou revisão necessária: '+predictLmReview.reason,409);
  const source=buildVerifiedReply({caseRow:p});
  if(!source.ok)invalid('Movimentação oficial não está recente ou exige leitura humana: '+source.reason,409);
  const sentAfter=chat.rows.some(x=>x.is_from_me&&Date.parse(x.timestamp)>=Date.parse(chat.chosen.timestamp));
- return {grant,p,chat,source,sentAfter,skills:selectOfficeAgentSkills({question:chat.chosen.content,action:'preview'})};
+ return {grant,p,chat,source,sentAfter,predictLmReview,
+   skills:selectOfficeAgentSkills({question:chat.chosen.content,action:'preview'})};
 }
 export async function POST(request){
  try{
@@ -72,6 +80,15 @@ export async function POST(request){
   const action=String(data.action||'');
   const jid=String(data.jid||'').trim();
   const jwt=tokenFrom(request);
+  if(action==='diagnostics'){
+   return officeJson({
+     ok:true,engine:'PredictLM · controles determinísticos',
+     modelRunning:false,externalPredictLmConfigured:Boolean(predictLmConfig(process.env)),
+     cores:predictLmCoreCatalog().map(x=>({id:x.id,name:x.name,mode:x.mode})),
+     transport:'WA.Auto existente',sendsAutomatically:false,
+     notice:'Os cores verificam risco, evidência e erros. Não são modelos carregados nem confirmam acesso judicial.'
+   });
+  }
   if(action==='cases'){
    const query=String(data.q||'').trim().replace(/[^\p{L}\p{N} .-]/gu,'').slice(0,60);
    if(query.length<3)invalid('Informe ao menos três caracteres para pesquisar.',400);
@@ -129,8 +146,11 @@ export async function POST(request){
    const query=new Request(endpoint,{method:'GET',headers:{Authorization:'Bearer '+jwt}});
    const resp=await consultOfficialProcess(query);
    const result=await resp.json().catch(()=>null);
-   if(!resp.ok||!result?.ok)invalid('Consulta oficial não concluída: '+String(result?.error||'fonte indisponível').slice(0,150),
-     [400,401,403,409,429].includes(resp.status)?resp.status:503);
+   if(!resp.ok||!result?.ok){
+     const recovery=classifyPredictLmFailure({status:resp.status,message:result?.error||''});
+     invalid('Fonte oficial não confirmada: '+recovery.userMessage,
+       [400,401,403,404,409,429].includes(resp.status)?resp.status:503);
+   }
    return officeJson({ok:true,notice:'Consulta oficial concluída. Confira fonte, data e conteúdo antes do atendimento.',
      processNumber:number,official:{source:result.source||null,checkedAt:result.checkedAt||null,notice:result.notice||null,fromCache:result.fromCache===true,stale:result.stale===true,items:Array.isArray(result.items)?result.items.slice(0,8).map(item=>({codigo:item.codigo||null,nome:String(item.nome||item.descricao||'').slice(0,250),dataHora:item.dataHora||item.data||null})):[]},skills:['judicial-research']});
   }
@@ -145,6 +165,13 @@ export async function POST(request){
       sourceAt:checked.source.sourceAt,reply:checked.source.text,
       history:checked.chat.history,contextNote:memo.error?'':(memo.data?.summary||''),
       skills:checked.skills.map(x=>({id:x.id,title:x.title})),
+      predictLmReview:{
+        tier:checked.predictLmReview.tier,route:checked.predictLmReview.route,
+        verification:checked.predictLmReview.verification,
+        signals:checked.predictLmReview.signals,
+        reason:checked.predictLmReview.reason,
+        requiresHumanReview:checked.predictLmReview.requiresHumanReview
+      },
       notice:checked.sentAfter?'Alguém respondeu após essa mensagem; não envie novamente.':'Prévia com fonte verificada. O envio exige confirmação e limites de segurança.'});
   }
   if(data.confirm_send!==true)invalid('O envio depende de confirmação individual do operador.',400);
