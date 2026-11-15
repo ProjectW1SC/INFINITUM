@@ -14,7 +14,7 @@ export default function OfficeLegalAgentPanel({db,selected,connected,messages,on
  const [preview,setPreview]=useState(null),[reviewed,setReviewed]=useState('');
  const [memory,setMemory]=useState('');
  const [diagnostics,setDiagnostics]=useState(null);
- const [consentQwen,setConsentQwen]=useState(false),[humanConfirmed,setHumanConfirmed]=useState(false);
+ const [consentQwen,setConsentQwen]=useState(true),[humanConfirmed,setHumanConfirmed]=useState(false);
  const jid=selected?.jid||'';
  const valid=/^[1-9][0-9]{9,14}@s\.whatsapp\.net$/.test(jid)&&!selected?.is_group;
  const lastInbound=useMemo(()=>(Array.isArray(messages)?messages:[])
@@ -33,7 +33,7 @@ export default function OfficeLegalAgentPanel({db,selected,connected,messages,on
  },[db,jid]);
  useEffect(()=>{
   setPreview(null);setReviewed('');setCases([]);setChosenCase(null);setHumanConfirmed(false);setMemory('');
-  setStatus('');setIdentityProof('');setConsentQwen(false);setDiagnostics(null);
+  setStatus('');setIdentityProof('');setConsentQwen(true);setDiagnostics(null);
   return()=>stopBlackholeQwen();
  },[jid]);
  async function run(name,operation){
@@ -91,8 +91,8 @@ export default function OfficeLegalAgentPanel({db,selected,connected,messages,on
  }
  async function polishWithQwen(){
   return run('qwen',async()=>{
-   if(!preview?.reply||!consentQwen)throw Error('Autorize a inferência no navegador.');
-   const check=await checkBlackholeQwenSupport();
+   if(!preview?.reply)throw Error('Prepare uma resposta oficial antes da revisão.');
+   const check=await checkBlackholeQwenSupport({preferCpu:true});
    if(!check.ok)throw Error(check.reason);
    try{
     const prompt=buildQwenReviewPrompt(preview.reply);
@@ -102,7 +102,7 @@ export default function OfficeLegalAgentPanel({db,selected,connected,messages,on
       role:m.role==='cliente'?'user':'assistant',content:String(m.text||'').slice(0,180)
     }));
     const res=await runBlackholeQwen(prompt,shortHistory,info=>setStatus(String(info?.message||'Qwen analisando...').slice(0,160)),
-     {consent:true,maxTokens:384,timeoutMs:600000});
+     {consent:true,preferCpu:true,maxTokens:512,timeoutMs:600000});
     const judged=assessQwenReview(preview.reply,res.reply);
     if(!judged.ok){
      setReviewed('');setStatus('Qwen sugeriu alteração que não preservou os fatos ('+judged.reason+'). Prévia oficial mantida.');
@@ -183,10 +183,10 @@ export default function OfficeLegalAgentPanel({db,selected,connected,messages,on
     </p>}
     <label style={{display:'flex',gap:6,alignItems:'center'}}>
      <input type="checkbox" checked={consentQwen} onChange={e=>setConsentQwen(e.target.checked)}/>
-     Permitir Qwen 0,5B local na GPU ou CPU/WebAssembly para melhorar o texto (pesos baixados apenas quando autorizado)
+     Qwen local pela CPU/WebAssembly ativado por padrão para revisar textos. Desmarque se quiser apenas a resposta determinística.
     </label>
     <div style={{display:'flex',gap:8,flexWrap:'wrap',margin:'8px 0'}}>
-     <button type="button" className="wa-button ghost" disabled={!!busy||!consentQwen} onClick={polishWithQwen}>Revisar com Qwen</button>
+     <button type="button" className="wa-button ghost" disabled={!!busy||!consentQwen} onClick={polishWithQwen}>Revisar com Qwen · CPU local</button>
      {reviewed&&<button type="button" className="wa-button ghost" onClick={()=>{setReviewed('');setHumanConfirmed(false)}}>Usar texto oficial</button>}
     </div>
     <label style={{display:'flex',gap:6,alignItems:'center'}}>
