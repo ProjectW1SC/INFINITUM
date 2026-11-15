@@ -10,7 +10,8 @@ test('server exposes authenticated narrow research, preview, consent and idempot
  assert.match(src,/routeInboundQuestion/);
  assert.match(src,/action==='authorize'/);
  assert.match(src,/action==='preview'/);
- assert.match(src,/action==='send'/);
+ assert.match(src,/action!=='preview'&&action!=='send'/);
+ assert.match(src,/data.confirm_send!==true/);
  assert.match(src,/action==='research'/);
  assert.match(src,/office_agent_chat_memory/);
  assert.doesNotMatch(src,/SERVICE_ROLE_KEY|setInterval|sendBulk|Promise\.all\(.*send/);
