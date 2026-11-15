@@ -13,7 +13,8 @@ test('without WebGPU the free Qwen 0.5B selects CPU/WASM instead of refusing',()
 test('missing navigator.deviceMemory is not mistaken for zero RAM',()=>{
  assert.equal(selectLocalQwenBackend({webgpu:false,memoryGb:0}).ok,true);
  assert.equal(selectLocalQwenBackend({webgpu:false,memoryGb:0}).device,'wasm');
- assert.equal(selectLocalQwenBackend({webgpu:true,memoryGb:0}).device,'webgpu');
+ assert.equal(selectLocalQwenBackend({webgpu:true,memoryGb:0}).device,'wasm');
+ assert.equal(selectLocalQwenBackend({webgpu:true,memoryGb:8,preferCpu:false}).device,'webgpu');
 });
 test('low memory warns rather than silently freezing CPU with massive model',()=>{
  const result=selectLocalQwenBackend({webgpu:false,memoryGb:2});
