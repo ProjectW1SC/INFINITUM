@@ -37,3 +37,11 @@ test('cached weights survive logout, and preparation stores no personal client d
  assert.doesNotMatch(store,/supabase|tenant_id|auth\.uid|service_role/i);
  assert.match(store,/indexedDB\.open\(QWEN_PREINSTALL_DB/);
 });
+
+test('when CDN rejects byte ranges, full-file fallback caches to disk off-main-thread rather than disabling Qwen forever',()=>{
+ const installer=read('public/workers/qwen-installer.worker.mjs');
+ assert.match(installer,/cacheWholeModel/);
+ assert.match(installer,/await cache\.put\(MODEL_URL,response\)/);
+ assert.match(installer,/nativeCached/);
+ assert.match(installer,/O fornecedor não disponibilizou retomada por partes/);
+});
