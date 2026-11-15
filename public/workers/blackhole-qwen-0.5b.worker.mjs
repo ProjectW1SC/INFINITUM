@@ -21,22 +21,48 @@ async function initialize(requestId,device='wasm',allowCpuFallback=true){
   emit(requestId,'loading',{message:'Carregando Qwen 0,5B quantizado (q4) em '+(device==='wasm'?'CPU/WebAssembly':'WebGPU')+'...'});
   const memory=Number(self.navigator?.deviceMemory||0);
   if(device==='wasm'&&memory>0&&memory<4)throw Error('Pouca RAM disponível para carregar o modelo em CPU. Use o modo determinístico.');
-  try{
-   const probe=await fetch('https://huggingface.co/onnx-community/Qwen2.5-0.5B-Instruct/resolve/main/config.json',{
-    cache:'force-cache',signal:AbortSignal.timeout(12000)});
-   if(!probe.ok)throw Error('HTTP '+probe.status);
-  }catch(e){throw Error('Arquivos do modelo indisponíveis em Hugging Face: '+String(e?.message||e).slice(0,130));}
   const lib=await loadLibrary(requestId);
+  // CacheStorage belongs to the stable INFINITUM origin, not the login session.
+  // Keep the library's historical cache key to reuse weights downloaded before
+  // this release. WASM binary caching avoids extra startup downloads.
+  lib.env.useBrowserCache=true;
+  lib.env.useWasmCache=true;
+  lib.env.cacheKey='transformers-cache';
   if(lib.env?.backends?.onnx?.wasm){
    lib.env.backends.onnx.wasm.numThreads=1;
   }
+  let lastProgress=0,lastPercent=-1;
   const progress_callback=p=>{
-   if(p?.status==='progress')emit(requestId,'progress',{
-    progress:Math.max(0,Math.min(100,Math.round(p.progress||0))),file:String(p.file||'').slice(0,200)});
-   else if(p?.status==='initiate')emit(requestId,'loading',{message:'Baixando pesos quantizados uma única vez; o navegador pode usar cache local.'});
+   if(p?.status==='progress'){
+    const percent=Math.max(0,Math.min(100,Math.round(p.progress||0)));
+    const now=Date.now();
+    if(percent===100||now-lastProgress>=600&&percent!==lastPercent){
+     lastProgress=now;lastPercent=percent;
+     emit(requestId,'progress',{progress:percent,file:String(p.file||'').slice(0,200)});
+    }
+   }else if(p?.status==='initiate')emit(requestId,'loading',{
+    message:'Abrindo o modelo do cache local ou baixando apenas os arquivos que estiverem faltando...'
+   });
+  };
+  const chooseDtype=async chosen=>{
+   if(chosen!=='wasm')return 'q4';
+   // On this model the CPU q8 ONNX file is approximately 512MB versus
+   // approximately 786MB for q4. Reuse any previously cached q4 weights
+   // instead of downloading a different quantization.
+   try{
+    const cached=await caches.open('transformers-cache');
+    const keys=(await cached.keys()).map(x=>x.url);
+    if(keys.some(x=>x.includes('/onnx/model_quantized.onnx')))return 'q8';
+    if(keys.some(x=>x.includes('/onnx/model_q4.onnx')))return 'q4';
+   }catch{}
+   return 'q8';
   };
   const create=async chosen=>{
-   const model=await lib.pipeline('text-generation',MODEL,{dtype:'q4',device:chosen,progress_callback});
+   const dtype=await chooseDtype(chosen);
+   emit(requestId,'loading',{message:chosen==='wasm'?
+    'Qwen CPU: carregando a versão quantizada mais leve disponível no cache ('+dtype+').':
+    'Qwen GPU: carregando pesos quantizados do cache.'});
+   const model=await lib.pipeline('text-generation',MODEL,{dtype,device:chosen,progress_callback});
    generator=model;deviceUsed=chosen;
    return model;
   };
