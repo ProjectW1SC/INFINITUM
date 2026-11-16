@@ -1,9 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {generateKeyPairSync,sign} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {
- verifyUpdateManifest,versionIsNewer,releaseArtifactUrl,
+ verifyUpdateManifest,validateReleaseMetadata,versionIsNewer,releaseArtifactUrl,
  publicKeyFingerprint
 } from '../desktop/release-trust.mjs';
 const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
@@ -14,25 +13,21 @@ const payload=(version='1.2.3')=>({
   url:'https://github.com/ProjectW1SC/INFINITUM/releases/download/v'+version+'/INFINITUM-KillaAI-Setup-'+version+'-x64.exe',
   size:1000000,sha512:Buffer.alloc(64,7).toString('base64') }
 });
-test('free signed manifest rejects tampering, downgrade, external URLs and an unsigned ZIP from main',()=>{
- const {privateKey,publicKey}=generateKeyPairSync('ed25519');
- const data=payload();
- const raw=Buffer.from(JSON.stringify(data),'utf8');
- const doc={format:'w1-signed-release-v1',payload:raw.toString('base64'),
-   signature:sign(null,raw,privateKey).toString('base64')};
- assert.equal(verifyUpdateManifest(doc,publicKey,'1.0.0').version,'1.2.3');
- assert.throws(()=>verifyUpdateManifest({...doc,signature:Buffer.alloc(64).toString('base64')},publicKey,'1.0.0'),/assinatura|signature/i);
- assert.throws(()=>verifyUpdateManifest({...doc,payload:Buffer.from(JSON.stringify({...data,version:'1.4.0'})).toString('base64')},publicKey,'1.0.0'),/assinatura|signature/i);
- assert.throws(()=>verifyUpdateManifest(doc,publicKey,'1.2.3'),/nova versão|newer/i);
+test('free signed manifest rejects tampering, downgrade and unsigned main ZIP',()=>{
+ const pub=read('desktop/branding/update-public-key.pem');
+ const doc=JSON.parse(read('tests/fixtures/killa-signed-release.json'));
+ assert.equal(verifyUpdateManifest(doc,pub,'1.0.0').version,'1.2.3');
+ assert.throws(()=>verifyUpdateManifest({...doc,signature:Buffer.alloc(64).toString('base64')},pub,'1.0.0'),/assinatura|signature/i);
+ assert.throws(()=>verifyUpdateManifest({...doc,payload:Buffer.from('tampered').toString('base64')},pub,'1.0.0'),/assinatura|signature/i);
+ assert.throws(()=>verifyUpdateManifest(doc,pub,'1.2.3'),/nova versão|newer/i);
  const external=payload();external.asset.url='https://evil.invalid/exe';
- const rawExternal=Buffer.from(JSON.stringify(external),'utf8');
- const docExternal={format:doc.format,payload:rawExternal.toString('base64'),signature:sign(null,rawExternal,privateKey).toString('base64')};
- assert.throws(()=>verifyUpdateManifest(docExternal,publicKey,'1.0.0'),/origem|URL|GitHub/i);
+ assert.throws(()=>validateReleaseMetadata(external,'1.0.0'),/origem|URL|GitHub/i);
  assert.equal(versionIsNewer('1.0.1','1.0.0'),true);
  assert.equal(versionIsNewer('0.9.9','1.0.0'),false);
- assert.equal(releaseArtifactUrl('1.2.3'),data.asset.url);
- assert.match(publicKeyFingerprint(publicKey),/^[a-f0-9]{64}$/);
+ assert.equal(releaseArtifactUrl('1.2.3'),payload().asset.url);
+ assert.match(publicKeyFingerprint(pub),/^[a-f0-9]{64}$/);
 });
+
 test('brand assets: W1 Capital actual logo and original INFINITUM infinity (not Ethereum)',()=>{
  const html=read('desktop/launcher.html');
  assert.match(html,/branding\/w1-wordmark\.svg/);
