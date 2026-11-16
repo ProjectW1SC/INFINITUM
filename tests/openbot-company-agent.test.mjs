@@ -97,3 +97,18 @@ test('feedback becomes a preference only after repeated human confirmations, nev
  assert.ok(p.includes('more_cordial'));
  assert.ok(!p.includes('invented_law'));assert.ok(!p.includes('avoid_repetition'));
 });
+
+test('approved training votes actually change phrasing without changing court facts',()=>{
+ const evidence='Consulta oficial confirmada: documento juntado em 14/11/2026.';
+ const votes=[{tag:'more_natural',approved_count:4,rejected_count:0},
+  {tag:'more_concise',approved_count:3,rejected_count:0},
+  {tag:'mention_sources',approved_count:4,rejected_count:0}];
+ const out=composeOpenBotCaseReply({
+  sourceText:evidence,sourceAt:'2026-11-15T14:00:00Z',
+  movementAt:'2026-11-14',lastReturnAt:'2026-11-01',policy:DEFAULT_OPENBOT_COMPANY_POLICY,learning:votes
+ });
+ assert.match(out.text,/documento juntado em 14\/11\/2026/);
+ assert.match(out.text,/DataJud|fonte oficial/i);
+ assert.doesNotMatch(out.text,/Seguimos à disposição\./);
+ assert.equal(out.requiresHumanReview,true);
+});
