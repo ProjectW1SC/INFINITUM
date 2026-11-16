@@ -56,8 +56,14 @@ jobs:
           node desktop/verify-local-server.mjs
       - name: Instalar Electron e gerar ícone oficial
         run: npm install --prefix desktop --no-audit --no-fund
+      - name: Validar EXE Windows empacotado antes de publicar
+        run: |
+          npm --prefix desktop run pack:win
+          node desktop/verify-packaged-server.mjs
       - name: Gerar EXE local, sem publicar automaticamente
         run: npm --prefix desktop run dist:win
+      - name: Reverificar payload antes de assinar o manifesto
+        run: node desktop/verify-packaged-server.mjs
       - name: Assinar manifesto com chave própria W1 Capital
         run: node desktop/sign-free-release.mjs '${{ inputs.version }}' 'desktop/dist/INFINITUM-KillaAI-Setup-${{ inputs.version }}-x64.exe'
         env:
