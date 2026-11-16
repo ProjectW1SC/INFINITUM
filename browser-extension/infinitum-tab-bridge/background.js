@@ -1,6 +1,16 @@
 import {BRIDGE_CHANNEL,BRIDGE_ORIGIN,GRANT_MS,validateBridgeRequest,canUseGrantedTab,sanitizeWhatsappSnapshot} from './policy.mjs';
 import {inspectCurrentWhatsappTab,insertWhatsappComposerDraft} from './whatsapp-tab.js';
 const GRANT_KEY='infinitum_whatsapp_tab_grant';
+const AUDIT_KEY='infinitum_browser_bridge_actions';
+async function auditAction(action,success){
+ // OpenBot local log: no message content, name, number, JID, token or cookie.
+ try{
+  const state=await chrome.storage.session.get(AUDIT_KEY);
+  const old=Array.isArray(state[AUDIT_KEY])?state[AUDIT_KEY]:[];
+  const entry={action:String(action).slice(0,32),ok:success===true,at:Date.now()};
+  await chrome.storage.session.set({[AUDIT_KEY]:[...old,entry].slice(-20)});
+ }catch{}
+}
 const grantRead=async()=>{const state=await chrome.storage.session.get(GRANT_KEY);return state?.[GRANT_KEY]||null};
 const grantWrite=async grant=>chrome.storage.session.set({[GRANT_KEY]:grant});
 const grantClear=async()=>chrome.storage.session.remove(GRANT_KEY);
@@ -23,17 +33,20 @@ async function getAuthorizedTab(){
 }
 async function processPopup(request){
  if(request.action==='tabs')return {ok:true,tabs:await availableTabs()};
- if(request.action==='revoke'){await grantClear();return {ok:true,authorized:false}};
+ if(request.action==='revoke'){await grantClear();await auditAction('revoke',true);return {ok:true,authorized:false}};
  if(request.action==='grant'){
   const id=Number(request.tabId),list=await availableTabs();
   if(!Number.isInteger(id)||!list.some(t=>t.id===id))return {ok:false,reason:'Aba WhatsApp Web não encontrada. Abra a aba e tente novamente.'};
   const expiresAt=Date.now()+GRANT_MS;
   await grantWrite({tabId:id,expiresAt});
+  await auditAction('grant',true);
   return {ok:true,authorized:true,tabId:id,expiresAt};
  }
  if(request.action==='status'){
   const tab=await getAuthorizedTab(),grant=tab?await grantRead():null;
-  return {ok:true,authorized:!!tab,tabId:tab?.id||null,expiresAt:grant?.expiresAt||null};
+  const actions=await chrome.storage.session.get(AUDIT_KEY);
+  return {ok:true,authorized:!!tab,tabId:tab?.id||null,expiresAt:grant?.expiresAt||null,
+   recentActions:Array.isArray(actions[AUDIT_KEY])?actions[AUDIT_KEY].slice(-5):[]};
  }
  return {ok:false,reason:'Operação não autorizada.'};
 }
@@ -68,6 +81,7 @@ async function processCrm(request,sender){
  }catch{
   response={ok:false,reason:'A aba não está acessível ou o WhatsApp Web mudou sua interface. Nenhuma mensagem foi enviada.'};
  }
+ await auditAction(request.type,response?.ok===true);
  return response;
 }
 chrome.runtime.onMessage.addListener((request,sender,sendResponse)=>{
