@@ -14,8 +14,8 @@ Organização de clientes, processos, atendimentos, captção de leads e rotinas
 **Licença atual:** Proprietária W1 Capital (16/11/2026). Distribuições anteriores sob MIT mantêm os direitos então concedidos. Copyright © 2026 W1 Capital.
 
 [![Licença: Proprietária](https://img.shields.io/badge/licença-Proprietária-741b40)](./LICENSE)
-[![Next.js](https://img.shields.io/badge/Next.js-14+-black)](https://nextjs.org/)
-[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E)](https://supabase.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-15.5.29-black)](https://nextjs.org/)
+[![Supabase](https://img.shields.io/badge/Electron-45.3.2-47848F)](https://supabase.com/)
 
 <br/>
 
@@ -94,18 +94,24 @@ Além das áreas principais: importação de Excel, origem dos registros e perso
 
 ---
 
-## Tecnologias
+## Tecnologias e linguagens
 
-- **Next.js e React** — páginas, componentes e interações
-- **Supabase** — PostgreSQL, Auth, RLS e Storage privado
-- **JavaScript / CSS** — regras operacionais, gráficos e identidade visual
-- **Vercel** — hospedagem e deploy
-- **Excel / Google Sheets** — importação e sincronização (quando autorizadas)
-- **DataJud e DJEN** — consultas processuais públicas (sujeitas à disponibilidade)
-- **WhatsApp bridge** — status, envio e webhook (quando configurados)
+O INFINITUM combina **JavaScript/JSX, HTML5, CSS3, SQL/PostgreSQL, YAML, JSON e PowerShell**. O TypeScript 5.9.3 é usado para checagem estática dos arquivos JavaScript (`allowJs` e `checkJs`); não é correto classificar o código atual como uma aplicação escrita em TypeScript sem fontes `.ts` ou `.tsx` confirmadas.
+
+| Camada | Tecnologia |
+| --- | --- |
+| Aplicação web | Next.js 15.5.29, React 19.1.2, JavaScript/JSX |
+| Servidor e scripts | Node.js 22+ (CI Windows Node 24), JavaScript ESM |
+| Desktop Windows | Electron 45.3.2, electron-builder 26.18.0, NSIS x64 |
+| Atualizações | electron-updater 6.8.11, validação Ed25519/SHA-512 e Authenticode nas releases assinadas |
+| Banco e autenticação | Supabase, PostgreSQL, SQL, Auth, RLS, Storage e Realtime |
+| Automação | GitHub Actions, YAML e PowerShell |
+| Interface | HTML5, CSS3, JSX e JavaScript |
+
+A documentação detalhada de linguagens, versões, arquitetura, scripts e build está em [`docs/TECH-STACK.md`](./docs/TECH-STACK.md).
 
 ---
-
+ 
 ## Executar localmente
 
 Requisitos: **Node.js 22+**, Git e um projeto Supabase configurado.
