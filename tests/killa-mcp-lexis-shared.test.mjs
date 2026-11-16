@@ -21,6 +21,7 @@ test('shared Lexis MCP setup uses company policy API and the Vercel MCP endpoint
  assert.match(page,/https:\/\/agentinfinitum\.vercel\.app\/mcp/);
  assert.match(page,/mcp_allowed_client_ids/);
  assert.match(page,/registro dinâmico e pode gerar um novo ID OAuth a cada novo login/);
+ assert.match(page,/Para manter um ID fixo/);
 });
 
 test('shared Lexis OAuth consent reads the same company allowlist instead of the native-only table',()=>{
