@@ -98,6 +98,17 @@ export default function OpenBotCompanySettings({db,jid='',contactName='',isGroup
       <option value="mention_only">Responder somente quando mencionarem @KillaAI e houver processo autorizado</option>
       <option value="manual_review">Sempre encaminhar para revisão humana</option>
      </select></label>
+    <label style={{display:'flex',gap:8,alignItems:'center'}}>
+     <input type="checkbox" disabled={!canEdit} checked={policy.mcp_enabled===true}
+      onChange={e=>update('mcp_enabled',e.target.checked)}/>
+     Autorizar MCP externo autenticado (ChatGPT, Claude, Grok, OpenCode e FreeBuff)
+    </label>
+    <label style={{display:'flex',gap:8,alignItems:'center'}}>
+     <input type="checkbox" disabled={!canEdit||!policy.mcp_enabled} checked={policy.mcp_group_history_enabled===true}
+      onChange={e=>update('mcp_group_history_enabled',e.target.checked)}/>
+     Permitir leitura de grupos para operadores autenticados pelo MCP (nunca responder no grupo)
+    </label>
+    <small>O MCP é exclusivamente de leitura e preparação de rascunhos. Use OAuth com aprovação individual; nunca compartilhe tokens.</small>
     <label style={{display:'grid',gap:4}}>Nível de permissão do Killa AI
      <select disabled={!canEdit} value={policy.permission_level||'basico'} onChange={e=>update('permission_level',e.target.value)}>
       <option value="basico">Básico</option><option value="medio">Médio</option><option value="alto">Alto</option>
