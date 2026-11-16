@@ -6,6 +6,8 @@ import {buildLexisEvents} from '../lib/lexis-operations.mjs';
 import {summarizeLexisReturns} from '../lib/lexis-return-kpis.mjs';
 import {loadLexisCompanySources} from '../lib/lexis-company-data.mjs';
 import LexisEventDetails from './lexis-event-details';
+import LexisAttendanceBoard from './lexis-attendance-board';
+import {useLexisAttendanceAudit} from './use-lexis-attendance-audit';
 const brazilToday=()=>new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'});
 const iso=(year,month,day)=>new Date(Date.UTC(year,month,day)).toISOString().slice(0,10);
 const fmt=d=>d?String(d).slice(0,10).split('-').reverse().join('/'):'Data não confirmada';
@@ -25,6 +27,7 @@ function Card({item,onSelect}){
 }
 export default function LexisOperations({db,session,area='deadlines'}){
  const [profile,setProfile]=useState(null),[team,setTeam]=useState([]),[sourceRows,setSourceRows]=useState({processes:[],hearings:[],tasks:[],manual:[]});
+ const audit=useLexisAttendanceAudit(db,profile?.empresa_id,session.user.id);
  const [errors,setErrors]=useState([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[search,setSearch]=useState('');
  const [month,setMonth]=useState(brazilToday().slice(0,7)),[filter,setFilter]=useState('todos'),[showPast,setShowPast]=useState(false),[view,setView]=useState('month');
  const [validSources,setValidSources]=useState({processes:false,hearings:false});
@@ -98,7 +101,8 @@ export default function LexisOperations({db,session,area='deadlines'}){
   ['Retornos vencidos',returnKpis.overdue,'vencido'],
   ['Retornos hoje',returnKpis.today,'hoje'],
   ['Próximos 7 dias',returnKpis.next7,'proximos'],
-  ['Já atendidos',returnKpis.attended,'atendido']
+  ['Já atendidos hoje',audit.data?.todayTotal??null,'atendimentos_hoje'],
+  ['Meus atendimentos hoje',audit.data?.personalToday??null,'meus_atendimentos']
  ];
  function chooseFilter(value){if(area==='audiencias'&&value==='vencido')setShowPast(true);if(area==='agenda')setView(value==='todos'?'month':'list');setFilter(value)}
  const save=async e=>{
@@ -134,22 +138,29 @@ export default function LexisOperations({db,session,area='deadlines'}){
  return <main className="inf-studio lx-workspace" data-lexis-operation={area}>
   <header className="inf-heading lx-workspace-heading"><div><small>INFINITUM / INTELIGÊNCIA JURÍDICA</small><h1>{titles[area]||'Agenda operacional'}</h1>
    <p>{subtitles[area]||subtitles.agenda}</p></div>
-   <div className="inf-actions"><button className="inf-btn" type="button" onClick={load} disabled={loading}><RefreshCw size={15}/> Atualizar</button>
+   <div className="inf-actions"><button className="inf-btn" type="button" onClick={()=>{load();audit.refresh()}} disabled={loading}><RefreshCw size={15}/> Atualizar</button>
     {area==='deadlines'?<Link className="inf-btn primary" href="/agenda"><Plus size={15}/> Novo compromisso na Agenda</Link>:<button className="inf-btn primary" type="button" onClick={()=>setEditing(x=>!x)}><Plus size={15}/> Novo compromisso</button>}</div>
   </header>
   {errors.map((e,i)=><p key={i} className="inf-note error" role="status">{e}</p>)}
   {loading&&<p className="inf-note">Consultando registros da organização no Supabase do LexisPredict...</p>}
   <div className="lx-kpis">
-   {displayedMetrics.map(([label,value,status])=>
-    <button key={status} type="button" className={'lx-kpi '+(filter===status?'is-active':'')} onClick={()=>chooseFilter(status)} aria-pressed={filter===status}>
-     <span>{label}</span><strong>{loading?'…':(area==='audiencias'?!validSources.hearings:!validSources.processes)?'—':Number(value).toLocaleString('pt-BR')}</strong><span className={'lx-kpi-mark lx-kpi-mark--'+status}/></button>)}
+   {displayedMetrics.map(([label,value,status])=>{
+    const byAudit=status==='atendimentos_hoje'||status==='meus_atendimentos';
+    const available=byAudit?!!audit.data:area==='audiencias'?validSources.hearings:validSources.processes;
+    const pending=byAudit?audit.loading:loading;
+    return <button key={status} type="button" className={'lx-kpi '+(filter===status?'is-active':'')}
+     onClick={()=>chooseFilter(status)} aria-pressed={filter===status}>
+     <span>{label}</span><strong>{!available?(pending?'…':'—'):Number(value).toLocaleString('pt-BR')}</strong>
+     <span className={'lx-kpi-mark lx-kpi-mark--'+status}/></button>;
+   })}
   </div>
+  {area!=='audiencias'&&<LexisAttendanceBoard audit={audit} userId={session.user.id} compact={area==='agenda'}/>}
   <section className="pr-module lx-panel">
    <div className="pr-module-intro"><span>CARTEIRA DA ORGANIZAÇÃO</span><h2>{area==='audiencias'?'Compromissos judiciais.':area==='agenda'?'Calendário compartilhado.':'Controle de vencimentos.'}</h2>
-    <p>Os KPIs de retorno usam o mesmo cálculo global do Dashboard: último atendimento e próximo retorno, somente processos com CNJ. A Agenda filtra apenas a lista pelo mês.</p></div>
+    <p>Retornos vencidos usam último/próximo retorno e somente processos com CNJ. Atendimentos realizados vêm da auditoria do CRM por dia e operador; são métricas diferentes. A Agenda filtra somente a lista pelo mês.</p></div>
    <div className="lx-toolbar"><label className="lx-search"><Search size={16}/><input aria-label="Buscar nos compromissos" placeholder="Buscar cliente, processo ou responsável" value={search} onChange={e=>setSearch(e.target.value)}/></label>
     <select aria-label="Situação" value={filter} onChange={e=>chooseFilter(e.target.value)}>
-     <option value="todos">Todas as situações</option>{area==='audiencias'?<><option value="futuras">Futuras</option>{Object.entries(statuses).filter(([k])=>k!=='atendido').map(([k,v])=><option key={k} value={k}>{k==='vencido'?'Passadas':v}</option>)}</>:<><option value="retornos">Retornos agendados</option><option value="hoje">Para hoje</option><option value="proximos">Próximos 7 dias</option><option value="atendido">Atendidos</option>{Object.entries(statuses).filter(([k])=>!['atendido','encerrado'].includes(k)).map(([k,v])=><option key={k} value={k}>{v}</option>)}</>}</select>
+     <option value="todos">Todas as situações</option>{area==='audiencias'?<><option value="futuras">Futuras</option>{Object.entries(statuses).filter(([k])=>k!=='atendido').map(([k,v])=><option key={k} value={k}>{k==='vencido'?'Passadas':v}</option>)}</>:<><option value="retornos">Retornos agendados</option><option value="hoje">Para hoje</option><option value="proximos">Próximos 7 dias</option><option value="atendimentos_hoje">Já atendidos hoje · auditoria</option><option value="meus_atendimentos">Meus atendimentos hoje · auditoria</option><option value="atendido">Agendamentos concluídos por data</option>{Object.entries(statuses).filter(([k])=>!['atendido','encerrado'].includes(k)).map(([k,v])=><option key={k} value={k}>{v}</option>)}</>}</select>
     {area==='audiencias'&&<label className="lx-check"><input type="checkbox" checked={showPast} onChange={e=>setShowPast(e.target.checked)}/> Incluir audiências anteriores</label>}
     {area==='agenda'&&<div className="lx-view-toggle"><button className="inf-btn" onClick={()=>setView('month')} aria-pressed={view==='month'}>Mês</button><button className="inf-btn" onClick={()=>setView('list')} aria-pressed={view==='list'}>Lista</button></div>}
    </div>
@@ -164,7 +175,7 @@ export default function LexisOperations({db,session,area='deadlines'}){
      {(groups.get(d)||[]).length>3&&<small>+{groups.get(d).length-3} registros</small>}
     </div>)}
    </div>}
-   {(area!=='agenda'||view==='list')&&<div className="lx-event-list">{listing.slice(0,visibleLimit).map(x=><Card key={x.id} item={x} onSelect={openDetails}/>)}
+   {['atendimentos_hoje','meus_atendimentos'].includes(filter)&&area!=='audiencias'?<p className="inf-note" role="status">Os processos atendidos são contabilizados na auditoria por executor e data, conforme o quadro acima. A lista de retornos mostra agendamentos e não representa os atendimentos registrados.</p>:(area!=='agenda'||view==='list')&&<div className="lx-event-list">{listing.slice(0,visibleLimit).map(x=><Card key={x.id} item={x} onSelect={openDetails}/>)}
     {listing.length>visibleLimit&&<div className="lx-load-more"><span>Mostrando {visibleLimit} de {listing.length} registros</span><button type="button" className="inf-btn" onClick={()=>setVisibleLimit(v=>v+60)}>Carregar mais</button></div>}
     {!loading&&!listing.length&&<p className="pr-list-empty">Nenhum registro corresponde aos filtros. Confira as fontes e altere o período quando necessário.</p>}
    </div>}
