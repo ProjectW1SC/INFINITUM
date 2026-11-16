@@ -301,6 +301,16 @@ async function approveSend(req){
   notice:'Accepted does not prove delivery or reading. Uncertain sends must not auto-retry.'});
 }
 Deno.serve(async(req)=>{
- if(new URL(req.url).pathname.endsWith('/approve'))return approveSend(req);
+ const path=new URL(req.url).pathname;
+ if(path.endsWith('/desktop-config')){
+  if(req.method!=='GET')return new Response(null,{status:405});
+  // Only public project identifiers; this endpoint never serves service_role or private keys.
+  const url=Deno.env.get('SUPABASE_URL')||'',key=Deno.env.get('SUPABASE_ANON_KEY')||'';
+  if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url)||!key)return new Response(null,{status:503});
+  return Response.json({supabaseUrl:url,publishableKey:key,bridgeOrigin:WA_BASE},{
+   headers:{'Cache-Control':'no-store','Access-Control-Allow-Origin':'*','X-Content-Type-Options':'nosniff'}
+  });
+ }
+ if(path.endsWith('/approve'))return approveSend(req);
  return secureMcp(req);
 });

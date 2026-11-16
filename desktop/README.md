@@ -42,3 +42,9 @@ A publicação `supabase_realtime` contém apenas `office_wa_chat_archive`, `off
 O KPI separa aceites `OpenBot` e `MCP` pelo recibo único do WA.Auto. Nenhum atendimento é registrado apenas porque um rascunho foi gerado. As telas atualizam os dados com atraso curto para evitar travamentos em PCs fracos.
 
 **Nota de implantação:** o QR verdadeiro só pode ser mostrado após login do usuário e resposta válida da sua sessão WA.Auto. Este manual não contém QR, token ou código de pareamento. O modelo MCP pode entregar a imagem temporária somente quando o administrador habilita a opção sensível. O servidor MCP permanece hospedado no Supabase, independente dos instaladores.
+
+## Versionamento e continuidade
+
+A versão desktop mantém uma **porta fixa por perfil Windows** e verifica um identificador temporário do servidor antes de abrir o login; isso conserva Supabase Auth e o cache Qwen entre reinicializações. O projeto já publica em Realtime as três tabelas restritas por `owner_id`; outros dados do CRM seguem seus fluxos autenticados existentes e não são enviados globalmente.
+
+O instalador piloto não recebe atualizações de código automaticamente sem assinatura Authenticode verificada. Um build Windows assinado poderá publicar novas versões com atualização segura quando certificados e canal de releases estiverem configurados. O modelo local Qwen funciona sem servidor de inferência, mas seus arquivos requerem download inicial e memória compatível.
