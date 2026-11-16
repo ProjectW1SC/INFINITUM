@@ -34,3 +34,11 @@ O navegador embarcado permite somente a origem local e abre links HTTPS permitid
 Uma chave Supabase publishable/anon é pública por definição e ainda pode ser vista por quem inspeciona o cliente, inclusive EXE. **Não pode ser escondida como segredo.** Segurança real: autenticação individual, RLS, OAuth, segundo fator e backend privado. Rotas Next que antes dependiam de credenciais privadas da Vercel continuam exigindo migração para Supabase Edge ou outro backend protegido; não funcionam automaticamente só por empacotar o código.
 
 **Licença:** consulte [licença proprietária](../LICENSE) para código novo e [NOTICE](../NOTICE.md) para concessões MIT anteriores. Bibliotecas Electron/Next possuem licenças próprias.
+
+## Sincronização de mensagens (configurada no Supabase)
+
+A publicação `supabase_realtime` contém apenas `office_wa_chat_archive`, `office_wa_message_archive` e `killa_mcp_send_intents`, com eventos de inclusão e atualização. Os filtros exigem `owner_id` igual ao usuário autenticado e o cliente não replica mensagens de outros escritórios.
+
+O KPI separa aceites `OpenBot` e `MCP` pelo recibo único do WA.Auto. Nenhum atendimento é registrado apenas porque um rascunho foi gerado. As telas atualizam os dados com atraso curto para evitar travamentos em PCs fracos.
+
+**Nota de implantação:** o QR verdadeiro só pode ser mostrado após login do usuário e resposta válida da sua sessão WA.Auto. Este manual não contém QR, token ou código de pareamento. O modelo MCP pode entregar a imagem temporária somente quando o administrador habilita a opção sensível. O servidor MCP permanece hospedado no Supabase, independente dos instaladores.
