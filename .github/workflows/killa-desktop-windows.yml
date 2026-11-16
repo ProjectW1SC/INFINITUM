@@ -73,7 +73,7 @@ jobs:
       - name: Guardar instalador para instalação
         uses: actions/upload-artifact@v4
         with:
-          name: infinitum-killa-windows-installer
+          name: infinitum-killa-windows-test-UNSIGNED
           path: desktop/dist/*.exe
           if-no-files-found: error
           retention-days: 14
