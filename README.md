@@ -15,7 +15,7 @@ Organização de clientes, processos, atendimentos, captção de leads e rotinas
 
 [![Licença: Proprietária](https://img.shields.io/badge/licença-Proprietária-741b40)](./LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-15.5.29-black)](https://nextjs.org/)
-[![Supabase](https://img.shields.io/badge/Electron-45.3.2-47848F)](https://supabase.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E)](https://supabase.com/)\n[![Electron](https://img.shields.io/badge/Electron-45.3.2-47848F)](https://www.electronjs.org/)
 
 <br/>
 
