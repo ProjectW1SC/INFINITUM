@@ -23,6 +23,23 @@ test('WhatsApp rejects missing JWT and a non-user-scoped upstream service',async
  await assert.rejects(waAutoOperation('status',uidA,{},env,async()=>{throw Error('request not authorized')}),/Sessão do CRM ausente/);
  await assert.rejects(waAutoOperation('status',uidA,{},env,async()=>({ok:true,status:200,text:async()=>JSON.stringify({ok:true,connection:{status:'ready'}})}),'jwt'),/isolamento individual/);
 });
+test('WA.Auto authentication failures preserve their HTTP status without exposing proxy HTML',async()=>{
+ for(const status of [401,403]){
+  await assert.rejects(
+   waAutoOperation('status',uidA,{},env,async()=>({ok:false,status,text:async()=>'<html>secret-proxy-page</html>'}),'valid-user-jwt'),
+   error=>{
+    assert.equal(error.status,status);
+    assert.match(error.message,new RegExp('HTTP '+status));
+    assert.doesNotMatch(error.message,/secret-proxy-page|<html>/);
+    return true;
+   }
+  );
+ }
+ await assert.rejects(
+  waAutoOperation('status',uidA,{},env,async()=>({ok:true,status:200,text:async()=>'<html>wrong route</html>'}),'valid-user-jwt'),
+  error=>error.status===502&&/não JSON/.test(error.message)
+ );
+});
 test('send requires explicit confirmation and never claims delivery',async()=>{
  await assert.rejects(waAutoOperation('send',uidA,{to:'5511999999999',message:'Oi',approved:false},env,async()=>{throw Error('invalid')} ,'jwt'),/Confirme/);
  let count=0;const r=await waAutoOperation('send',uidA,{to:'5511999999999',message:'Ola',approved:true},env,async()=>{count++;return {ok:true,status:201,text:async()=>JSON.stringify({ok:true,userScoped:true,messageId:'id-1'})}},'jwt');
