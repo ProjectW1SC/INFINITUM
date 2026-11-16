@@ -11,7 +11,7 @@ Não use este endereço até confirmar um deploy de produção `READY` que conte
 ## Ativação (administrador)
 
 1. Ative **Supabase Auth → OAuth Server**, com registro dinâmico de clientes e consentimento habilitados. Configure **Authorization Path** como `/oauth/consent`, e confirme o **Site URL** como `https://agentinfinitum.vercel.app`. Mantenha redirecionamentos de login restritos aos domínios reais.
-2. No INFINITUM, em **Killa AI → regras da empresa**, marque **Autorizar MCP externo autenticado**, salve e ajuste o nível para **Médio** (leitura de histórico) ou **Alto** (pesquisa oficial). As opções começam desligadas. Grupos têm uma segunda permissão separada, também desligada.
+2. No **INFINITUM nativo**, acesse `/mcp/setup`, habilite o MCP e salve. É necessário um login administrador do CRM. O nível **Médio** libera a leitura de histórico; a pesquisa por processo no banco nativo ainda exige vínculo WhatsApp–processo comprovado e, até sua implantação, permanece bloqueada. Se o login usa a **carteira LexisPredict compartilhada**, configure o MCP nas regras da empresa. As opções começam desligadas. Grupos têm uma permissão separada, também desligada.
 3. Em cada cliente MCP, informe o endereço acima, complete o OAuth com sua conta no INFINITUM e aprove somente clientes reconhecidos. Cada conta consulta apenas seus dados permitidos pelas regras e RLS.
 4. Verifique o resultado com `killa_status`, `killa_list_chats`, `killa_read_chat` e `killa_preview_reply`. Nenhuma ferramenta faz disparos. Não compartilhe access tokens em conversas ou códigos-fonte.
 
@@ -55,7 +55,7 @@ No **ChatGPT web → Plugins → Add custom MCP server**, se essa função estiv
 
 - `básico`: dados da empresa no status; não concede histórico por MCP.
 - `médio`: permite listar/ler conversas do proprietário autenticado.
-- `alto`: permite solicitar pesquisa oficial vinculada a contato privado autorizado.
+- `alto`: permite solicitar pesquisa oficial vinculada a contato privado autorizado **na carteira LexisPredict compartilhada**. No banco nativo, essa ação permanece bloqueada até existir autorização explícita do vínculo entre contato e processo.
 - `muito alto` e `máximo`: ampliam o fluxo de propostas no INFINITUM, mas **não** concedem envio automático pelo MCP.
 - O MCP não contorna controles de outro atendente, limites de envio, escopos Supabase ou revisão jurídica.
 - Grupos permanecem bloqueados até habilitação específica. **Nunca envie backlogs, logs, prompts ou dados administrativos para clientes.**
@@ -66,4 +66,4 @@ O workbench permite Qwen2.5 0.5B, Qwen3 1.7B e Qwen3 4B (ONNX via Transformers.j
 
 ## Segurança e publicação
 
-Mantenha OAuth Server, RLS, whitelists de redirect, CSP e supervisão de logs sob revisão. A rota de mensagens exige sessão autenticada; não configure token global de serviço no navegador. A CI testa `npm test`, `npm run typecheck`, `npm run test:dom`, `npm run build`. Só considere o MCP **operacional** após deploy `READY`, autorização OAuth ativada e uma conexão real bem-sucedida com cada cliente. Se a Vercel bloquear builds por limite do plano, o código pode estar na `main` sem estar no domínio principal.
+Mantenha OAuth Server, RLS, whitelists de redirect, CSP e supervisão de logs sob revisão. A rota de mensagens exige sessão autenticada; não configure token global de serviço no navegador. No banco nativo, habilite a integração pelo endereço `https://agentinfinitum.vercel.app/mcp/setup` após a publicação. A CI testa `npm test`, `npm run typecheck`, `npm run test:dom`, `npm run build`. Só considere o MCP **operacional** após deploy `READY`, autorização OAuth ativada e uma conexão real bem-sucedida com cada cliente. Se a Vercel bloquear builds por limite do plano, o código pode estar na `main` sem estar no domínio principal.
