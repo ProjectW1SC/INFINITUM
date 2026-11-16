@@ -29,8 +29,10 @@ test('login and recovery retain the same authentication handlers with a shared p
  assert.match(file('app/layout.jsx'),/brand-auth\.css/);
 });
 
-test('MIT license matches the public README and W1 Capital copyright',()=>{
- assert.match(file('LICENSE'),/MIT License[\s\S]*Copyright \(c\) 2026 W1 Capital/);
- assert.match(file('README.md'),/MIT License/);
- assert.doesNotMatch(file('README.md'),/não constitui, por si só, autorização para reprodução/i);
+test('prospective proprietary licence and historic MIT grants match the README',()=>{
+ assert.match(file('LICENSE'),/PROPRIETÁRIO/);
+ assert.match(file('LICENSE'),/MIT/);
+ assert.match(file('LICENSE'),/RETROATIVAMENTE/);
+ assert.match(file('README.md'),/Proprietária/);
+ assert.match(file('NOTICE.md'),/MIT/);
 });

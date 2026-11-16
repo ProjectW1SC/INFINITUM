@@ -30,8 +30,15 @@ REA, BLA, antirea, anti-rea-forge e DeRea ajudam a estudar ameaças, empacotamen
 
 ## Escopo da licença
 
-[LICENSE](./LICENSE) mantém MIT para o código INFINITUM. Marcas, bases privadas, credenciais e direitos de terceiros não são licenciados pelo MIT; veja [NOTICE](./NOTICE.md). A licença de LexisPredict é proprietária e independente.
+[LICENSE](./LICENSE) passa a reger material autoral novo sob termos proprietários, preservando concessões históricas MIT. Marcas, bases privadas, credenciais e direitos de terceiros não são licenciados pelo MIT; veja [NOTICE](./NOTICE.md). A licença de LexisPredict é proprietária e independente.
 
 ## Limitações operacionais
 
 Migrações futuras precisam adicionar políticas restritivas às novas tabelas públicas. Nenhuma ferramenta MCP atualmente permite envio automático. A verificação de envio judicial depende de cadastro de contato/processo, consentimento, revisão humana e confirmação do WhatsApp; sem esses elementos não registrar KPI.
+
+
+## MCP Edge independente e envio com consentimento verificável
+
+A Edge Function `killa-mcp` no projeto Supabase publica OAuth protegido independentemente da Vercel. Apenas client IDs autorizados, MFA/AAL2 e usuários ativos podem usar o MCP. Exibir QR ou código de pareamento ao próprio cliente OAuth exige `mcp_pairing_enabled=true`, configurável por administrador; QR é credencial transitória e deve ser tratado como segredo.
+
+Para envio, a IA apenas cria uma solicitação com validade de cinco minutos. A operação real depende de um funcionário autenticado por sessão normal, com segundo fator, conferência do texto e consentimento explícito na página `/mcp/approve`. O backend usa atualização atômica para impedir envio concorrente duplicado, vincula o identificador WA.Auto e nunca repete automaticamente estados incertos. Nenhum agente recebe chaves privilegiadas. O frontend de confirmação requer implantação independente da Edge Function; enquanto não disponível, solicitações expiram sem envio.
