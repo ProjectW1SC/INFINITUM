@@ -1,0 +1,40 @@
+name: Package INFINITUM WhatsApp Web local bridge
+on:
+  push:
+    paths:
+      - "browser-extension/infinitum-tab-bridge/**"
+      - ".github/workflows/package-whatsapp-tab-bridge.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify extension source
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check browser-extension/infinitum-tab-bridge/background.js
+          node --check browser-extension/infinitum-tab-bridge/policy.mjs
+          node --check browser-extension/infinitum-tab-bridge/whatsapp-tab.js
+          node --check browser-extension/infinitum-tab-bridge/crm-bridge.js
+          node --check browser-extension/infinitum-tab-bridge/popup.js
+          node -e "const f=require('fs');const p='browser-extension/infinitum-tab-bridge/manifest.json';const m=JSON.parse(f.readFileSync(p));if(m.manifest_version!==3||m.permissions.includes('cookies')||m.permissions.includes('debugger'))process.exit(1)"
+      - name: Create unpacked-install ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          cd browser-extension
+          zip -r ../artifacts/INFINITUM-WhatsAppWeb-Bridge.zip infinitum-tab-bridge -x '*.DS_Store' -x '__MACOSX/*'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: INFINITUM-WhatsAppWeb-Bridge
+          path: artifacts/INFINITUM-WhatsAppWeb-Bridge.zip
+          if-no-files-found: error
+          retention-days: 30
