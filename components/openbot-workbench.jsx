@@ -130,6 +130,8 @@ export default function OpenBotWorkbench({db,session}){
    <span className="inf-badge">Apenas revisão</span><strong>{x.label}</strong><p>{x.role}</p>
   </article>)}</div>
   <div className="inf-note" style={{marginTop:15}}>
+   <a href="/mcp/setup" className="inf-btn" style={{display:'inline-block',marginBottom:10}}>Configurar MCP do Killa AI</a>
+   <p>Conecte assistentes externos por OAuth para ler conversas autorizadas e preparar rascunhos. Nenhuma ferramenta MCP envia WhatsApp.</p>
    <strong>WhatsApp com um único QR Code.</strong> Acesse a sessão atual pelo
    {' '}<a href={ZAPFAST_SINGLE_SESSION_URL} target="_blank" rel="noopener noreferrer">ZapFast Web (Cloudflare)</a>
    {' '}ou utilize o WA.Auto já configurado no INFINITUM. Não vincule o mesmo número a dois motores ao mesmo tempo.
