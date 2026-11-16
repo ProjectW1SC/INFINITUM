@@ -28,15 +28,17 @@ Organização de clientes, processos, atendimentos, captção de leads e rotinas
 
 ## Killa AI / OpenBot — MCP por usuário
 
+**MCP sem Vercel:** `https://ulkuhiibeoibbzhqrfya.supabase.co/functions/v1/killa-mcp` (Supabase Edge Function; independente dos builds do frontend).
+
 [Configurar MCP](https://agentinfinitum.vercel.app/mcp/setup) · [Vincular WhatsApp por QR individual](https://agentinfinitum.vercel.app/mcp/pair) · [KPI de atendimentos](https://agentinfinitum.vercel.app/report) · [Manual técnico](./docs/killa-mcp.md) · [Política de segurança](./SECURITY.md)
 
-O servidor MCP remoto exige uma conta do INFINITUM autenticada por OAuth 2.1, MFA/AAL2, habilitação administrativa e `client_id` do aplicativo registrado na lista permitida. Cada usuário só lê seu arquivo de WhatsApp e, na carteira compartilhada Lexis, dados vinculados à empresa autorizada. **As ferramentas MCP não enviam mensagens.** O QR é atualizado na página autenticada e nunca retorna como texto à IA.
+O servidor MCP remoto exige uma conta do INFINITUM autenticada por OAuth 2.1, MFA/AAL2, habilitação administrativa e `client_id` do aplicativo registrado na lista permitida. Cada usuário só lê seu arquivo de WhatsApp e, na carteira compartilhada Lexis, dados vinculados à empresa autorizada. **O envio por MCP exige autorização humana individual com MFA:** a IA solicita, o operador confere no INFINITUM e o Edge Function encaminha ao WA.Auto apenas após confirmação. O QR pode ser exibido como imagem a clientes MCP aprovados exclusivamente quando o administrador ativa essa opção sensível.
 
 A proteção vale também contra clientes modificados: o PostgreSQL possui políticas RLS restritivas para impedir gravação direta com JWT OAuth e não concede escrita anônima às tabelas operacionais existentes. Isso não impede a ação de um administrador do banco nem protege se uma chave secreta privilegiada vazar.
 
 O painel de KPI de atendimento OpenBot apresenta somente mensagens com aceite do provedor e registro verificável. Sem essa fonte, informa que não há contagem confirmada. Não confunde rascunhos com atendimento concluído.
 
-**Licença:** INFINITUM continua MIT e LexisPredict mantém licença proprietária independente. Confira o [NOTICE](./NOTICE.md). A licença MIT não proíbe engenharia reversa e o repositório público permanece inspecionável.
+**Licença:** material novo INFINITUM sob termos proprietários W1 Capital; concessões MIT de versões anteriores seguem válidas. LexisPredict tem licença proprietária independente. Consulte [NOTICE](./NOTICE.md). A exposição do código no GitHub não permite garantir proteção absoluta contra engenharia reversa.
 
 ## Sobre o projeto
 

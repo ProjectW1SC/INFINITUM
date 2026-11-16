@@ -1,8 +1,23 @@
 # Killa AI MCP — integração externa sem Work
 
+## Endpoint principal independente da Vercel
+
+`https://ulkuhiibeoibbzhqrfya.supabase.co/functions/v1/killa-mcp`
+
+Implantação própria **Supabase Edge Function** com OAuth Supabase, autenticação MFA/AAL2, client IDs aprovados, leitura restrita por usuário e RLS. Não depende de publicar alterações no frontend Vercel. **OAuth Server precisa estar habilitado** no projeto Supabase para login de clientes externos. ChatGPT/Claude/Grok/OpenCode/FreeBuff só podem conectar se sua versão/plano suportar servidor MCP remoto e o fluxo OAuth.
+
+As ferramentas do Edge incluem status, histórico privado, estado do WhatsApp, pareamento por **imagem QR** ou **código por telefone**, solicitação de envio, acompanhamento do recibo e KPI de envios aceitos. O QR/código só pode ser mostrado ao assistente quando `mcp_pairing_enabled` está habilitado pelo administrador; isso é sensível e deve ficar desativado quando não estiver em uso.
+
+**Envio seguro:** `killa_request_send` cria uma solicitação de mensagem para conversa privada já arquivada. Um funcionário entra no INFINITUM com seu login normal, segundo fator e abre a página `/mcp/approve?requestId=...` para conferir e confirmar. A Edge Function executa o envio uma vez; resposta sem recibo fica `uncertain` e não será automaticamente reenviada. O navegador de aprovação ainda precisa de uma versão do frontend que contenha essa página. `killa_send_status` consulta o estado; `killa_attendance_kpi` conta somente aceite com ID do provedor.
+
+**NÃO coloque senhas, tokens Supabase, QR ou código de pareamento em mensagens de chat.** A imagem temporária só deve ser exibida em ferramentas seguras, quando explicitamente habilitada.
+
+---
+
+
 Esta documentação explica o servidor MCP remoto de **leitura e rascunhos** do INFINITUM. Ele reaproveita a autenticação Supabase, os motores determinísticos, o PredictLM e a pesquisa DJEN/DataJud já existente. **O MCP não envia mensagens WhatsApp.** Para mensagens ao cliente, o operador precisa abrir o INFINITUM e confirmar cada envio individualmente.
 
-## Endereço estável
+## Endereço legado do frontend (opcional)
 
 `https://agentinfinitum.vercel.app/mcp` — transporte MCP Streamable HTTP, sem sessão do servidor, métodos `initialize`, `tools/list`, `tools/call`, `ping`. O servidor não usa Colibri API, Needle ou um serviço separado de inferência.
 
