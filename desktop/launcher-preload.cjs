@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('killaLauncher',Object.freeze({
  launch:()=>invoke('launcher:launch'),
  install:()=>invoke('launcher:install-update'),
  releases:()=>invoke('launcher:open-downloads'),
+ setAutoUpdate:enabled=>ipcRenderer.invoke('launcher:set-auto-update',enabled===true),
  onState:listener=>{
   if(typeof listener!=='function')return ()=>{};
   const fn=(_event,state)=>listener(state);

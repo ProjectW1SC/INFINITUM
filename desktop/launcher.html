@@ -10,13 +10,15 @@
 <body>
 <div class="window">
 <header>
-  <div class="logo"><span class="logo-ball" aria-hidden="true"></span><span>W1 CAPITAL <small>APLICATIVOS</small></span></div>
+  <div class="logo"><img class="w1-brand" src="./branding/w1-wordmark.svg" alt="W1 Capital — Estratégia e Tecnologia" width="230" height="52"/><span class="shop-label">CENTRAL DE APLICATIVOS</span></div>
   <span class="badge"><span aria-hidden="true">●</span> Canal seguro</span>
 </header>
 <main class="layout">
 <section class="product">
   <div class="eyebrow">INSTALADO NO SEU COMPUTADOR</div>
-  <div class="art" aria-hidden="true"><div class="orb"></div><div class="halo"></div></div>
+  <div class="art"><div class="inf-mark" role="img" aria-label="Símbolo original de infinito do INFINITUM">
+ <img src="./branding/infinitum-symbol.svg" width="216" height="100" alt="INFINITUM — símbolo próprio de infinito"/>
+ </div></div>
   <div class="label">INFINITUM <strong>KILLA AI</strong></div>
   <h1>Seu escritório.<br/>Sua inteligência.</h1>
   <p>Inicie o CRM direto no Windows. Suas conversas e processos permanecem vinculados ao login individual e ao Supabase.</p>
@@ -27,7 +29,7 @@
 <section class="update-panel" aria-label="Gerenciador de atualizações">
   <div class="section-top"><h2>Central de atualizações</h2><span class="chip">WINDOWS</span></div>
   <div class="app">
-    <div class="app-icon">K</div><div><h3>INFINITUM · Killa AI</h3><span id="installed-version">Versão instalada: ...</span></div>
+    <div class="app-icon"><img src="./branding/infinitum-symbol.svg" alt="INFINITUM" width="44" height="28"/></div><div><h3>INFINITUM · Killa AI</h3><span id="installed-version">Versão instalada: ...</span></div>
   </div>
   <div class="status">
     <span class="label-small">ESTADO DO APLICATIVO</span>
@@ -43,9 +45,10 @@
     <button id="launch" class="primary">Abrir INFINITUM</button>
     <button id="check" class="secondary">Verificar atualizações</button>
     <button id="releases" class="link">Ver versões publicadas</button>
+    <label class="automatic"><input type="checkbox" id="auto-updates" checked/> Atualizar automaticamente somente versões aprovadas pela W1 Capital</label>
   </div>
   <div class="security"><span class="shield">◆</span>
-    <p><strong>Distribuição protegida.</strong> Atualizações do programa somente por instaladores assinados, verificados pelo Windows e publicados no GitHub Releases. O launcher não executa códigos recebidos por chat, WhatsApp ou Supabase.</p>
+    <p><strong>Distribuição protegida.</strong> Atualizações gratuitas: manifesto Ed25519 da W1 Capital e hash SHA-512 verificados antes de executar. Uma assinatura reconhecida pelo Windows é opcional e evita alguns avisos do SmartScreen. O launcher não executa códigos recebidos por chat, WhatsApp ou Supabase.</p>
   </div>
 </section>
 </main>

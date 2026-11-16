@@ -6,9 +6,9 @@
   "description": "INFINITUM Killa AI local Windows with Supabase owner-scoped realtime and remote MCP",
   "main": "main.mjs",
   "scripts": {
-    "dist:win": "electron-builder --win nsis --x64 --publish never",
-    "pack:win": "electron-builder --win dir --x64 --publish never",
-    "dist:release": "electron-builder --win nsis --x64 --publish always"
+    "dist:win": "node generate-windows-icon.mjs && electron-builder --win nsis --x64 --publish never",
+    "pack:win": "node generate-windows-icon.mjs && electron-builder --win dir --x64 --publish never",
+    "dist:release": "node generate-windows-icon.mjs && electron-builder --win nsis --x64 --publish always"
   },
   "dependencies": {
     "electron-updater": "6.8.11"
@@ -32,7 +32,11 @@
       "launcher-preload.cjs",
       "launcher.html",
       "launcher.css",
-      "launcher-ui.js"
+      "launcher-ui.js",
+      "branding/**/*",
+      "generate-windows-icon.mjs",
+      "release-trust.mjs",
+      "free-update-client.mjs"
     ],
     "extraResources": [
       {
@@ -57,7 +61,8 @@
         "nsis"
       ],
       "artifactName": "INFINITUM-KillaAI-Setup-${version}-${arch}.exe",
-      "verifyUpdateCodeSignature": true
+      "verifyUpdateCodeSignature": true,
+      "icon": "branding/infinitum-app.ico"
     },
     "nsis": {
       "oneClick": false,

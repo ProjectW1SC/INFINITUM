@@ -12,7 +12,7 @@ export function safeLauncherSnapshot(input={}){
   phase,version:VERSION.test(String(input?.version||''))?String(input.version):'0.0.0',
   updateVersion:VERSION.test(String(input?.updateVersion||''))?String(input.updateVersion):'',
   percent:normalizeUpdateProgress({percent:input?.percent}),
-  signed:input?.signed===true,downloaded:input?.downloaded===true,
+  signed:input?.signed===true,downloaded:input?.downloaded===true,autoInstall:input?.autoInstall!==false,
   message:typeof input?.message==='string'?input.message.replace(/[<>]/g,'').slice(0,240):''
  });
 }

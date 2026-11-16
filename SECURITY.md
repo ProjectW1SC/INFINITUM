@@ -42,3 +42,8 @@ Migrações futuras precisam adicionar políticas restritivas às novas tabelas 
 A Edge Function `killa-mcp` no projeto Supabase publica OAuth protegido independentemente da Vercel. Apenas client IDs autorizados, MFA/AAL2 e usuários ativos podem usar o MCP. Exibir QR ou código de pareamento ao próprio cliente OAuth exige `mcp_pairing_enabled=true`, configurável por administrador; QR é credencial transitória e deve ser tratado como segredo.
 
 Para envio, a IA apenas cria uma solicitação com validade de cinco minutos. A operação real depende de um funcionário autenticado por sessão normal, com segundo fator, conferência do texto e consentimento explícito na página `/mcp/approve`. O backend usa atualização atômica para impedir envio concorrente duplicado, vincula o identificador WA.Auto e nunca repete automaticamente estados incertos. Nenhum agente recebe chaves privilegiadas. O frontend de confirmação requer implantação independente da Edge Function; enquanto não disponível, solicitações expiram sem envio.
+
+
+## Canal gratuito de atualização da central W1 Capital
+
+O launcher empacota os logos oficiais, valida a chave Ed25519 da W1 Capital embutida no EXE, manifesto de versão específico, URL oficial GitHub Releases e hash SHA-512 antes de executar um instalador. Não executa ZIPs da main, scripts remotos, mensagens de clientes ou instruções de LLM como atualizações. A chave privada deve existir somente no ambiente protegido de release GitHub Actions com revisão, jamais no Supabase, frontend, banco ou EXE. O instalador autêntico pode ainda receber alertas do Windows SmartScreen porque a assinatura Ed25519 própria não é Authenticode reconhecido pelo sistema. Não contornar os avisos do Windows nem importar certificados raiz automaticamente.

@@ -4,6 +4,8 @@ import {createServer} from 'node:net';
 import {join} from 'node:path';
 import {existsSync,readFileSync,mkdirSync,writeFileSync} from 'node:fs';
 import {randomBytes} from 'node:crypto';
+import {pathToFileURL} from 'node:url';
+import {createFreeUpdater} from './free-update-client.mjs';
 import {setTimeout as sleep} from 'node:timers/promises';
 import {validateDesktopConfig,safeStandaloneEnvironment,isLocalAppNavigation,
  isSafeExternalNavigation,shouldRunSignedUpdater} from './runtime-policy.mjs';
@@ -11,8 +13,9 @@ import {safeLauncherSnapshot,normalizeUpdateProgress,canInstallSignedUpdate,isSi
 
 const CONFIG_ENDPOINT='https://ulkuhiibeoibbzhqrfya.supabase.co/functions/v1/killa-mcp/desktop-config';
 let nextProcess=null,port=0,desktopConfig=null,window=null,launcherWindow=null,shuttingDown=false,localNonce='';
-let updater=null,updateCheck=null,appOpen=null;
-let launcherState=safeLauncherSnapshot({phase:'loading',version:app.getVersion(),message:'Inicializando canal de atualizações seguro.',signed:false});
+let updater=null,freeUpdater=null,updateCheck=null,appOpen=null;
+let autoUpdateEnabled=true;
+let launcherState=safeLauncherSnapshot({phase:'loading',version:app.getVersion(),message:'Inicializando canal de atualizações seguro.',signed:false,autoInstall:true});
 if(!app.requestSingleInstanceLock())app.quit();
 else app.on('second-instance',()=>{if(window){window.show();window.focus()}});
 app.setAppUserModelId('br.com.w1capital.infinitum.killa');
@@ -94,9 +97,42 @@ function pushLauncher(changes){
 function isTrustedLauncherEvent(event){
  return !!(launcherWindow&&!launcherWindow.isDestroyed()&&
   event?.sender===launcherWindow.webContents&&
-  launcherWindow.webContents.getURL().startsWith('file://'));
+  event?.senderFrame?.url===pathToFileURL(join(app.getAppPath(),'launcher.html')).href);
+}
+async function applyVerifiedUpdate(){
+ if(!canInstallSignedUpdate(launcherState))return pushLauncher({
+  message:'Nenhuma atualização autenticada disponível para instalação.'
+ });
+ if(freeUpdater){
+  pushLauncher({phase:'installing',message:'Executando instalador verificado por assinatura Ed25519 da W1 Capital.'});
+  try{
+   await freeUpdater.install();
+   app.quit();
+  }catch{
+   pushLauncher({phase:'error',downloaded:false,
+    message:'A integridade do pacote falhou ou o Windows bloqueou a instalação. Nenhum arquivo novo foi autorizado.'});
+  }
+  return launcherState;
+ }
+ if(!updater)return pushLauncher({phase:'unsigned',message:'Atualizador não configurado.'});
+ pushLauncher({phase:'installing',message:'Instalando atualização Windows assinada e validada.'});
+ try{updater.quitAndInstall(false,true)}
+ catch{pushLauncher({phase:'error',message:'Instalador bloqueado; versão anterior preservada.'})}
+ return launcherState;
 }
 async function checkForSignedUpdates(){
+ if(freeUpdater){
+  if(updateCheck)return updateCheck;
+  updateCheck=freeUpdater.check().then(async result=>{
+   if(result.status==='downloaded'&&autoUpdateEnabled&&!window)
+    await applyVerifiedUpdate();
+  }).catch(()=>{
+   pushLauncher({phase:'offline',downloaded:false,
+    message:'Não foi possível autenticar uma release W1 Capital. Nenhum programa foi executado. Você pode abrir a versão instalada.'});
+  }).finally(()=>{updateCheck=null});
+  await updateCheck;
+  return launcherState;
+ }
  if(!updater||!launcherState.signed)return pushLauncher({
   phase:'unsigned',message:'Esta instalação piloto não recebe executáveis automaticamente. Abra apenas releases assinados.'
  });
@@ -109,6 +145,30 @@ async function checkForSignedUpdates(){
  return launcherState;
 }
 async function setupSignedUpdater(){
+ // Two independent trust paths:
+ // 1) Free W1 Ed25519 signatures pinned in the executable plus SHA-512;
+ // 2) Optional Windows Authenticode, only if a trusted publisher is configured.
+ // Never check arbitrary main.zip or run a downloaded script.
+ const markerFile=join(process.resourcesPath,'signed-updates.json');
+ let freeConfig=null;
+ try{freeConfig=JSON.parse(readFileSync(markerFile,'utf8'))}catch{}
+ if(app.isPackaged&&process.platform==='win32'&&
+    freeConfig?.enabled===true&&freeConfig.source==='w1-ed25519-github-release'){
+  try{
+   const pub=readFileSync(join(app.getAppPath(),'branding','update-public-key.pem'),'utf8');
+   freeUpdater=createFreeUpdater({app,publicKey:pub,onState:pushLauncher});
+   pushLauncher({phase:'ready',signed:true,autoInstall:autoUpdateEnabled,
+    message:'Canal gratuito W1 Capital: verificações Ed25519 e SHA-512 ativadas.'});
+   const interval=setInterval(()=>{void checkForSignedUpdates()},6*60*60*1000);
+   interval.unref?.();
+   await checkForSignedUpdates();
+  }catch{
+   freeUpdater=null;
+   pushLauncher({phase:'unsigned',signed:false,
+    message:'A identidade criptográfica de atualização não foi validada. Atualizações de EXE bloqueadas.'});
+  }
+  return;
+ }
  // A writable marker by itself cannot grant updater access. The installed
  // app-update.yml must also contain the publisher's Authenticode identity.
  const marker=join(process.resourcesPath,'signed-updates.json');
@@ -198,13 +258,17 @@ ipcMain.handle('launcher:open-downloads',async event=>{
 });
 ipcMain.handle('launcher:install-update',event=>{
  expectTrustedLauncher(event);
- if(!canInstallSignedUpdate(launcherState)||!updater)return pushLauncher({
-  message:'Nenhuma atualização assinada e validada está disponível para instalar.'
- });
- pushLauncher({phase:'installing',message:'Aplicando a atualização autorizada. O Windows validará a assinatura antes de executar.'});
- try{updater.quitAndInstall(false,true)}catch{
-  pushLauncher({phase:'error',message:'Não foi possível iniciar a instalação. A versão atual foi preservada.'});
- }
+ return applyVerifiedUpdate();
+});
+ipcMain.handle('launcher:set-auto-update',(event,value)=>{
+ expectTrustedLauncher(event);
+ if(typeof value!=='boolean')throw Error('Configuração de atualização inválida.');
+ autoUpdateEnabled=value;
+ const prefs=join(app.getPath('userData'),'killa-launcher-preferences.json');
+ writeFileSync(prefs,JSON.stringify({autoInstall:value})+'\n',{mode:0o600});
+ pushLauncher({autoInstall:value,message:value
+  ?'Instalação automática ativada apenas para releases W1 Capital autenticadas.'
+  :'Instalação automática desligada; você pode atualizar manualmente no launcher.'});
  return launcherState;
 });
 ipcMain.handle('launcher:launch',async event=>{
@@ -264,9 +328,22 @@ ipcMain.on('killa:public-config',event=>{
   {supabaseUrl:desktopConfig.supabaseUrl,publishableKey:desktopConfig.publishableKey}:null;
 });
 app.on('before-quit',cleanup);
-app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit()});
+app.on('window-all-closed',()=>{
+ if(process.platform==='darwin')return;
+ if(autoUpdateEnabled&&freeUpdater&&launcherState.phase==='downloaded'){
+  // Keep main process alive until the authenticated installer is launched.
+  void applyVerifiedUpdate().finally(()=>app.quit());
+  return;
+ }
+ app.quit();
+});
 app.whenReady().then(async()=>{
  Menu.setApplicationMenu(null);
+ try{
+  const prefs=JSON.parse(readFileSync(join(app.getPath('userData'),'killa-launcher-preferences.json'),'utf8'));
+  autoUpdateEnabled=prefs?.autoInstall!==false;
+ }catch{autoUpdateEnabled=true}
+ pushLauncher({autoInstall:autoUpdateEnabled});
  try{
   await openLauncherWindow();
   void setupSignedUpdater();

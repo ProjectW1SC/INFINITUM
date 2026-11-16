@@ -1,0 +1,80 @@
+name: W1 Capital — publicar atualização GRATUITA Ed25519
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versão estável x.y.z aprovada pela W1 Capital'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  approved-free-release:
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      github.repository == 'ProjectW1SC/INFINITUM' &&
+      (github.actor == 'ProjectW1SC' || github.actor == 'W1CAPITAL')
+    environment: desktop-production
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validar versão e impedir sobreposição de release
+        shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ($env:VERSION -notmatch '^\d+\.\d+\.\d+$') { throw 'Versão estável inválida' }
+          if ($env:GITHUB_REF -ne 'refs/heads/main') { throw 'Só a main pode publicar' }
+          gh release view ('v'+$env:VERSION) --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) { throw 'Versão já publicada: nunca sobrescreva uma release' }
+          $global:LASTEXITCODE=0
+      - name: Preparar release somente com chave Ed25519 autorizada
+        run: node desktop/prepare-free-release.mjs '${{ inputs.version }}'
+        env:
+          KILLA_ED25519_PRIVATE_KEY_B64: ${{ secrets.KILLA_ED25519_PRIVATE_KEY_B64 }}
+      - name: Instalar dependências do CRM
+        run: npm install --no-audit --no-fund
+      - name: Verificação completa
+        run: |
+          npm test
+          npm run typecheck
+      - name: Compilar Next standalone local
+        run: npm run build
+        env:
+          KILLA_DESKTOP_STANDALONE: '1'
+      - name: Validar servidor embutido
+        run: |
+          node desktop/stage-standalone.mjs
+          node desktop/verify-local-server.mjs
+      - name: Instalar Electron e gerar ícone oficial
+        run: npm install --prefix desktop --no-audit --no-fund
+      - name: Gerar EXE local, sem publicar automaticamente
+        run: npm --prefix desktop run dist:win
+      - name: Assinar manifesto com chave própria W1 Capital
+        run: node desktop/sign-free-release.mjs '${{ inputs.version }}' 'desktop/dist/INFINITUM-KillaAI-Setup-${{ inputs.version }}-x64.exe'
+        env:
+          KILLA_ED25519_PRIVATE_KEY_B64: ${{ secrets.KILLA_ED25519_PRIVATE_KEY_B64 }}
+      - name: Publicar SOMENTE versão aprovada, uma vez
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          gh release create ('v'+$env:VERSION) --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --latest --title ('INFINITUM Killa AI v'+$env:VERSION) --notes 'Versão aprovada pela W1 Capital; manifesto Ed25519 e hash SHA-512 verificados pelo launcher.' ('desktop/dist/INFINITUM-KillaAI-Setup-'+$env:VERSION+'-x64.exe') 'desktop/dist/killa-update.json'
+      - name: Arquivar instalador e manifesto para auditoria
+        uses: actions/upload-artifact@v4
+        with:
+          name: killa-approved-release-${{ inputs.version }}
+          path: |
+            desktop/dist/INFINITUM-KillaAI-Setup-${{ inputs.version }}-x64.exe
+            desktop/dist/killa-update.json
+          if-no-files-found: error
+          retention-days: 30

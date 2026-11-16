@@ -25,7 +25,7 @@ npm install --prefix desktop
 npm --prefix desktop run dist:win
 \`\`\`
 
-Este protótipo pode ser distribuído como **instalador não assinado** nos testes. O Windows SmartScreen pode avisar. Para liberar atualizações automáticas confiáveis a todos os usuários, é obrigatório assinar o EXE com certificado confiável, configurar o publicador no Electron Builder, publicar versões no GitHub Releases e habilitar \`desktop/signed-updates.json\` **somente no pipeline de assinatura verificada**. Sem isso, a atualização de código deve ser distribuída manualmente; alterações de dados e regras no Supabase chegam sem reinstalação.
+Este protótipo pode ser distribuído como **instalador não assinado** nos testes. O Windows SmartScreen pode avisar. O canal gratuito Ed25519 agora permite atualizações autenticadas sem certificado Windows, após a primeira release oficial. O Authenticode reconhecido pelo Windows é opcional e não deve ser confundido com a assinatura própria do launcher.
 
 ## Segurança e limites
 
@@ -68,3 +68,30 @@ O workflow de publicação só aceita execução pela `main`, com certificado Wi
 Para instalar em outro computador: baixe uma versão **assinada** em GitHub Releases e execute o instalador. Depois disso, o launcher baixa as versões futuras assinadas e oferece a instalação sem usar a Vercel. O Windows pode exigir consentimento UAC conforme a forma de instalação e a política do PC.
 
 Atualizações dos **dados e regras armazenados no Supabase** continuam em tempo real, por usuário, independentemente de o executável ter uma nova versão. Mudanças de código do CRM e do OpenBot precisam de um novo pacote assinado; não são importadas automaticamente do banco para dentro do EXE.
+
+## Loja de aplicativos W1 Capital e atualização gratuita
+
+O Killa Launcher usa **logotipo W1 Capital vinho/prata** retirado do site oficial da W1 e **símbolo do infinito do INFINITUM**, separado do Ethereum. O arquivo .ico do EXE é gerado localmente pelo script generate-windows-icon.mjs, sem imagens de terceiros.
+
+**Distribuição automática gratuita:** somente GitHub Releases aprovadas manualmente, com manifesto Ed25519 assinado pela W1 Capital e hash SHA-512 do instalador. O launcher guarda apenas a chave pública e verifica a assinatura, os bytes, a URL oficial, a versão superior e o tamanho máximo antes de instalar. Por padrão, ele baixa e aplica atualizações autenticadas quando o CRM não está aberto; o funcionário pode desligar a opção no launcher.
+
+**Proibido:** executar arquivos ZIP da branch main como atualizações, aceitar redirecionamentos a servidores externos, executar scripts enviados por clientes/LLMs ou baixar código JS remoto para substituir o aplicativo.
+
+### Primeira publicação oficial (ação única necessária)
+
+1. Abra GitHub do INFINITUM → Settings → Environments e crie/proteja **desktop-production**, restringindo a main e exigindo aprovação de revisores confiáveis.
+2. Dentro de **desktop-production → Environment secrets**, cadastre o segredo **KILLA_ED25519_PRIVATE_KEY_B64**, contendo em Base64 o conteúdo integral do PEM da chave privada W1. Nunca publique esse PEM no Git, no ChatGPT, no WhatsApp ou no EXE. O public key fingerprint já embutido no cliente é 64226fb4ce21332768a8779be5548acdddd4933f0be48cfc35751884ca481d3c.
+3. Em GitHub → Actions → **W1 Capital — publicar atualização GRATUITA Ed25519**, selecione a main, digite uma nova versão (por exemplo 0.1.1), execute e aprove a publicação. O workflow recompila, testa, assina o manifesto e envia o EXE somente ao GitHub Releases.
+4. Instale o primeiro EXE oficial uma vez. A partir dele, o launcher verifica novas releases, baixa e aplica automaticamente as que a W1 publicar/aprovar.
+
+Sem o segredo configurado e sem primeira release, **nenhum auto-update é ativado**. EXEs piloto anteriores não possuem a chave pública embutida e precisam da primeira instalação oficial manual.
+
+### Assinatura gratuita versus confiança do Windows
+
+A assinatura Ed25519 autentica criptograficamente uma atualização para o launcher e é gratuita, mas não atribui automaticamente status de editor confiável no Windows. O Microsoft SmartScreen pode avisar ou bloquear um instalador sem Authenticode emitido por uma autoridade reconhecida. Essa assinatura de editor normalmente exige um certificado que não é gratuito; não instalamos certificados raiz próprios nem desativamos mecanismos de proteção do Windows. O pipeline Authenticode opcional continua separado e bloqueado até haver um certificado legítimo.
+
+### Segurança operacional
+
+Os segredos de assinatura só são lidos no GitHub Actions de publicação, nunca no aplicativo ou no Supabase. Uma atualização com assinatura incorreta, hash adulterado, origem imprevista ou versão inferior é recusada. A instalação ocorre no perfil do usuário com NSIS, sem scripts ocultos nem elevação de privilégios forçada. Se a chave privada for comprometida, suspenda imediatamente o canal e faça rotação controlada da confiança — nenhum mecanismo é invulnerável ao roubo da chave de publicação.
+
+Dados de clientes, WhatsApp e autenticação não são hospedados pelo serviço de releases. O Supabase continua guardando dados sob RLS por usuário, e o launcher não depende da Vercel.
