@@ -55,8 +55,14 @@ jobs:
           node --check desktop/launcher-ui.js
           node --check desktop/launcher-preload.cjs
           node --check desktop/main.mjs
+      - name: Testar EXE empacotado antes do instalador
+        run: |
+          npm --prefix desktop run pack:win
+          node desktop/verify-packaged-server.mjs
       - name: Compilar instalador EXE Windows x64
         run: npm --prefix desktop run dist:win
+      - name: Verificar payload final do instalador
+        run: node desktop/verify-packaged-server.mjs
       - name: Guardar instalador para instalação
         uses: actions/upload-artifact@v4
         with:
