@@ -3,6 +3,7 @@ import {useCallback,useEffect,useMemo,useState} from 'react';
 import {archiveChats,archiveMessages,mergeChats,mergeMessages,messageState} from '../lib/wa-auto-archive.mjs';
 import {ZAPFAST_SINGLE_SESSION_URL} from '../lib/openbot-workspace-policy.mjs';
 import OfficeLegalAgentPanel from './office-legal-agent-panel';
+import WhatsappTabBridgePanel from './whatsapp-tab-bridge-panel';
 import {ArrowLeft,CheckCircle2,ChevronDown,ExternalLink,Link2Off,LoaderCircle,MessageCircle,MessageSquare,Plus,RefreshCw,Search,Send,Settings2,ShieldCheck,Smartphone,Users,Wifi,WifiOff,X} from 'lucide-react';
 const stamp=value=>{if(!value)return '';const d=new Date(value);return Number.isNaN(d.getTime())?'':d.toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit',timeZone:'America/Sao_Paulo'})};
 const tiny=value=>String(value||'').trim().slice(0,220);
@@ -178,7 +179,7 @@ export default function WaAutoInbox({db,userId}){
  const visibleChats=useMemo(()=>chats.filter(c=>(!groups||c.is_group)&&
   [c.name,c.phone,c.jid].some(x=>String(x||'').toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR')))),[chats,groups,query]);
  return <main className="wa-workspace">
-  <header className="wa-heading"><div><small>PROJECTW1SC / COMUNICAÇÃO</small><h1>WhatsApp <span>Workspace</span></h1><p>Uma sessão WhatsApp por usuário do CRM. Cada pessoa vincula seu próprio aparelho pelo QR Code; não existe número fixo do escritório.</p></div>
+  <header className="wa-heading"><div><small>PROJECTW1SC / COMUNICAÇÃO</small><h1>WhatsApp <span>Workspace</span></h1><p>Use a sessão WA.Auto ou conecte à aba WhatsApp Web já aberta no seu computador, sem novo QR Code. Cada forma de acesso é independente.</p></div>
    <div className="wa-heading-actions">
     <a className="wa-button ghost" href={ZAPFAST_SINGLE_SESSION_URL} target="_blank" rel="noopener noreferrer" title="Abrir sessão já vinculada no ZapFast, sem gerar outro QR Code"><ExternalLink size={15}/> ZapFast · sessão existente</a>
     <span className={'wa-state '+(connected?'online':'offline')}><span className="wa-dot"/>{connected?'WhatsApp conectado':status?.configured?'Desconectado':'Aguardando configuração'}</span>
@@ -189,6 +190,7 @@ export default function WaAutoInbox({db,userId}){
   {error&&<div className="wa-alert error" role="alert">{error}<button type="button" aria-label="Fechar erro" onClick={()=>setError('')}><X size={15}/></button></div>}
   {archiveWarning&&<div className="wa-alert" role="status">{archiveWarning}<button type="button" aria-label="Fechar aviso de histórico" onClick={()=>setArchiveWarning('')}><X size={15}/></button></div>}
   {notice&&<div className="wa-alert" role="status"><CheckCircle2 size={17}/>{notice}</div>}
+  <WhatsappTabBridgePanel/>
   {(!status?.configured||showConnect||!connected)&&<section className="wa-connection">
     <div className="wa-connection-title"><div className="wa-device-icon">{connected?<Wifi size={21}/>:<WifiOff size={21}/>}</div><div><strong>Seu WhatsApp · Conexão individual</strong><p>{status?.configured?tiny(connection.message)||'Sessão vinculada à sua conta do CRM.':'Serviço WA.Auto indisponível no servidor. Não informe credenciais nesta página.'}</p></div></div>
     {!status?.configured?<div className="wa-help">O servidor WhatsApp precisa estar disponível para gerar o QR. A identidade e as credenciais são verificadas no servidor; nunca cole tokens nesta página.</div>:<div className="wa-connect-content">
@@ -201,7 +203,7 @@ export default function WaAutoInbox({db,userId}){
       {connected&&<button type="button" className="wa-button danger" disabled={!!busy} onClick={()=>{if(window.confirm('Desvincular o aparelho desta sessão WhatsApp?'))action('logout')}}><Link2Off size={16}/> Desvincular</button>}
      </div>
      </div>}
-     <div className="wa-disclaimer"><ShieldCheck size={15}/> Mesmo número: use somente uma conexão ativa, WA.Auto ou ZapFast. O botão acima abre a sessão do ZapFast existente; não vincule o mesmo número novamente no WA.Auto. Nenhum envio automático foi autorizado.</div>
+     <div className="wa-disclaimer"><ShieldCheck size={15}/> WA.Auto e ZapFast usam conexões próprias: não pareie o mesmo número novamente só para abrir outra interface. A ponte local acima usa a aba WhatsApp Web já conectada, sem registrar outro dispositivo e sem enviar mensagens automaticamente.</div>
   </section>}
   <section className="wa-chat-layout" aria-label="Central de conversas">
    <aside className={'wa-contacts '+(current?'wa-mobile-hidden':'')}>
