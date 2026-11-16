@@ -56,7 +56,7 @@ test('free release distribution requires manual approval, private signing secret
  assert.doesNotMatch(signed,/BEGIN PRIVATE KEY[\\s\\S]*END PRIVATE KEY/);
  const update=read('desktop/free-update-client.mjs');
  assert.match(update,/verifyUpdateManifest/);
- assert.match(update,/createHash\\('sha512'\\)/);
- assert.match(update,/getPath\\('userData'\\)/);
+ assert.ok(update.includes("createHash('sha512')"));
+ assert.ok(update.includes("getPath('userData')"));
  assert.doesNotMatch(update,/execSync|eval\(|https:\/\/.*vercel/);
 });
