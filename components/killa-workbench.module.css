@@ -37,3 +37,32 @@
 .srOnly{position:absolute;width:1px;height:1px;clip:rect(0,0,0,0);overflow:hidden;white-space:nowrap}
 @media(max-width:640px){.shell{border-radius:13px;padding:17px}.top{align-items:flex-start}.status{font-size:10px}.center{padding:15px 0}.quickModes button{flex:1}.actions button{width:100%}.disclosure{padding:12px}}
 @media(prefers-reduced-motion:reduce){.orb{animation:none}}
+
+
+/* Killa OAuth setup: its own high-contrast styling, independent of CRM theme overrides */
+.mcpSetup{max-width:830px;margin:24px auto 60px;padding:0 18px;color:#251d27}
+.mcpHeading{padding:20px 2px 14px}
+.mcpHeading>a{font-size:13px;color:#883e64;text-decoration:underline}
+.mcpHeading h1{font-size:clamp(24px,3vw,32px)!important;color:#2c1827!important;margin:12px 0 8px!important}
+.mcpHeading p{color:#50444e!important;font-size:14px;line-height:1.6}
+.mcpCard{background:#fff;color:#281c27;border:1px solid #d6c9d3;border-radius:13px;padding:20px 22px;margin:12px 0;box-shadow:0 4px 16px #170f1712}
+.mcpCard h2{font-size:18px!important;color:#291825!important;margin:0 0 12px!important}
+.mcpCard p,.mcpCard strong,.mcpCard label{color:#342833!important;line-height:1.55}
+.mcpCard p{font-size:13px}
+.mcpCard summary{color:#2d1b2a!important;font-weight:700;cursor:pointer}
+.mcpCard a{color:#7b2555!important}
+.mcpCard [role="alert"]{color:#8f2739!important;background:#fff2f2;border-radius:8px;padding:10px}
+.mcpCheck{display:flex;align-items:flex-start;gap:9px;cursor:pointer;padding:8px 0;font-size:14px}
+.mcpCheck input{margin-top:4px;accent-color:#892d5e}
+.field{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:650;margin:12px 0;color:#332334!important}
+.field select,.field textarea{width:100%;box-sizing:border-box;background:#fff!important;color:#281d28!important;border:1px solid #96808e;border-radius:9px;padding:11px;font:inherit;line-height:1.5;min-width:0}
+.field select:disabled,.field textarea:disabled{opacity:.65}
+.mcpEndpoint{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#f8f1f5;border:1px solid #dac9d5;border-radius:10px;padding:11px;max-width:100%}
+.mcpEndpoint code{flex:1;overflow-wrap:anywhere;color:#4a1837;font-size:12px}
+.mcpEndpoint button,.mcpFooter button{background:#853a61;color:#fff;border:1px solid #853a61;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:700}
+.mcpFooter{margin:15px 0 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.mcpFooter button:disabled{opacity:.5;cursor:not-allowed}
+.mcpFooter p{color:#50404e;font-size:12px}
+.mcpError{background:#fff0f1;color:#802237!important;border:1px solid #e6aeb7;border-radius:9px;padding:13px}
+.mcpSuccess{background:#edf9f3;color:#17593f!important;border:1px solid #8dcfb5;border-radius:9px;padding:13px}
+@media(max-width:640px){.mcpSetup{padding:0 10px}.mcpCard{padding:16px}.mcpEndpoint button{width:100%}}
