@@ -46,7 +46,7 @@ jobs:
         run: |
           npm test
           npm run typecheck
-      - name: Compilar Next local sem Vercel
+      - name: Compilar Next standalone local
         run: npm run build
         env:
           KILLA_DESKTOP_STANDALONE: '1'
