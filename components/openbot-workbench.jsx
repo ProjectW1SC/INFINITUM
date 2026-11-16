@@ -131,12 +131,12 @@ export default function OpenBotWorkbench({db,session}){
     <h2>Prepare sua resposta</h2>
     <p>Escreva seu pedido. O rascunho aparece abaixo, pronto para revisão. Nenhuma mensagem é enviada.</p>
    </div>
-   <div className={ui.quickModes}><button type="button" aria-pressed={mode==='texto'} onClick={()=>{setMode('texto');setDraft('')}}>Resposta ou resumo</button><button type="button" aria-pressed={mode==='peca'} onClick={()=>{setMode('peca');setDraft('')}}>Minuta jurídica</button></div>
+   <div className={ui.quickModes}><button type="button" disabled={busy} aria-pressed={mode==='texto'} onClick={()=>{setMode('texto');setDraft('')}}>Resposta ou resumo</button><button type="button" disabled={busy} aria-pressed={mode==='peca'} onClick={()=>{setMode('peca');setDraft('')}}>Minuta jurídica</button></div>
     <div className={ui.composer}>
     <label htmlFor="killa-input" className={ui.srOnly}>Mensagem para Killa AI</label>
-    <textarea id="killa-input" rows={3} maxLength={6000} value={prompt} onChange={e=>setPrompt(e.target.value)}
+    <textarea id="killa-input" rows={3} disabled={busy} maxLength={6000} value={prompt} onChange={e=>setPrompt(e.target.value)}
      placeholder="Peça uma análise, um resumo ou uma resposta baseada em fatos confirmados…"/>
-    <div className={ui.actions}><span>{mode==='peca'?'Peça jurídica':'Assistente local'}</span>
+    <div className={ui.actions}><span>{engine==='deterministico'?'Rascunho rápido · sem baixar modelo':'Qwen opcional · processamento no navegador'}</span>
      <button onClick={generate} type="button" disabled={busy||!prompt.trim()}>{busy?'Processando…':'Gerar rascunho'}</button>
     </div>
    </div>
@@ -254,7 +254,7 @@ export default function OpenBotWorkbench({db,session}){
     {timelineSvg&&<img alt="Linha do tempo ilustrativa, sem verificação judicial" style={{maxWidth:'100%',borderRadius:8}}
       src={'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(timelineSvg)}/>}
    </details>
-   {notice&&<p className="inf-note" role="status">{notice}</p>}
+
   </div>
   </details>
  </section>;
