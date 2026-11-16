@@ -66,3 +66,7 @@
 .mcpError{background:#fff0f1;color:#802237!important;border:1px solid #e6aeb7;border-radius:9px;padding:13px}
 .mcpSuccess{background:#edf9f3;color:#17593f!important;border:1px solid #8dcfb5;border-radius:9px;padding:13px}
 @media(max-width:640px){.mcpSetup{padding:0 10px}.mcpCard{padding:16px}.mcpEndpoint button{width:100%}}
+
+.quickField{max-width:740px;margin:0 auto 10px;display:flex;flex-wrap:wrap;align-items:center;gap:12px;font-size:13px;color:#fff!important;font-weight:650}
+.quickField select{background:#2a1b29!important;color:#fff!important;border:1px solid #a0708e;border-radius:9px;min-width:190px;padding:9px 12px}
+.feedback{max-width:740px;margin:12px auto;color:#ffe8f2!important;background:#462b3b;border:1px solid #a47791;border-radius:9px;padding:10px 13px;font-size:13px;overflow-wrap:anywhere}
