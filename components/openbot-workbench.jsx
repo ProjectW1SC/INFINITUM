@@ -15,6 +15,7 @@ export default function OpenBotWorkbench({db,session}){
  const [source,setSource]=useState('');
  const [engine,setEngine]=useState('deterministico');
  const [consent,setConsent]=useState(false);
+ const [onlineConsent,setOnlineConsent]=useState(false);
  const [preferCpu,setPreferCpu]=useState(true),[tokenBudget,setTokenBudget]=useState(128);
  const [mode,setMode]=useState('texto'),[kind,setKind]=useState('manifestacao');
  const [timelineEvents,setTimelineEvents]=useState(''),[timelineSvg,setTimelineSvg]=useState('');
@@ -50,6 +51,23 @@ export default function OpenBotWorkbench({db,session}){
   setBusy(true);setDraft('');setApproved(false);setSource('');setNotice('');
   try{
    let answer,model;
+   if(engine==='online'){
+    if(!onlineConsent)throw Error('Autorize o envio do texto ao modelo online antes de gerar.');
+    if(!db||!session?.user?.id)throw Error('Entre no CRM para utilizar a IA online.');
+    const {data:{session:authSession},error:authError}=await db.auth.getSession();
+    if(authError||!authSession?.access_token)throw Error('Sessão expirada. Faça login novamente.');
+    const response=await fetch('/api/superagente',{method:'POST',
+     headers:{Authorization:'Bearer '+authSession.access_token,'Content-Type':'application/json'},
+     body:JSON.stringify({prompt:userText,externalAiConsent:true,allowEngineFallback:true,preferredMotor:'auto'}),
+     cache:'no-store',signal:AbortSignal.timeout(40000)});
+    let output;try{output=await response.json()}catch{throw Error('O servidor de IA não devolveu uma resposta válida.')}
+    if(!response.ok||output.ok!==true)throw Error(output.error||'Modelo de IA indisponível.');
+    if(typeof output.reply!=='string'||!output.reply.trim())throw Error('O modelo não retornou uma resposta.');
+    setDraft(output.reply.slice(0,18000));
+    setSource(output.isGenerativeModel?('IA online · '+String(output.model||'modelo configurado')):'Motor de regras (IA online indisponível)');
+    setNotice(output.notice||'Rascunho pronto. Revise os dados antes de usar.');
+    return;
+   }
    if(localSelected){
     const isPetition=mode==='peca';
     const authoritative=isPetition
@@ -136,7 +154,7 @@ export default function OpenBotWorkbench({db,session}){
     <label htmlFor="killa-input" className={ui.srOnly}>Mensagem para Killa AI</label>
     <textarea id="killa-input" rows={3} disabled={busy} maxLength={6000} value={prompt} onChange={e=>setPrompt(e.target.value)}
      placeholder="Peça uma análise, um resumo ou uma resposta baseada em fatos confirmados…"/>
-    <div className={ui.actions}><span>{engine==='deterministico'?'Rascunho rápido · sem baixar modelo':'Qwen opcional · processamento no navegador'}</span>
+    <div className={ui.actions}><span>{engine==='deterministico'?'Rascunho rápido · sem baixar modelo':engine==='online'?'IA online · autorização necessária':'Qwen opcional · processamento no navegador'}</span>
      <button onClick={generate} type="button" disabled={busy||!prompt.trim()}>{busy?'Processando…':'Gerar rascunho'}</button>
     </div>
    </div>
@@ -192,12 +210,15 @@ export default function OpenBotWorkbench({db,session}){
    <label>Motor de inteligência
     <select value={engine} onChange={e=>{setEngine(e.target.value);if(e.target.value==='qwen4')setPreferCpu(false);setDraft('');setApproved(false)}}>
      <option value="colibri-local">Qwen local · CPU padrão, grátis e ativo</option>
-     <option value="deterministico">Motor PredictLM/LexisPredict determinístico · sem modelo</option>
+     <option value="deterministico">Motor leve · sem baixar modelo (padrão)</option>
+     <option value="online">IA online configurada · geração livre com autorização</option>
      <option value="qwen">Qwen 0,5B · CPU/WebAssembly</option>
      <option value="qwen17">Qwen3 1,7B · CPU (8 GB RAM) ou GPU</option>
      <option value="qwen4">Qwen3 4B · GPU (8 GB RAM)</option>
     </select>
    </label>
+   {engine==='online'&&<label><input type="checkbox" checked={onlineConsent} onChange={e=>setOnlineConsent(e.target.checked)}/>
+     Autorizo enviar somente este pedido ao modelo externo configurado. Não inclua dados de clientes sem autorização.</label>}
    {localSelected&&<label><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/>
     Modelo local opcional, sem servidor Colibri/Needle. Os modelos grandes baixam pesos apenas quando escolhidos e exigem mais RAM. Desmarque para usar somente regras leves.
    </label>}
