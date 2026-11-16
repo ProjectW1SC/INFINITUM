@@ -1,16 +1,18 @@
 'use client';
-import {useCallback,useEffect,useState} from 'react';
+import {useCallback,useEffect,useRef,useState} from 'react';
 import SecuredWorkspace from '../../../components/secured-workspace.jsx';
 function PairView({db,session}){
  const [connection,setConnection]=useState(null),[qrImage,setQrImage]=useState('');
  const [busy,setBusy]=useState(false),[notice,setNotice]=useState('');
+ const statusPollingEnabled=useRef(true);
  const refresh=useCallback(async()=>{
   const {data:{session:auth}}=await db.auth.getSession();
   if(!auth?.access_token)throw Error('Entre novamente no INFINITUM.');
   const res=await fetch('/api/office/whatsapp/bridge?action=status',{
    headers:{Authorization:'Bearer '+auth.access_token},cache:'no-store'});
   const data=await res.json();
-  if(!res.ok||data.ok===false)throw Error(String(data.error||'Não foi possível consultar a conexão individual.').slice(0,240));
+  if(!res.ok||data.ok===false){statusPollingEnabled.current=false;throw Error(String(data.error||'Não foi possível consultar a conexão individual.').slice(0,240));}
+  statusPollingEnabled.current=data.configured===true;
   setConnection(data);
   return data;
  },[db]);
@@ -18,7 +20,7 @@ function PairView({db,session}){
   let active=true;
   refresh().catch(e=>{if(active)setNotice(e.message)});
   const clock=window.setInterval(()=>{
-   if(document.visibilityState==='visible'&&active)
+   if(document.visibilityState==='visible'&&active&&statusPollingEnabled.current)
     refresh().catch(e=>{if(active)setNotice(String(e?.message||'Conexão indisponível.').slice(0,240))});
   },4000);
   return()=>{active=false;window.clearInterval(clock)};
@@ -55,7 +57,9 @@ function PairView({db,session}){
   <h1>Killa AI · conectar seu WhatsApp</h1>
   <p>Esta sessão pertence somente ao usuário autenticado no INFINITUM. Nenhuma IA recebe o QR, a chave ou o código de pareamento.</p>
   <p role="status">{connection?.connected?'WhatsApp conectado à sua conta.':
-   connection?.configured?'Aguardando conexão do seu WhatsApp.':'WA.Auto não configurado para esta conta.'}</p>
+   connection?.configured?'Aguardando conexão do seu WhatsApp.':
+   connection?.message||'WA.Auto não configurado para esta conta.'}</p>
+  {!connection?.configured&&<button type="button" onClick={()=>refresh().catch(e=>setNotice(e.message))}>Reverificar servidor WA.Auto</button>}
   {!connection?.connected&&qrImage&&<figure>
    <img src={qrImage} alt="QR Code individual de vinculação ao WhatsApp" width={260} height={260}/>
    <figcaption>WhatsApp no celular → Aparelhos conectados → Conectar um aparelho.</figcaption>
