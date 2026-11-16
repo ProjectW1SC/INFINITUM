@@ -67,3 +67,16 @@ O workbench permite Qwen2.5 0.5B, Qwen3 1.7B e Qwen3 4B (ONNX via Transformers.j
 ## Segurança e publicação
 
 Mantenha OAuth Server, RLS, whitelists de redirect, CSP e supervisão de logs sob revisão. A rota de mensagens exige sessão autenticada; não configure token global de serviço no navegador. No banco nativo, habilite a integração pelo endereço `https://agentinfinitum.vercel.app/mcp/setup` após a publicação. A CI testa `npm test`, `npm run typecheck`, `npm run test:dom`, `npm run build`. Só considere o MCP **operacional** após deploy `READY`, autorização OAuth ativada e uma conexão real bem-sucedida com cada cliente. Se a Vercel bloquear builds por limite do plano, o código pode estar na `main` sem estar no domínio principal.
+
+
+## Regras de segurança reforçadas (16/11/2026)
+
+O MCP aceita somente tokens OAuth identificados pelo `client_id` do aplicativo cadastrado no Supabase, associado à mesma conta e aprovado explicitamente em `/mcp/setup`. MFA no nível `aal2` é exigido para todos os acessos. O endpoint público não atende `initialize` nem `tools/list` sem autenticação.
+
+**Separação real de privilégios:** as demais rotas do CRM recusam JWT OAuth de terceiros, mesmo quando válidos. A migração `20261116143000_killa_oauth_database_boundary.sql` cria políticas `AS RESTRICTIVE` de INSERT, UPDATE e DELETE nas tabelas públicas existentes com RLS. As permissões anônimas de escrita e TRUNCATE herdadas são revogadas. Novas tabelas requerem migração equivalente antes de exposição.
+
+**QR individual:** a ferramenta `killa_whatsapp_status` informa o estado da conexão e mostra o link `https://agentinfinitum.vercel.app/mcp/pair`. O QR é apresentado e renovado no navegador autenticado do operador, nunca devolvido nos resultados do modelo. Use seu WhatsApp no celular para escanear o QR; não envie imagens do QR à IA.
+
+**KPI:** a rota `/api/office/agent/kpis` contabiliza apenas eventos OpenBot com `status='accepted'` e `provider_message_id`, agrupados pelo operador autenticado, em janela de 30 dias. Sem a tabela de confirmações na carteira nativa, a resposta é **fonte indisponível**. Preparações MCP não são atendimentos.
+
+**Limites:** ferramentas MCP continuam sem envio; a capacidade de um modelo gerar uma mensagem não confere permissão para dispará-la. A senha é inserida no login HTTPS do provedor de identidade, não no ChatGPT/Claude/Grok. Nenhuma obfuscação impede engenharia reversa de JS exposto; controle real se aplica no servidor e no banco.

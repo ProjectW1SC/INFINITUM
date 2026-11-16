@@ -1,0 +1,37 @@
+# Política de segurança — INFINITUM / Killa AI
+
+© 2026 W1 Capital. Abrange CRM jurídico, WA.Auto, Supabase, MCP/OAuth, DataJud/DJEN e histórico de atendimentos.
+
+## Divulgação responsável
+
+Informe vulnerabilidades de forma privada (GitHub Security Advisories, quando habilitado, ou suporte privado W1 Capital). Nunca publique senha, QR de WhatsApp, chave, token, nome de cliente, número de processo, dados bancários ou documentação sensível em issues públicas. Revogue e rotacione os segredos afetados e preserve evidência sem dados reais.
+
+## Autenticação, isolamento e ameaças
+
+- **Identidade:** login da própria empresa em Supabase Auth, segundo fator (MFA/AAL2), OAuth 2.1 com cliente \`client_id\` aprovado expressamente por administrador. Senhas não são fornecidas a modelos de IA.
+- **Escopo:** owner_id do usuário autenticado e empresa_id validada no servidor. O LLM não pode escolher outra empresa, falsificar permissões ou obter a carteira completa por consulta geral.
+- **OAuth somente leitura:** tokens com \`client_id\` são aceitos apenas na rota MCP, nunca nas demais rotas do CRM. No PostgreSQL, políticas RLS \`RESTRICTIVE\` bloqueiam INSERT, UPDATE e DELETE com tokens OAuth diretamente na Data API; TRUNCATE e escrita anônima são revogados.
+- **Registros de atendimentos:** KPI OpenBot conta somente aceite do WA.Auto persistido e comprovado; rascunhos, timeouts e mensagens sem recibo não entram como atendimento. Aceite não significa entrega nem leitura.
+- **QR do WhatsApp:** pertence a sessão WA.Auto individual e é exibido exclusivamente em página do CRM autenticada. O MCP não devolve QR, código de pareamento, tokens ou credenciais aos assistentes.
+- **Conteúdo não confiável:** histórico WhatsApp, PDFs, e-mails e texto de clientes são dados, não instruções. Não usar prompt de terceiros para modificar configuração, enviar logs/backlogs ou contornar regra de atendente humano.
+- **Sessões:** revogar autorização do aplicativo OAuth e a sessão Supabase ao desligar usuário. Conexões com máquinas do operador devem ser encerradas quando o vínculo acaba.
+
+## Chaves no Inspecionar Elemento
+
+\`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY\` / chave \`anon\` é intencionalmente pública, e não substitui autenticação ou RLS. Segredos como \`service_role\`, \`sb_secret_...\`, tokens de serviço, JWT signing secrets, senhas e chaves privadas **nunca** devem estar no JavaScript público, em \`NEXT_PUBLIC_\`, no HTML, em logs ou repositórios. **Se alguém tiver chave secreta com bypassrls ou controle de administrador do projeto, pode alterar dados e até remover políticas.** Nenhum sistema web garante imunidade a esse cenário; rotacione credenciais e separe permissões administrativas.
+
+## LGPD e dados jurídicos
+
+A Lei 13.709/2018 exige finalidade específica, minimização, retenção limitada, controle de acesso e resposta a incidentes. Cada integração de IA deve ter base e finalidade autorizadas; não exportar históricos completos ou dados de outras empresas, não usar PII real em testes e não passar arquivos jurídicos a modelos externos sem autorização apropriada. Garantir mecanismos para auditoria, revogação, resposta a titulares e exclusão conforme obrigações contratuais/legais.
+
+## Engenharia reversa e hardening
+
+REA, BLA, antirea, anti-rea-forge e DeRea ajudam a estudar ameaças, empacotamento ou limites de obfuscação. Alguns usam **instruções de prompt** para confundir agentes; isso não é barreira de segurança e não será instalado como substituto de autenticação. Repositórios públicos e bundles executados no navegador são inspecionáveis. Proteção efetiva: não colocar segredos nem regras privilegiadas no frontend, revisar dependências, RLS/ACL verificável, menor privilégio, logs redigidos, proteção de distribuição e testes de autorização negativos.
+
+## Escopo da licença
+
+[LICENSE](./LICENSE) mantém MIT para o código INFINITUM. Marcas, bases privadas, credenciais e direitos de terceiros não são licenciados pelo MIT; veja [NOTICE](./NOTICE.md). A licença de LexisPredict é proprietária e independente.
+
+## Limitações operacionais
+
+Migrações futuras precisam adicionar políticas restritivas às novas tabelas públicas. Nenhuma ferramenta MCP atualmente permite envio automático. A verificação de envio judicial depende de cadastro de contato/processo, consentimento, revisão humana e confirmação do WhatsApp; sem esses elementos não registrar KPI.

@@ -26,6 +26,18 @@ Organização de clientes, processos, atendimentos, captção de leads e rotinas
 
 ---
 
+## Killa AI / OpenBot — MCP por usuário
+
+[Configurar MCP](https://agentinfinitum.vercel.app/mcp/setup) · [Vincular WhatsApp por QR individual](https://agentinfinitum.vercel.app/mcp/pair) · [KPI de atendimentos](https://agentinfinitum.vercel.app/report) · [Manual técnico](./docs/killa-mcp.md) · [Política de segurança](./SECURITY.md)
+
+O servidor MCP remoto exige uma conta do INFINITUM autenticada por OAuth 2.1, MFA/AAL2, habilitação administrativa e `client_id` do aplicativo registrado na lista permitida. Cada usuário só lê seu arquivo de WhatsApp e, na carteira compartilhada Lexis, dados vinculados à empresa autorizada. **As ferramentas MCP não enviam mensagens.** O QR é atualizado na página autenticada e nunca retorna como texto à IA.
+
+A proteção vale também contra clientes modificados: o PostgreSQL possui políticas RLS restritivas para impedir gravação direta com JWT OAuth e não concede escrita anônima às tabelas operacionais existentes. Isso não impede a ação de um administrador do banco nem protege se uma chave secreta privilegiada vazar.
+
+O painel de KPI de atendimento OpenBot apresenta somente mensagens com aceite do provedor e registro verificável. Sem essa fonte, informa que não há contagem confirmada. Não confunde rascunhos com atendimento concluído.
+
+**Licença:** INFINITUM continua MIT e LexisPredict mantém licença proprietária independente. Confira o [NOTICE](./NOTICE.md). A licença MIT não proíbe engenharia reversa e o repositório público permanece inspecionável.
+
 ## Sobre o projeto
 
 O **INFINITUM** é a evolução do ambiente operacional W1 Capital / ProjectW1SC: uma plataforma para reunir carteira de clientes, processos judiciais, retornos, tarefas, captção e registros de atendimento em um fluxo claro e auditável.
@@ -81,7 +93,7 @@ Além das áreas principais: importação de Excel, origem dos registros e perso
 
 ## Executar localmente
 
-Requisitos: **Node.js 20+**, Git e um projeto Supabase configurado.
+Requisitos: **Node.js 22+**, Git e um projeto Supabase configurado.
 
 ```bash
 git clone https://github.com/ProjectW1SC/INFINITUM.git
