@@ -8,11 +8,11 @@ import {pathToFileURL} from 'node:url';
 import {createFreeUpdater} from './free-update-client.mjs';
 import {setTimeout as sleep} from 'node:timers/promises';
 import {validateDesktopConfig,safeStandaloneEnvironment,isLocalAppNavigation,
- isSafeExternalNavigation,shouldRunSignedUpdater,DESKTOP_ENTRY_PATH} from './runtime-policy.mjs';
+ isSafeExternalNavigation,isSafeZapFastNavigation,DESKTOP_ZAPFAST_URL,shouldRunSignedUpdater,DESKTOP_ENTRY_PATH} from './runtime-policy.mjs';
 import {safeLauncherSnapshot,normalizeUpdateProgress,canInstallSignedUpdate,isSignedUpdateConfiguration} from './launcher-policy.mjs';
 
 const CONFIG_ENDPOINT='https://ulkuhiibeoibbzhqrfya.supabase.co/functions/v1/killa-mcp/desktop-config';
-let nextProcess=null,port=0,desktopConfig=null,window=null,launcherWindow=null,shuttingDown=false,localNonce='';
+let nextProcess=null,port=0,desktopConfig=null,window=null,launcherWindow=null,zapFastWindow=null,shuttingDown=false,localNonce='';
 let updater=null,freeUpdater=null,updateCheck=null,appOpen=null;
 let autoUpdateEnabled=true;
 let launcherState=safeLauncherSnapshot({phase:'loading',version:app.getVersion(),message:'Inicializando canal de atualizações seguro.',signed:false,autoInstall:true});
@@ -272,6 +272,60 @@ ipcMain.handle('launcher:set-auto-update',(event,value)=>{
   ?'Instalação automática ativada apenas para releases W1 Capital autenticadas.'
   :'Instalação automática desligada; você pode atualizar manualmente no launcher.'});
  return launcherState;
+});
+// ZapFast is a separate, first-party HTTPS application. Its browser profile is
+// isolated from the CRM's Supabase session; it does not share cookies or tokens.
+async function openZapFastWindow(){
+ if(zapFastWindow&&!zapFastWindow.isDestroyed()){
+  zapFastWindow.show();zapFastWindow.focus();
+  return {opened:true};
+ }
+ const target=new BrowserWindow({
+  width:1150,height:790,minWidth:740,minHeight:520,
+  show:false,backgroundColor:'#16101a',autoHideMenuBar:true,
+  title:'W1 Capital · ZapFast WhatsApp',
+  webPreferences:{
+   partition:'persist:w1-zapfast',
+   contextIsolation:true,nodeIntegration:false,sandbox:true,
+   webSecurity:true,webviewTag:false,allowRunningInsecureContent:false
+  }
+ });
+ zapFastWindow=target;
+ target.webContents.session.setPermissionRequestHandler((_sender,_permission,done)=>done(false));
+ target.webContents.setWindowOpenHandler(({url})=>{
+  if(isSafeZapFastNavigation(url))void target.loadURL(url).catch(()=>{});
+  return {action:'deny'};
+ });
+ target.webContents.on('will-navigate',(event,url)=>{
+  if(!isSafeZapFastNavigation(url))event.preventDefault();
+ });
+ target.webContents.on('will-redirect',(event,url)=>{
+  if(!isSafeZapFastNavigation(url))event.preventDefault();
+ });
+ target.on('closed',()=>{if(zapFastWindow===target)zapFastWindow=null});
+ try{await target.loadURL(DESKTOP_ZAPFAST_URL)}
+ catch{
+  if(!target.isDestroyed())target.close();
+  throw Error('ZapFast não abriu. Verifique o serviço HTTPS e a conexão com a internet.');
+ }
+ target.show();
+ return {opened:true};
+}
+function isTrustedDesktopEvent(event){
+ return !!(window&&!window.isDestroyed()&&event?.sender===window.webContents&&
+  isLocalAppNavigation(event?.senderFrame?.url,port));
+}
+ipcMain.handle('killa:open-zapfast',event=>{
+ if(!isTrustedDesktopEvent(event))throw Error('Origem do CRM não autorizada.');
+ return openZapFastWindow();
+});
+ipcMain.handle('launcher:open-zapfast',event=>{
+ expectTrustedLauncher(event);
+ return openZapFastWindow();
+});
+ipcMain.handle('launcher:open-store',event=>{
+ expectTrustedLauncher(event);
+ return launchLocalCRM('/app-store');
 });
 async function launchLocalCRM(target=DESKTOP_ENTRY_PATH){
  if(window&&!window.isDestroyed()){

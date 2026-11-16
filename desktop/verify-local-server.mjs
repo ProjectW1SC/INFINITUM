@@ -42,7 +42,7 @@ try{
  }
  if(!success)throw Error('O servidor Next local não passou na verificação de integridade.');
  // A green healthcheck does not prove the Electron landing page exists.
- for(const route of [DESKTOP_ENTRY_PATH,'/whatsapp','/app-store/admin']){
+ for(const route of [DESKTOP_ENTRY_PATH,'/whatsapp','/app-store','/app-store/admin']){
   const response=await fetch('http://127.0.0.1:'+port+route,{
    cache:'no-store',redirect:'manual',signal:AbortSignal.timeout(7000)
   });

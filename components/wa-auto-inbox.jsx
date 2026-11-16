@@ -17,6 +17,8 @@ export default function WaAutoInbox({db,userId}){
  const [showConnect,setShowConnect]=useState(false),[showNew,setShowNew]=useState(false),[qrImage,setQrImage]=useState('');
  const [lastSync,setLastSync]=useState(''),[archiveWarning,setArchiveWarning]=useState(''),[archiveAt,setArchiveAt]=useState('');
  const [syncUnsupported,setSyncUnsupported]=useState(false);
+ const [desktopZapFast,setDesktopZapFast]=useState(false);
+ useEffect(()=>setDesktopZapFast(typeof window.killaDesktop?.openZapFast==='function'),[]);
  const statusPollingEnabled=useRef(true);
  const connected=status?.configured&&status?.connected;
  const connection=status?.connection||{};
@@ -208,7 +210,7 @@ export default function WaAutoInbox({db,userId}){
  return <main className="wa-workspace">
   <header className="wa-heading"><div><small>PROJECTW1SC / COMUNICAÇÃO</small><h1>WhatsApp <span>Workspace</span></h1><p>Use a sessão WA.Auto ou conecte à aba WhatsApp Web já aberta no seu computador, sem novo QR Code. Cada forma de acesso é independente.</p></div>
    <div className="wa-heading-actions">
-    <a className="wa-button ghost" href={ZAPFAST_SINGLE_SESSION_URL} target="_blank" rel="noopener noreferrer" title="Abrir sessão já vinculada no ZapFast, sem gerar outro QR Code"><ExternalLink size={15}/> ZapFast · sessão existente</a>
+    {desktopZapFast?<button className="wa-button ghost" type="button" onClick={()=>window.killaDesktop?.openZapFast().catch(()=>setError("Não foi possível abrir a janela ZapFast."))} title="Abrir ZapFast em janela própria no desktop, sem novo QR Code"><ExternalLink size={15}/> ZapFast · abrir no desktop</button>:<a className="wa-button ghost" href={ZAPFAST_SINGLE_SESSION_URL} target="_blank" rel="noopener noreferrer" title="Abrir sessão já vinculada no ZapFast, sem gerar outro QR Code"><ExternalLink size={15}/> ZapFast · sessão existente</a>}
     <span className={'wa-state '+(connected?'online':'offline')}><span className="wa-dot"/>{connected?'WhatsApp conectado':status?.code==='wa_auto_upstream_route_missing'?'WA.Auto sem rota':status?.configured?'Desconectado':'Aguardando configuração'}</span>
     <button className="wa-icon-btn" aria-label="Atualizar WhatsApp" type="button" disabled={!!busy} onClick={refresh}><RefreshCw size={17}/></button>
     <button className="wa-button" type="button" onClick={()=>setShowConnect(v=>!v)}><Smartphone size={16}/> Conexão</button>
