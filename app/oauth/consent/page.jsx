@@ -66,7 +66,7 @@ export default function KillaOAuthConsent(){
     setPendingRedirect(data.redirect_url);
     if(verified){
      try{
-      await recordMfaGrant(db,id);
+      if(SHARED_LEXIS_DB)await recordMfaGrant(db,id);
       if(live)window.location.assign(data.redirect_url);
      }catch(e){if(live)setNotice(String(e?.message||e).slice(0,230))}
     }else{
@@ -89,7 +89,7 @@ export default function KillaOAuthConsent(){
     throw Error('O Supabase ainda não confirmou o nível AAL2. Digite um código novo.');
    setMfaOk(true);setMfaCode('');
    if(pendingRedirect){
-    await recordMfaGrant(db,authorizationId);
+    if(SHARED_LEXIS_DB)await recordMfaGrant(db,authorizationId);
     window.location.assign(pendingRedirect);
    }else setNotice('Segundo fator confirmado. Agora você pode autorizar a leitura.');
   }catch(e){setNotice(String(e?.message||e).slice(0,230))}
@@ -99,7 +99,7 @@ export default function KillaOAuthConsent(){
   if(!db?.auth?.oauth||!authorizationId||busy||(approved&&!clientApproved))return;
   setBusy(true);setNotice('');
   try{
-   if(approved)await recordMfaGrant(db,authorizationId);
+   if(approved&&SHARED_LEXIS_DB)await recordMfaGrant(db,authorizationId);
    const result=approved?
     await db.auth.oauth.approveAuthorization(authorizationId):
     await db.auth.oauth.denyAuthorization(authorizationId);
