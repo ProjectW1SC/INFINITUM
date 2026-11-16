@@ -59,7 +59,7 @@ export default function OfficeLegalAgentPanel({db,selected,connected,messages,on
    if(!inboundId)throw Error('Escolha uma conversa com mensagem recebida e arquivada.');
    const value=await call({action:'preview',inbound_message_id:inboundId});
    setPreview({...value,inbound_message_id:inboundId});
-   setReviewed('');setHumanConfirmed(false);setIncludeHearing(false);
+   setReviewed('');setHumanConfirmed(false);setIncludeHearing(value.hearingOnly===true&&!!value.hearing);
    setMemory(value.contextNote||'');
    setStatus(value.notice||'Prévia pronta; confira os autos.');
   });
