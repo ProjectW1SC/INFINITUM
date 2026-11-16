@@ -311,11 +311,7 @@ async function openAppWindow(){
   event.preventDefault();
   if(isSafeExternalNavigation(target))void shell.openExternal(target);
  });
- window.on('closed',()=>{
-  window=null;
-  if(autoUpdateEnabled&&freeUpdater&&launcherState.phase==='downloaded')
-   void applyVerifiedUpdate();
- });
+ window.on('closed',()=>{window=null});
  await window.loadURL('http://127.0.0.1:'+port+'/login');
  window.show();
 }
@@ -332,7 +328,15 @@ ipcMain.on('killa:public-config',event=>{
   {supabaseUrl:desktopConfig.supabaseUrl,publishableKey:desktopConfig.publishableKey}:null;
 });
 app.on('before-quit',cleanup);
-app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit()});
+app.on('window-all-closed',()=>{
+ if(process.platform==='darwin')return;
+ if(autoUpdateEnabled&&freeUpdater&&launcherState.phase==='downloaded'){
+  // Keep main process alive until the authenticated installer is launched.
+  void applyVerifiedUpdate().finally(()=>app.quit());
+  return;
+ }
+ app.quit();
+});
 app.whenReady().then(async()=>{
  Menu.setApplicationMenu(null);
  try{

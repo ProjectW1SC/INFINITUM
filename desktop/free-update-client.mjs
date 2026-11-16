@@ -119,6 +119,10 @@ export async function launchVerifiedInstaller({path,manifest,spawnImpl=spawn}){
   shell:false,stdio:'ignore'
  });
  if(!child||typeof child.unref!=='function')throw Error('Não foi possível executar instalador verificado.');
+ await new Promise((resolve,reject)=>{
+  child.once('error',reject);
+  child.once('spawn',resolve);
+ });
  child.unref();
  return {started:true};
 }
