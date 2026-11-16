@@ -34,7 +34,9 @@
       "launcher.css",
       "launcher-ui.js",
       "branding/**/*",
-      "generate-windows-icon.mjs"
+      "generate-windows-icon.mjs",
+      "release-trust.mjs",
+      "free-update-client.mjs"
     ],
     "extraResources": [
       {
