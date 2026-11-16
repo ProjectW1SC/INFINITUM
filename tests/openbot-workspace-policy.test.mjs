@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {OPENBOT_COWORKERS,planAgentTask,reviewDraftGate,ZAPFAST_SINGLE_SESSION_URL} from '../lib/openbot-workspace-policy.mjs';
 
-test('OpenBot workspace lists six original legal coworkers, none can send independently',()=>{
- assert.equal(OPENBOT_COWORKERS.length,6);
+test('OpenBot workspace lists seven narrow legal coworkers, none can send independently',()=>{
+ assert.equal(OPENBOT_COWORKERS.length,7);
  assert.ok(OPENBOT_COWORKERS.every(a=>!a.canSend&&!a.canShareCaseData&&a.id&&a.label));
 });
 test('judicial action requires official verification and human review',()=>{
