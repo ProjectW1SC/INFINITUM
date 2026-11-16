@@ -5,3 +5,8 @@ contextBridge.exposeInMainWorld('killaDesktopPublicConfig',
  Object.freeze(publicConfig&&typeof publicConfig==='object'?{
   supabaseUrl:publicConfig.supabaseUrl,publishableKey:publicConfig.publishableKey
  }:{}));
+
+// Only the trusted local CRM renderer can open the dedicated ZapFast window.
+contextBridge.exposeInMainWorld('killaDesktop',Object.freeze({
+ openZapFast:()=>ipcRenderer.invoke('killa:open-zapfast')
+}));
