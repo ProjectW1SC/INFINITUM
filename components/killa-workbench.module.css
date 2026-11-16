@@ -70,3 +70,6 @@
 .quickField{max-width:740px;margin:0 auto 10px;display:flex;flex-wrap:wrap;align-items:center;gap:12px;font-size:13px;color:#fff!important;font-weight:650}
 .quickField select{background:#2a1b29!important;color:#fff!important;border:1px solid #a0708e;border-radius:9px;min-width:190px;padding:9px 12px}
 .feedback{max-width:740px;margin:12px auto;color:#ffe8f2!important;background:#462b3b;border:1px solid #a47791;border-radius:9px;padding:10px 13px;font-size:13px;overflow-wrap:anywhere}
+
+.quickConsent{max-width:740px;display:flex;align-items:flex-start;gap:9px;margin:0 auto 11px;color:#ffebf5!important;font-size:13px;line-height:1.5}
+.quickConsent input{accent-color:#e98bb9;margin-top:3px}
