@@ -14,11 +14,11 @@ test('MCP refuses ordinary Supabase user token, tokens for another user and unkn
  assert.throws(()=>assertAuthorizedMcpClaims(jwtClaims(token(identity)),
   {userId:identity.sub,allowedClientIds:['oc_claude']}),/autorizad|cliente/i);
 });
-test('MCP requires MFA by default even after an OAuth token was issued',()=>{
+test('MCP accepts OAuth AAL1 only when a recent MFA proof was verified server-side',()=>{
  assert.throws(()=>assertAuthorizedMcpClaims(jwtClaims(token({...identity,aal:'aal1'})),
-  {userId:identity.sub,allowedClientIds:['oc_chatgpt'],requireMfa:true}),/MFA|fator|aal2/i);
- assert.equal(assertAuthorizedMcpClaims(jwtClaims(token(identity)),
-  {userId:identity.sub,allowedClientIds:['oc_chatgpt'],requireMfa:true}).clientId,'oc_chatgpt');
+  {userId:identity.sub,allowedClientIds:['oc_chatgpt'],mfaGrantVerified:false}),/MFA|segundo fator|confirm/i);
+ assert.equal(assertAuthorizedMcpClaims(jwtClaims(token({...identity,aal:'aal1'})),
+  {userId:identity.sub,allowedClientIds:['oc_chatgpt'],mfaGrantVerified:true}).clientId,'oc_chatgpt');
 });
 test('All MCP methods require OAuth; ordinary CRM routes refuse OAuth tokens',()=>{
  const office=read('lib/office-server.mjs'),route=read('app/mcp/route.js');

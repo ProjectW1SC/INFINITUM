@@ -86,7 +86,7 @@ Mantenha OAuth Server, RLS, whitelists de redirect, CSP e supervisão de logs so
 
 ## Regras de segurança reforçadas (16/11/2026)
 
-O MCP aceita somente tokens OAuth identificados pelo `client_id` do aplicativo cadastrado no Supabase, associado à mesma conta e aprovado explicitamente em `/mcp/setup`. MFA no nível `aal2` é exigido para todos os acessos. O endpoint público não atende `initialize` nem `tools/list` sem autenticação.
+O MCP aceita somente tokens OAuth identificados pelo `client_id` do aplicativo cadastrado no Supabase, associado à mesma conta e aprovado explicitamente em `/mcp/setup`. A tela de consentimento exige sessão interativa `aal2` e grava uma prova privada de MFA vinculada ao usuário, empresa e cliente OAuth. **O token OAuth emitido pelo Supabase pode ser `aal1` mesmo quando a sessão do navegador passou por MFA**; por isso o MCP não confia no `aal` do token OAuth isoladamente. A prova de MFA expira em 8 horas e é verificada no servidor por RPC, mantendo a exigência de segundo fator sem criar um ciclo de login. O endpoint público não atende `initialize` nem `tools/list` sem autenticação válida.
 
 **Separação real de privilégios:** as demais rotas do CRM recusam JWT OAuth de terceiros, mesmo quando válidos. A migração `20261116143000_killa_oauth_database_boundary.sql` cria políticas `AS RESTRICTIVE` de INSERT, UPDATE e DELETE nas tabelas públicas existentes com RLS. As permissões anônimas de escrita e TRUNCATE herdadas são revogadas. Novas tabelas requerem migração equivalente antes de exposição.
 

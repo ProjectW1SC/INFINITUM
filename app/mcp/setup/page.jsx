@@ -184,7 +184,7 @@ export default function KillaMcpSetup(){
      <label className={ui.field}>IDs OAuth (um por linha)
       <textarea rows={3} disabled={!canEdit} spellCheck={false} value={clientIdsText} onChange={e=>setClientIdsText(e.target.value)}
        placeholder="ID público do aplicativo externo"/></label>
-     {SHARED_LEXIS_DB&&<p>O OpenMausBot registra um novo ID OAuth em cada novo login. Copie o ID exibido na solicitação atual e mantenha os IDs anteriores se ainda houver conexões ativas. Depois que a conexão aparecer como autenticada no OpenMausBot, não inicie outro login sem necessidade.</p>}
+     {SHARED_LEXIS_DB&&<p>O OpenMausBot usa registro dinâmico e pode gerar um novo ID OAuth a cada novo login. Com o registro dinâmico ativado no Supabase, deixe os campos “Sign-in app” do OpenMausBot vazios; não reutilize ali um ID dinâmico. Copie o ID da solicitação atual para esta lista e mantenha IDs anteriores apenas enquanto houver conexões ativas. Depois que a conexão autenticar, não inicie outro login sem necessidade.</p>}
      <p>Para usar em um cliente MCP que aceite OAuth, informe este endereço:</p>
      <div className={ui.mcpEndpoint}><code>{MCP_URL}</code>
       <button type="button" onClick={()=>{if(!navigator.clipboard?.writeText){setError('Copie o endereço manualmente.');return}navigator.clipboard.writeText(MCP_URL)
