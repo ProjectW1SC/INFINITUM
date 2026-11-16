@@ -95,3 +95,10 @@ A assinatura Ed25519 autentica criptograficamente uma atualização para o launc
 Os segredos de assinatura só são lidos no GitHub Actions de publicação, nunca no aplicativo ou no Supabase. Uma atualização com assinatura incorreta, hash adulterado, origem imprevista ou versão inferior é recusada. A instalação ocorre no perfil do usuário com NSIS, sem scripts ocultos nem elevação de privilégios forçada. Se a chave privada for comprometida, suspenda imediatamente o canal e faça rotação controlada da confiança — nenhum mecanismo é invulnerável ao roubo da chave de publicação.
 
 Dados de clientes, WhatsApp e autenticação não são hospedados pelo serviço de releases. O Supabase continua guardando dados sob RLS por usuário, e o launcher não depende da Vercel.
+
+
+## Administração de builds e MCP
+
+Abra **Killa Launcher → Administração · Build Logs / Typecheck / Env**. Só o superadmin com MFA pode consultar os dados privados. A Edge Function e o console Next local não dependem de Vercel. O MCP pode consultar as execuções e solicitar publicação, nunca aprovar diretamente.
+
+[Guia de superadmin e autorização](../docs/killa-store-superadmin.md).

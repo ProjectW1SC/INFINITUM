@@ -6,6 +6,7 @@ on:
     branches:
       - feat/infinitum-windows-desktop-20261116
       - feat/killa-secure-launcher-20261116
+      - feat/killa-superadmin-store-mcp-20261116
       - feat/w1-branded-free-updates-20261116
       - main
     paths:

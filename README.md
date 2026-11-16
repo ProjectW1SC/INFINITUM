@@ -28,6 +28,8 @@ Organização de clientes, processos, atendimentos, captção de leads e rotinas
 
 ## W1 Capital App Store — Launcher Windows
 
+[Console privativo de superadmin, diagnósticos e MCP](docs/killa-store-superadmin.md).
+
 O launcher Windows inclui as marcas oficiais W1 Capital e INFINITUM, e instala/atualiza o programa local sem consultar a Vercel. O canal gratuito usa releases específicas aprovadas pela W1, assinatura Ed25519 e hash SHA-512; não executa o ZIP da main. Atualizações aprovadas são baixadas e aplicadas automaticamente quando o programa não está aberto, com opção de desligar.
 
 Veja o [manual da central de aplicativos](desktop/README.md). A primeira versão oficial exige que o administrador configure o segredo de assinatura e aprove uma release no GitHub Actions. As versões piloto anteriores precisam de atualização manual. A assinatura própria gratuita não elimina alertas SmartScreen de Windows.
