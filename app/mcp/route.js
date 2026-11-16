@@ -18,7 +18,13 @@ export async function POST(request){
   const auth=await officeAuth(request,{allowOAuth:true});
   await authorizeKillaMcpSession(auth);
   ctx={...auth,authorization:request.headers.get('authorization')||''};
- }catch{return killaMcpUnauthorized()}
+ }catch(error){
+  const status=Number(error?.status)||401;
+  if(status===401)return killaMcpUnauthorized();
+  const safeStatus=[403,429,503].includes(status)?status:403;
+  return Response.json({error:String(error?.message||'Acesso MCP negado.').slice(0,240)},
+   {status:safeStatus,headers});
+ }
  // Rate controls belong on the authenticated endpoint; never trust a client-supplied owner or company.
  const result=await handleKillaMcpMessage(message,ctx);
  return result===null?new Response(null,{status:202,headers:{'Cache-Control':'no-store'}}):
