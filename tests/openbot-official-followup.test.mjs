@@ -11,7 +11,7 @@ test('stagnant process requires fresh checks from both DJEN and DataJud after la
  assert.equal(assessOpenBotPostReturnResearch({...base,snapshots:[]}).ok,false);
  assert.equal(assessOpenBotPostReturnResearch({...base,snapshots:[snapshot('datajud')]}).ok,false);
  const both=assessOpenBotPostReturnResearch({...base,snapshots:[snapshot('datajud'),snapshot('djen')]});
- assert.equal(both.ok,true);assert.equal(both.checkedAt,'2026-11-16T15:00:00Z');
+ assert.equal(both.ok,true);assert.equal(both.checkedAt,'2026-11-16T15:00:00.000Z');
 });
 test('stale, partial and failed judicial check never proves that nothing happened',()=>{
  const stale=snapshot('djen');stale.checked_at='2026-09-01T00:00:00Z';
