@@ -29,7 +29,10 @@ export default function KillaMcpSetup(){
  const [role,setRole]=useState(''),[policy,setPolicy]=useState(DEFAULT_POLICY);
  const [clientIdsText,setClientIdsText]=useState('');
  const [checking,setChecking]=useState(false),[saving,setSaving]=useState(false);
- const [mfaStatus,setMfaStatus]=useState('desconhecido'),[notice,setNotice]=useState(''),[error,setError]=useState('');
+ const [mfaStatus,setMfaStatus]=useState('desconhecido'),[mfaFactor,setMfaFactor]=useState('');
+ const [mfaQr,setMfaQr]=useState(''),[mfaCode,setMfaCode]=useState('');
+ const [mfaBusy,setMfaBusy]=useState(false),[mfaNotice,setMfaNotice]=useState('');
+ const [notice,setNotice]=useState(''),[error,setError]=useState('');
  useEffect(()=>{
   if(!db||!session?.user?.id)return;
   let active=true;setChecking(true);setError('');setNotice('');
@@ -55,13 +58,47 @@ export default function KillaMcpSetup(){
     setPolicy(saved);setClientIdsText((saved.allowed_client_ids||[]).join('\n'));
    }
    try{
-    const mfa=await withAuthDeadline(db.auth.mfa.getAuthenticatorAssuranceLevel(),9000);
-    if(active)setMfaStatus(mfa.error?'desconhecido':mfa.data?.currentLevel==='aal2'?'ativo':'pendente');
+    const [mfa,factors]=await Promise.all([
+     withAuthDeadline(db.auth.mfa.getAuthenticatorAssuranceLevel(),9000),
+     withAuthDeadline(db.auth.mfa.listFactors(),9000)
+    ]);
+    if(!active)return;
+    if(mfa.error||factors.error){setMfaStatus('desconhecido');return}
+    const verified=(factors.data?.totp||[]).find(x=>x.status==='verified');
+    setMfaFactor(verified?.id||'');
+    setMfaStatus(mfa.data?.currentLevel==='aal2'?'ativo':'pendente');
    }catch{if(active)setMfaStatus('desconhecido')}
   })().catch(e=>{if(active)setError(String(e.message||e))}).finally(()=>{if(active)setChecking(false)});
   return()=>{active=false};
  },[db,session?.user?.id]);
  const canEdit=role==='admin'&&!checking&&!error;
+ async function enrollMfa(){
+  if(!db||mfaBusy||mfaStatus==='ativo')return;
+  setMfaBusy(true);setMfaNotice('');
+  try{
+   const result=await db.auth.mfa.enroll({factorType:'totp',friendlyName:'INFINITUM Killa MCP'});
+   if(result.error)throw result.error;
+   setMfaFactor(result.data.id);
+   setMfaQr(String(result.data.totp?.qr_code||''));
+   setMfaNotice('Escaneie o QR com seu aplicativo autenticador. Depois informe o código de seis dígitos.');
+  }catch(e){setMfaNotice('Não foi possível iniciar o segundo fator: '+String(e.message||e).slice(0,180))}
+  finally{setMfaBusy(false)}
+ }
+ async function verifyMfa(){
+  if(!db||!mfaFactor||mfaBusy)return;
+  if(!/^\d{6}$/.test(mfaCode)){setMfaNotice('Digite os seis dígitos do aplicativo autenticador.');return}
+  setMfaBusy(true);setMfaNotice('');
+  try{
+   const result=await db.auth.mfa.challengeAndVerify({factorId:mfaFactor,code:mfaCode});
+   if(result.error)throw result.error;
+   const assurance=await db.auth.mfa.getAuthenticatorAssuranceLevel();
+   if(assurance.error||assurance.data?.currentLevel!=='aal2')
+    throw Error('O Supabase ainda não confirmou o nível AAL2. Tente novamente com um código novo.');
+   setMfaStatus('ativo');setMfaQr('');setMfaCode('');
+   setMfaNotice('Segundo fator confirmado. Esta sessão agora está em AAL2.');
+  }catch(e){setMfaNotice('Não foi possível confirmar o código: '+String(e.message||e).slice(0,180))}
+  finally{setMfaBusy(false)}
+ }
  async function save(){
   if(!canEdit||!db||!session?.user?.id||saving)return;
   const ids=[...new Set(clientIdsText.split(/[\n,]+/).map(x=>x.trim()).filter(Boolean))];
@@ -109,7 +146,21 @@ export default function KillaMcpSetup(){
      {!canEdit&&<p role="alert">{SHARED_LEXIS_DB
       ?'Esta configuração exige o perfil Administrador na carteira LexisPredict vinculada à sua conta. A autorização é verificada pela empresa, não por crm_memberships.'
       :'Esta configuração exige perfil administrador ativo em crm_memberships. Um usuário comum não pode ativar o MCP. Peça ao administrador do CRM para habilitar sua conta.'}</p>}
-     {mfaStatus!=='ativo'&&<p>O login de segundo fator (MFA/AAL2) é obrigatório para conectar apps externos. Ative e confirme o segundo fator no Supabase Auth antes do primeiro acesso MCP.</p>}
+     {mfaStatus!=='ativo'&&<div className={ui.mcpCard}>
+      <h3>Ativar segundo fator nesta conta</h3>
+      <p>Use um aplicativo autenticador. O QR é individual e só é exibido nesta sessão; não o compartilhe.</p>
+      {!mfaFactor&&<button type="button" disabled={mfaBusy} onClick={enrollMfa}>{mfaBusy?'Gerando QR…':'Gerar QR do autenticador'}</button>}
+      {mfaQr&&<div><img src={mfaQr} alt="QR individual para configurar o segundo fator" width="220" height="220"/>
+       <p>Escaneie o QR no aplicativo autenticador e digite o código atual abaixo.</p></div>}
+      {mfaFactor&&<label className={ui.field}>Código de seis dígitos
+       <input type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6}
+        value={mfaCode} onChange={e=>setMfaCode(e.target.value.replace(/\D/g,'').slice(0,6))}/>
+      </label>}
+      {mfaFactor&&<button type="button" disabled={mfaBusy||!/^\d{6}$/.test(mfaCode)} onClick={verifyMfa}>
+       {mfaBusy?'Confirmando…':'Confirmar segundo fator'}
+      </button>}
+      {mfaNotice&&<p role="status">{mfaNotice}</p>}
+     </div>}
     </section>
     <section className={ui.mcpCard}>
      <h2>2. Ativação do MCP</h2>
