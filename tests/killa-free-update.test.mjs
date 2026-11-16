@@ -60,3 +60,12 @@ test('free release distribution requires manual approval, private signing secret
  assert.ok(update.includes("getPath('userData')"));
  assert.doesNotMatch(update,/execSync|eval\(|https:\/\/.*vercel/);
 });
+
+test('packaged Electron includes the entire signed update verifier and its pinned public key',()=>{
+ const pkg=JSON.parse(read('desktop/package.json'));
+ for(const path of ['main.mjs','free-update-client.mjs','release-trust.mjs','branding/**/*']){
+  assert.ok(pkg.build.files.includes(path),'Ausente do EXE: '+path);
+ }
+ assert.match(read('desktop/free-update-client.mjs'),/pinnedKeyMatches/);
+ assert.match(read('desktop/branding/update-public-key.pem'),/BEGIN PUBLIC KEY/);
+});

@@ -4,7 +4,7 @@ import {mkdir,open,rename,rm,stat} from 'node:fs/promises';
 import {dirname,join} from 'node:path';
 import {spawn} from 'node:child_process';
 import {
- LATEST_SIGNED_MANIFEST,verifyUpdateManifest,trustedHttpsUrl
+ LATEST_SIGNED_MANIFEST,verifyUpdateManifest,trustedHttpsUrl,pinnedKeyMatches
 } from './release-trust.mjs';
 
 const MANIFEST_LIMIT=12000;
@@ -127,7 +127,7 @@ export async function launchVerifiedInstaller({path,manifest,spawnImpl=spawn}){
  return {started:true};
 }
 export function createFreeUpdater({app,publicKey,onState=()=>{},fetchImpl=fetch}){
- if(!app||!publicKey)throw Error('Chave pública e aplicativo obrigatórios.');
+ if(!app||!publicKey||!pinnedKeyMatches(publicKey))throw Error('Chave pública W1 Capital inválida; atualizações bloqueadas.');
  let lastManifest=null,lastPath=null;
  const tell=state=>onState(state);
  return Object.freeze({
