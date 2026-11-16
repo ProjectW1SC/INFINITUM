@@ -56,7 +56,9 @@ async function stablePrivatePort(){
 function serverEntrypoint(){
  const dir=app.isPackaged?join(process.resourcesPath,'app-server'):join(process.cwd(),'desktop','app-server');
  const path=join(dir,'server.js');
- if(!existsSync(path))throw Error('Servidor Next.js não encontrado no pacote. Instalação incompleta.');
+ if(!existsSync(path))throw Object.assign(Error('Servidor Next.js ausente. Instalação incompleta.'),{code:'DESKTOP_BUNDLE_INCOMPLETE'});
+ if(!existsSync(join(dir,'node_modules','next','package.json')))
+  throw Object.assign(Error('Dependências Next.js ausentes no instalador. Instale novamente uma versão corrigida.'),{code:'DESKTOP_BUNDLE_INCOMPLETE'});
  return {dir,path};
 }
 async function startLocalNext(){
@@ -284,15 +286,23 @@ async function launchLocalCRM(target='/login'){
  appOpen=(async()=>{
   pushLauncher({phase:'opening',message:'Iniciando servidor local autorizado, sem Vercel.'});
   try{
+   // Validate the on-disk Windows bundle BEFORE contacting Supabase.
+   // A missing node_modules is a packaging error, not an authentication failure.
+   serverEntrypoint();
    desktopConfig=await loadPublicConfiguration();
    await startLocalNext();
    await openAppWindow(target);
    if(launcherWindow&&!launcherWindow.isDestroyed())launcherWindow.close();
    return launcherState;
-  }catch{
+  }catch(error){
    if(nextProcess&&!nextProcess.killed){try{nextProcess.kill()}catch{}}
    nextProcess=null;
-   return pushLauncher({phase:'error',message:'O servidor local não iniciou. Verifique a autenticação no Supabase.'});
+   const message=error?.code==='DESKTOP_BUNDLE_INCOMPLETE'
+    ?'Instalação incompleta: dependências Next.js ausentes. Baixe e instale uma versão corrigida.'
+    :desktopConfig===null
+     ?'Não foi possível carregar a configuração pública do Supabase. Verifique a internet e a Edge Function desktop-config.'
+     :'Servidor Next.js local não iniciou. Verifique o pacote e a porta local; nenhum dado de cliente foi exposto.';
+   return pushLauncher({phase:'error',message});
   }finally{appOpen=null}
  })();
  return appOpen;
