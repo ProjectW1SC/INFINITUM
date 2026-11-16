@@ -27,7 +27,7 @@ node desktop/verify-packaged-server.mjs
 npm --prefix desktop run dist:win
 \`\`\`
 
-Este protótipo pode ser distribuído como **instalador não assinado** nos testes. O Windows SmartScreen pode avisar. O canal gratuito Ed25519 agora permite atualizações autenticadas sem certificado Windows, após a primeira release oficial. O Authenticode reconhecido pelo Windows é opcional e não deve ser confundido com a assinatura própria do launcher.
+O instalador do workflow de teste Windows (artefato `infinitum-killa-windows-test-UNSIGNED`) **não é uma distribuição final**. Pode apresentar avisos do SmartScreen e não deve ser oferecido como versão sem alertas. As **releases públicas do GitHub** agora exigem tanto assinatura Windows Authenticode válida para o EXE e instalador quanto validação da cadeia de confiança em Windows antes da publicação. A assinatura gratuita Ed25519 continua protegendo o manifesto de atualização do launcher, mas não substitui Authenticode. Mesmo arquivos Authenticode válidos podem mostrar avisos inicialmente até que o editor ou hash tenha reputação positiva. Para eliminar especificamente o aviso de download SmartScreen de forma mais previsível, considerar distribuição pela Microsoft Store.
 
 ## Verificação do instalador Windows
 
@@ -71,7 +71,7 @@ No canal **assinado**, o launcher baixa novas versões em segundo plano, verific
 
 No **piloto não assinado**, o launcher aparece e permite abrir o CRM, mas mantém o atualizador de executáveis bloqueado; não existe botão de instalar arquivo não verificado. A proteção não depende de ocultar JavaScript no navegador.
 
-O workflow de publicação só aceita execução pela `main`, com certificado Windows obrigatório e `forceCodeSigning`. O ambiente GitHub **desktop-production** deve ser configurado com revisores obrigatórios e acesso aos segredos `KILLA_WINDOWS_CERT_P12` e `KILLA_WINDOWS_CERT_PASSWORD`. Sem certificado ou aprovação, não há publicação de release. As permissões de escrever no GitHub ficam somente no workflow de release, não no EXE.
+O workflow de publicação só aceita execução pela `main`, com certificado Windows obrigatório, `forceCodeSigning` e conferência final de `Get-AuthenticodeSignature` para o app e instalador. Se não houver certificado confiável, **nenhuma release será publicada**. O ambiente GitHub **desktop-production** deve ser configurado com revisores obrigatórios e acesso aos segredos `KILLA_WINDOWS_CERT_P12` e `KILLA_WINDOWS_CERT_PASSWORD`. Sem certificado ou aprovação, não há publicação de release. As permissões de escrever no GitHub ficam somente no workflow de release, não no EXE.
 
 Para instalar em outro computador: baixe uma versão **assinada** em GitHub Releases e execute o instalador. Depois disso, o launcher baixa as versões futuras assinadas e oferece a instalação sem usar a Vercel. O Windows pode exigir consentimento UAC conforme a forma de instalação e a política do PC.
 
@@ -81,7 +81,7 @@ Atualizações dos **dados e regras armazenados no Supabase** continuam em tempo
 
 O Killa Launcher usa **logotipo W1 Capital vinho/prata** retirado do site oficial da W1 e **símbolo do infinito do INFINITUM**, separado do Ethereum. O arquivo .ico do EXE é gerado localmente pelo script generate-windows-icon.mjs, sem imagens de terceiros.
 
-**Distribuição automática gratuita:** somente GitHub Releases aprovadas manualmente, com manifesto Ed25519 assinado pela W1 Capital e hash SHA-512 do instalador. O launcher guarda apenas a chave pública e verifica a assinatura, os bytes, a URL oficial, a versão superior e o tamanho máximo antes de instalar. Por padrão, ele baixa e aplica atualizações autenticadas quando o CRM não está aberto; o funcionário pode desligar a opção no launcher.
+**Distribuição automática gratuita para usuários (com assinatura Authenticode exigida do editor):** somente GitHub Releases aprovadas manualmente, com manifesto Ed25519 assinado pela W1 Capital e hash SHA-512 do instalador. O launcher guarda apenas a chave pública e verifica a assinatura, os bytes, a URL oficial, a versão superior e o tamanho máximo antes de instalar. Por padrão, ele baixa e aplica atualizações autenticadas quando o CRM não está aberto; o funcionário pode desligar a opção no launcher.
 
 **Proibido:** executar arquivos ZIP da branch main como atualizações, aceitar redirecionamentos a servidores externos, executar scripts enviados por clientes/LLMs ou baixar código JS remoto para substituir o aplicativo.
 

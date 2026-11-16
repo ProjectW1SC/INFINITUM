@@ -17,7 +17,8 @@ const manifestPath=join(dir,'package.json');
 const pkg=JSON.parse(readFileSync(manifestPath,'utf8'));
 pkg.version=version;
 delete pkg.build.publish;
-pkg.build.win.verifyUpdateCodeSignature=true; // Only paid Authenticode uses built-in updater.
+pkg.build.win.verifyUpdateCodeSignature=true; // Windows validates the publisher independently of Ed25519 updates.
+pkg.build.forceCodeSigning=true; // Ed25519 alone does not satisfy Windows SmartScreen/Authenticode.
 writeFileSync(manifestPath,JSON.stringify(pkg,null,2)+'\n');
 writeFileSync(join(dir,'signed-updates.json'),JSON.stringify({
  enabled:true,source:'w1-ed25519-github-release',version,channel:'stable'
