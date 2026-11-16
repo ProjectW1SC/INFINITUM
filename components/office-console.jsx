@@ -31,7 +31,7 @@ const LOADED={
  audiencias:['clients','cases','deadlines'],
  documents:['clients','cases','documents'],
  whatsapp:['clients','messages'],
- agents:['clients','cases','deadlines','leads','messages','runs'],
+ agents:['runs'],
  reports:['clients','cases','deadlines','leads','messages','runs']
 };
 const titleMap={dashboard:'Painel jurídico',clients:'Clientes',cases:'Processos',deadlines:'Prazos',audiencias:'Audiências',documents:'Peças e petições',whatsapp:'WhatsApp',agents:'Mini Agentes',reports:'Relatórios'};
@@ -60,6 +60,7 @@ function OfficeUI({area,db,session}){
  const [showManualWeb,setShowManualWeb]=useState(false);
  const [miniResult,setMiniResult]=useState(null),[deadlineFilter,setDeadlineFilter]=useState('abertos');
  const [agentSearch,setAgentSearch]=useState(''),[agentFilter,setAgentFilter]=useState('todos');
+ const [showAdvancedAgents,setShowAdvancedAgents]=useState(false);
  const need=LOADED[area]||LOADED.dashboard;
  const load=useCallback(async()=>{
   setLoading(true);
@@ -232,11 +233,22 @@ function OfficeUI({area,db,session}){
   }catch(e){setNotice('Mensagem não enviada: '+e.message)}finally{setBusy(false)}
  }
  async function runMini(){
+  if(busy)return;
   setBusy(true);setNotice('');
-  const result=officeMiniReview({clients,cases,deadlines,leads,messages});setMiniResult(result);
-  const {error}=await db.from('office_agent_runs').insert({owner_id:session.user.id,agent:'mini',task:'Revisar fila do escritório',result,mode:'manual',status:'review',sources:[{type:'crm',date:result.asOf}],external_actions:0});
-  setBusy(false);
-  setNotice(error?'Triagem exibida, mas o log não foi salvo: '+error.message:'Mini Agent executou triagem somente leitura e registrou seu relatório.');
+  try{
+   // Only fetch complete datasets when triage is explicitly requested.
+   const {datasets,errors}=await withAuthDeadline(loadOfficeCollections(db,['clients','cases','deadlines','leads','messages']),30000);
+   if(errors.length)throw Error('Dados necessários indisponíveis: '+errors.join(' · '));
+   const result=officeMiniReview({clients:datasets.clients||[],cases:datasets.cases||[],
+    deadlines:datasets.deadlines||[],leads:datasets.leads||[],messages:datasets.messages||[]});
+   setData(old=>({...old,...datasets}));setMiniResult(result);
+   const {error}=await db.from('office_agent_runs').insert({owner_id:session.user.id,agent:'mini',
+    task:'Revisar fila do escritório',result,mode:'manual',status:'review',
+    sources:[{type:'crm',date:result.asOf}],external_actions:0});
+   setNotice(error?'Triagem exibida, mas o log não foi salvo: '+error.message:
+    'Triagem concluída com dados carregados nesta execução.');
+  }catch(e){setNotice('Triagem não concluída: '+String(e.message||e))}
+  finally{setBusy(false)}
  }
  return <main className={'inf-studio '+(area==='dashboard'?'pr-dashboard-route':'')}>
   <header className="inf-heading"><div><small>BLACKHOLE · INTELIGÊNCIA JURÍDICA</small><h1>{titleMap[area]||'Painel jurídico'}</h1>
@@ -337,6 +349,10 @@ function OfficeUI({area,db,session}){
      </>:<div className="office-list-empty">Selecione uma conversa para responder.</div>}</section></div>
   </>}
   {area==='agents'&&<>
+   <OpenBotWorkbench db={db} session={session}/>
+   <details className="inf-panel" onToggle={e=>setShowAdvancedAgents(e.currentTarget.open)} style={{marginTop:14,padding:16}}>
+    <summary style={{cursor:'pointer',fontWeight:700}}>Outros agentes, scanner e histórico</summary>
+    {showAdvancedAgents&&<div style={{paddingTop:16}}>
    <div className="blackhole-agents-header">
     <div><small>BLACKHOLE / ESTÚDIO DE AGENTES</small><h2>Agentes de IA e automação</h2>
      <p>Especialistas para receber demandas, organizar processos, revisar evidências e preparar atendimentos. Cada card indica sua capacidade real.</p></div>
@@ -369,7 +385,7 @@ function OfficeUI({area,db,session}){
     <strong style={{marginTop:9}}>{x.name}</strong><p>{x.role}</p>
     <Link className="inf-btn" href={x.id==='mini'?'/agentes#mini-triagem':x.id==='hermes'?'/scanner':x.id==='pecas'||x.id==='pesquisa'?'/pecas':x.id==='tribunais'?'/processos':x.id==='prazos'||x.id==='audiencias'?'/prazos':x.id==='whatsapp'||x.id==='posvenda'?'/whatsapp':x.id==='leads'?'/leads':'/relatorios'}>Abrir área</Link>
    </article>)}</div>
-   <OpenBotWorkbench db={db} session={session}/>
+   
    <BlackholeHermesAgent db={db} session={session}/>
    <div className="inf-panel" id="mini-triagem"><h2>Mini Agent · análise operacional automática</h2><p>O Supabase executa uma triagem diária sem computador aberto, guardando pendências e retornos na trilha de auditoria. Use o botão para uma revisão adicional sob demanda.</p>
     <div className="office-action-row"><button className="inf-btn primary" onClick={runMini} disabled={busy}><Bot size={14}/> Executar triagem</button></div>
@@ -378,6 +394,8 @@ function OfficeUI({area,db,session}){
    </div>
    <section className="inf-panel" style={{marginTop:15}}><h2>Execuções registradas</h2>{runs.slice(0,15).map(r=><article className="office-record" key={r.id}><strong>{r.agent} · {r.task}</strong><small>{dateLabel(r.created_at)} · {r.mode==='scheduled'?'Agendado automaticamente':'Manual'} · {r.status} · {r.external_actions} ações externas</small></article>)}
     {!runs.length&&<div className="office-list-empty">Ainda não há execuções registradas.</div>}</section>
+    </div>}
+   </details>
   </>}
   {area==='reports'&&<><div className="inf-grid"><Stat label="Clientes do escritório" value={clients.length} href="/clientes"/><Stat label="Casos cadastrados" value={cases.length} href="/processos"/><Stat label="Prazos vencidos" value={mini.counts.overdue} href="/prazos"/><Stat label="Leads na carteira" value={leads.length} href="/leads"/></div>
     <section className="inf-panel"><h2>Relatório operacional verificável</h2><Source>Contagens da carteira jurídica autorizada, limitada ao conjunto carregado. Não representam decisões judiciais nem desempenho financeiro ou comercial presumido.</Source>
