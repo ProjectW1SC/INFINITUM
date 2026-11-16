@@ -59,7 +59,7 @@ async function processCrm(request,sender){
    response={ok:true,snapshot:sanitizeWhatsappSnapshot(data),warning:data.warning};
   }else if(request.type==='draft'){
    const result=await chrome.scripting.executeScript({
-    target:{tabId:tab.id},func:insertWhatsappComposerDraft,args:[String(request.text).trim()]
+    target:{tabId:tab.id},func:insertWhatsappComposerDraft,args:[String(request.text).trim(),request.expectedTitle]
    });
    const data=result?.[0]?.result;
    response={ok:data?.ok===true,prepared:data?.prepared===true,submitted:false,
