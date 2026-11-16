@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DEFAULT_OPENBOT_COMPANY_POLICY,normalizeOpenBotPolicy,contactNameVariants,rankProcessCandidates,evaluateOpenBotInbound,planNextOpenBotReturn,composeOpenBotCaseReply,deriveApprovedLearning} from '../lib/openbot-company-agent.mjs';
+import {DEFAULT_OPENBOT_COMPANY_POLICY,normalizeOpenBotPolicy,contactNameVariants,rankProcessCandidates,evaluateOpenBotInbound,planNextOpenBotReturn,composeOpenBotCaseReply,deriveApprovedLearning,isConciliationLinkRequest} from '../lib/openbot-company-agent.mjs';
 
 test('company rules default to silent drafts: no bulk messaging, unknown contact or administrative interception',()=>{
  const p=DEFAULT_OPENBOT_COMPANY_POLICY;
@@ -111,4 +111,12 @@ test('approved training votes actually change phrasing without changing court fa
  assert.match(out.text,/DataJud|fonte oficial/i);
  assert.doesNotMatch(out.text,/Seguimos à disposição\./);
  assert.equal(out.requiresHumanReview,true);
+});
+
+test('confirmed conciliation access request can be handled under human review without turning other sensitive asks into routine replies',()=>{
+ assert.equal(isConciliationLinkRequest('Pode me mandar o link da audiência de conciliação?'),true);
+ assert.equal(isConciliationLinkRequest('Quando será minha audiência?'),true);
+ assert.equal(isConciliationLinkRequest('Quero recorrer da sentença e o link da audiência'),false);
+ assert.equal(isConciliationLinkRequest('Vai ter acordo e quanto vou receber na audiência?'),false);
+ assert.equal(isConciliationLinkRequest('O prazo de recurso venceu?'),false);
 });
