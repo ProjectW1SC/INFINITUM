@@ -1,5 +1,7 @@
 // Main CRM route renders login through SecuredWorkspace; /login does not exist.
 export const DESKTOP_ENTRY_PATH='/';
+// Independent ZapFast web session, never an implicit WA.Auto/CRM account.
+export const DESKTOP_ZAPFAST_URL='https://zapfast-cloudflare-web.daviconcentrix.workers.dev/';
 const PROJECT='https://ulkuhiibeoibbzhqrfya.supabase.co';
 const WA='https://lexispredict-wa-auto.onrender.com';
 const PORT_MIN=1024,PORT_MAX=65535;
@@ -56,6 +58,13 @@ export function isSafeExternalNavigation(value){
    // Open only this exact separately authenticated ZapFast site in the system browser.
    'zapfast-cloudflare-web.daviconcentrix.workers.dev'].includes(host)
    ||(host.endsWith('.supabase.co')&&/^[a-z0-9-]+\.supabase\.co$/.test(host));
+ }catch{return false}
+}
+export function isSafeZapFastNavigation(value){
+ try{
+  const url=new URL(value);
+  return url.protocol==='https:'&&url.origin===new URL(DESKTOP_ZAPFAST_URL).origin&&
+    url.username===''&&url.password==='';
  }catch{return false}
 }
 export function shouldRunSignedUpdater({packaged=false,win32=false,signedMarker=false}={}){
