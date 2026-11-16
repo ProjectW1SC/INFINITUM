@@ -8,7 +8,7 @@ import {pathToFileURL} from 'node:url';
 import {createFreeUpdater} from './free-update-client.mjs';
 import {setTimeout as sleep} from 'node:timers/promises';
 import {validateDesktopConfig,safeStandaloneEnvironment,isLocalAppNavigation,
- isSafeExternalNavigation,shouldRunSignedUpdater} from './runtime-policy.mjs';
+ isSafeExternalNavigation,shouldRunSignedUpdater,DESKTOP_ENTRY_PATH} from './runtime-policy.mjs';
 import {safeLauncherSnapshot,normalizeUpdateProgress,canInstallSignedUpdate,isSignedUpdateConfiguration} from './launcher-policy.mjs';
 
 const CONFIG_ENDPOINT='https://ulkuhiibeoibbzhqrfya.supabase.co/functions/v1/killa-mcp/desktop-config';
@@ -273,14 +273,14 @@ ipcMain.handle('launcher:set-auto-update',(event,value)=>{
   :'Instalação automática desligada; você pode atualizar manualmente no launcher.'});
  return launcherState;
 });
-async function launchLocalCRM(target='/login'){
+async function launchLocalCRM(target=DESKTOP_ENTRY_PATH){
  if(window&&!window.isDestroyed()){
-  if(target!=='/login')await window.loadURL('http://127.0.0.1:'+port+target);
+  if(target!==DESKTOP_ENTRY_PATH)await window.loadURL('http://127.0.0.1:'+port+target);
   window.show();window.focus();
   return launcherState;
  }
  if(appOpen){await appOpen;
-  if(window&&target!=='/login')await window.loadURL('http://127.0.0.1:'+port+target);
+  if(window&&target!==DESKTOP_ENTRY_PATH)await window.loadURL('http://127.0.0.1:'+port+target);
   return launcherState;
  }
  appOpen=(async()=>{
@@ -309,7 +309,7 @@ async function launchLocalCRM(target='/login'){
 }
 ipcMain.handle('launcher:launch',event=>{
  expectTrustedLauncher(event);
- return launchLocalCRM('/login');
+ return launchLocalCRM(DESKTOP_ENTRY_PATH);
 });
 ipcMain.handle('launcher:open-admin',event=>{
  expectTrustedLauncher(event);
@@ -317,7 +317,7 @@ ipcMain.handle('launcher:open-admin',event=>{
  // enforces the exclusive superadmin allowlist and MFA for every request.
  return launchLocalCRM('/app-store/admin');
 });
-async function openAppWindow(target='/login'){
+async function openAppWindow(target=DESKTOP_ENTRY_PATH){
  window=new BrowserWindow({
   width:1300,height:840,minWidth:880,minHeight:600,
   show:false,backgroundColor:'#120c15',autoHideMenuBar:true,

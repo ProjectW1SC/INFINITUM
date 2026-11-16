@@ -110,3 +110,12 @@ Dados de clientes, WhatsApp e autenticação não são hospedados pelo serviço 
 Abra **Killa Launcher → Administração · Build Logs / Typecheck / Env**. Só o superadmin com MFA pode consultar os dados privados. A Edge Function e o console Next local não dependem de Vercel. O MCP pode consultar as execuções e solicitar publicação, nunca aprovar diretamente.
 
 [Guia de superadmin e autorização](../docs/killa-store-superadmin.md).
+
+
+### Correção do 404 ao abrir o EXE
+
+O login pertence à rota `/` do INFINITUM; `/login` não existe. Launcher e verificações compartilham `DESKTOP_ENTRY_PATH='/'`. O CI exige HTTP 200 e conteúdo HTML nas rotas `/`, `/whatsapp` e `/app-store/admin`, antes e depois do empacotamento Windows. Uma resposta verde de `/api/desktop/health` isoladamente não é suficiente.
+
+### Avisos de antivírus e editor desconhecido
+
+O artefato `infinitum-killa-windows-test-UNSIGNED` é somente de teste e não deve ser instalado como versão pública. Releases públicas exigem certificado Authenticode confiável, validação do EXE e do instalador e revisão no GitHub. Um alerta com nome de ameaça não pode ser presumido falso positivo só por ser Electron. Não desative o Microsoft Defender; verifique o nome da detecção e a origem do arquivo.

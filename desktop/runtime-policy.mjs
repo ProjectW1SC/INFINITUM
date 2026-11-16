@@ -1,3 +1,5 @@
+// Main CRM route renders login through SecuredWorkspace; /login does not exist.
+export const DESKTOP_ENTRY_PATH='/';
 const PROJECT='https://ulkuhiibeoibbzhqrfya.supabase.co';
 const WA='https://lexispredict-wa-auto.onrender.com';
 const PORT_MIN=1024,PORT_MAX=65535;
@@ -50,7 +52,9 @@ export function isSafeExternalNavigation(value){
   const host=url.hostname.toLowerCase();
   return ['github.com','docs.github.com','supabase.com','www.supabase.com',
    'whatsapp.com','www.whatsapp.com','wa.me','accounts.google.com',
-   'agentinfinitum.vercel.app','projectw1sc-crm.vercel.app'].includes(host)
+   'agentinfinitum.vercel.app','projectw1sc-crm.vercel.app',
+   // Open only this exact separately authenticated ZapFast site in the system browser.
+   'zapfast-cloudflare-web.daviconcentrix.workers.dev'].includes(host)
    ||(host.endsWith('.supabase.co')&&/^[a-z0-9-]+\.supabase\.co$/.test(host));
  }catch{return false}
 }

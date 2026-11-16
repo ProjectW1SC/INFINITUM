@@ -85,7 +85,7 @@ export default function StoreSuperadmin(){
   await task(async()=>{await request('mcp-toggle','POST',{enabled});await refresh()});
  }
  if(loading)return <main className="store"><h1>Loja W1 Capital</h1><p>Validando sessão...</p></main>;
- if(!session?.user)return <main className="store"><h1>Loja W1 Capital</h1><p>Faça login.</p><Link href="/login">Entrar</Link></main>;
+ if(!session?.user)return <main className="store"><h1>Loja W1 Capital</h1><p>Faça login.</p><Link href="/">Entrar</Link></main>;
  if(access?.ok===false)return <main className="store"><h1>Acesso negado</h1><p>Somente superadmin exclusivo da loja.</p><Link href="/agentes">Voltar ao INFINITUM</Link></main>;
  if(!access)return <main className="store"><h1>Loja W1 Capital</h1><p>Verificando superadmin...</p></main>;
  if(access.needsMfa)return <main className="store"><h1>Segurança extra da loja</h1><p>É obrigatório ativar o segundo fator TOTP para consultar logs e Env.</p>
