@@ -54,6 +54,7 @@ test('only signed release workflow can distribute automatic updates, independent
  assert.match(workflow,/KILLA_WINDOWS_CERT_P12/);
  assert.match(workflow,/KILLA_WINDOWS_CERT_PASSWORD/);
  assert.match(workflow,/forceCodeSigning/);
+ assert.match(read('desktop/prepare-signed-release.mjs'),/forceCodeSigning=true/);
  assert.doesNotMatch(workflow,/vercel\s+(deploy|build)/i);
  const pkg=JSON.parse(read('desktop/package.json'));
  assert.equal(pkg.build.win.verifyUpdateCodeSignature,true);
@@ -61,4 +62,11 @@ test('only signed release workflow can distribute automatic updates, independent
  const docs=read('desktop/README.md');
  assert.match(docs,/launcher|iniciador/i);
  assert.match(docs,/GitHub Releases/);
+});
+
+test('a modified marker alone cannot enable updating without publisher signature metadata',async()=>{
+ const {isSignedUpdateConfiguration}=await import('../desktop/launcher-policy.mjs');
+ assert.equal(isSignedUpdateConfiguration({enabled:true,source:'signed-github-release'},''),false);
+ assert.equal(isSignedUpdateConfiguration({enabled:true,source:'signed-github-release'},'verifyUpdateCodeSignature: false\npublisherName: CN=Evil'),false);
+ assert.equal(isSignedUpdateConfiguration({enabled:true,source:'signed-github-release'},'publisherName: CN=W1 Capital'),true);
 });

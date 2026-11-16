@@ -13,6 +13,8 @@ permissions:
 
 jobs:
   signed-windows-release:
+    if: github.ref == 'refs/heads/main'
+    environment: desktop-production
     runs-on: windows-latest
     timeout-minutes: 50
     steps:
@@ -20,6 +22,57 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Bloquear versões inválidas e execuções fora da main
+        shell: pwsh
+        run: |
+          if ('${{ github.ref }}' -ne 'refs/heads/main') { throw 'Releases só podem sair da main.' }
+          if ('${{ inputs.version }}' -notmatch '^\d+\.\d+\.\d+
+        shell: pwsh
+        env:
+          WIN_CSC_LINK: ${{ secrets.KILLA_WINDOWS_CERT_P12 }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.KILLA_WINDOWS_CERT_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WIN_CSC_LINK) -or [string]::IsNullOrWhiteSpace($env:WIN_CSC_KEY_PASSWORD)) {
+            throw 'Configure o certificado de assinatura e senha nos GitHub Actions Secrets antes de publicar.'
+          }
+      - name: Validar compromisso de assinatura antes da publicação
+        run: node -e "const p=require('./desktop/package.json');if(p.build.win.verifyUpdateCodeSignature!==true)process.exit(1)"
+      - name: Preparar versão com autoatualização assinada
+        run: node desktop/prepare-signed-release.mjs '${{ inputs.version }}'
+      - name: Instalar dependências
+        run: npm install --no-audit --no-fund
+      - name: Validar testes e tipos
+        run: |
+          npm test
+          npm run typecheck
+      - name: Build standalone local
+        run: npm run build
+        env:
+          KILLA_DESKTOP_STANDALONE: '1'
+      - name: Preparar e testar servidor Next local
+        run: |
+          node desktop/stage-standalone.mjs
+          node desktop/verify-local-server.mjs
+      - name: Instalar empacotador
+        run: npm install --prefix desktop --no-audit --no-fund
+      - name: Validar opção forceCodeSigning antes de publicar
+        shell: pwsh
+        run: |
+          $p=Get-Content desktop/package.json -Raw | ConvertFrom-Json
+          if ($p.build.forceCodeSigning -ne $true) { throw 'forceCodeSigning ausente: build não pode publicar.' }
+      - name: Publicar instalador com assinatura no GitHub Releases
+        run: npm --prefix desktop run dist:release
+        env:
+          WIN_CSC_LINK: ${{ secrets.KILLA_WINDOWS_CERT_P12 }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.KILLA_WINDOWS_CERT_PASSWORD }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: infinitum-killa-windows-signed
+          path: desktop/dist/*.exe
+          if-no-files-found: error
+          retention-days: 30
+) { throw 'Versão semântica inválida.' }
       - name: Bloquear publicação sem certificado Windows
         shell: pwsh
         env:

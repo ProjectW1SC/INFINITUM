@@ -54,3 +54,17 @@ O instalador piloto não recebe atualizações de código automaticamente sem as
 O workflow [release Windows assinado](../.github/workflows/killa-desktop-signed-release.yml) foi preparado para distribuir novas versões pelo GitHub Releases, que o `electron-updater` verifica nas instalações existentes. Por segurança, ele **recusa publicar sem** os segredos `KILLA_WINDOWS_CERT_P12` e `KILLA_WINDOWS_CERT_PASSWORD`. O certificado nunca entra nos executáveis nem nos repositórios.
 
 Somente builds assinados receberão `signed-updates.json: enabled=true`; os pilotos não assinados continuam sem download automático de código. As alterações de dados de cada usuário no Supabase Realtime não exigem novo executável.
+
+## Launcher de atualização — estilo loja de aplicativos
+
+A instalação inclui um **Killa Launcher** local, que abre antes do CRM e apresenta o produto, a versão instalada, o estado do canal e o andamento do download. A janela é HTML/CSS/JavaScript incorporada ao instalador e nunca carrega código remoto. Cada instalação utiliza `electron-updater` para buscar `latest.yml` e o instalador nas **GitHub Releases oficiais**; nenhum build, API ou arquivo da Vercel participa das atualizações.
+
+No canal **assinado**, o launcher baixa novas versões em segundo plano, verifica o hash do pacote e exige assinatura Windows Authenticode com a identidade do publicador prevista no manifesto instalado. **Só executa o novo instalador com a confirmação explícita de quem está no PC**. Versões anteriores não são instaladas automaticamente. Quando a rede falha, é possível abrir a versão local já instalada.
+
+No **piloto não assinado**, o launcher aparece e permite abrir o CRM, mas mantém o atualizador de executáveis bloqueado; não existe botão de instalar arquivo não verificado. A proteção não depende de ocultar JavaScript no navegador.
+
+O workflow de publicação só aceita execução pela `main`, com certificado Windows obrigatório e `forceCodeSigning`. O ambiente GitHub **desktop-production** deve ser configurado com revisores obrigatórios e acesso aos segredos `KILLA_WINDOWS_CERT_P12` e `KILLA_WINDOWS_CERT_PASSWORD`. Sem certificado ou aprovação, não há publicação de release. As permissões de escrever no GitHub ficam somente no workflow de release, não no EXE.
+
+Para instalar em outro computador: baixe uma versão **assinada** em GitHub Releases e execute o instalador. Depois disso, o launcher baixa as versões futuras assinadas e oferece a instalação sem usar a Vercel. O Windows pode exigir consentimento UAC conforme a forma de instalação e a política do PC.
+
+Atualizações dos **dados e regras armazenados no Supabase** continuam em tempo real, por usuário, independentemente de o executável ter uma nova versão. Mudanças de código do CRM e do OpenBot precisam de um novo pacote assinado; não são importadas automaticamente do banco para dentro do EXE.
