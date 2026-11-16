@@ -140,10 +140,9 @@ export default function OpenBotWorkbench({db,session}){
      <button onClick={generate} type="button" disabled={busy||!prompt.trim()}>{busy?'Processando…':'Gerar rascunho'}</button>
     </div>
    </div>
-   <nav className={ui.links}><a href="/mcp/setup">Conectar assistentes</a><a href="/whatsapp">Meu WhatsApp</a>
-    <a href="/report">Atendimentos confirmados</a></nav>
+   
    {draft&&<article className={ui.answer}><small>Resposta proposta · revisão obrigatória</small>
-    <p>{draft}</p><small>{source}</small><div className={ui.inlineActions}><button type="button" onClick={()=>navigator.clipboard?.writeText(draft).then(()=>setNotice('Rascunho copiado. Nenhuma mensagem enviada.')).catch(()=>setNotice('Selecione o texto para copiar.'))}>Copiar rascunho</button></div></article>}
+    <p>{draft}</p><small>{source}</small><div className={ui.inlineActions}><button type="button" onClick={()=>{if(!navigator.clipboard?.writeText){setNotice('Selecione o texto para copiar.');return}navigator.clipboard.writeText(draft).then(()=>setNotice('Rascunho copiado. Nenhuma mensagem enviada.')).catch(()=>setNotice('Selecione o texto para copiar.'))}}>Copiar rascunho</button></div></article>}
   </div>
   <details className={ui.disclosure}><summary>Modelo local opcional, revisão e ferramentas avançadas</summary>
    <div className="blackhole-agents-header">
