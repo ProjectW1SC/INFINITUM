@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validateDesktopConfig,safeStandaloneEnvironment,isLocalAppNavigation,shouldRunSignedUpdater} from '../desktop/runtime-policy.mjs';
+import {validateDesktopConfig,safeStandaloneEnvironment,isLocalAppNavigation,isSafeExternalNavigation,shouldRunSignedUpdater} from '../desktop/runtime-policy.mjs';
 import {readFileSync} from 'node:fs';
 const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 const config={supabaseUrl:'https://ulkuhiibeoibbzhqrfya.supabase.co',
@@ -84,4 +84,13 @@ test('EXE release is built on Windows and supports audited GitHub updates',()=>{
  const pkg=read('desktop/package.json');
  assert.match(pkg,/electron-builder/);
  assert.match(pkg,/nsis/);
+});
+
+test('the Electron WhatsApp panel opens only the exact official ZapFast site outside the CRM',()=>{
+ assert.equal(isSafeExternalNavigation('https://zapfast-cloudflare-web.daviconcentrix.workers.dev/'),true);
+ assert.equal(isSafeExternalNavigation('https://zapfast-cloudflare-web.daviconcentrix.workers.dev/api/status'),true);
+ assert.equal(isSafeExternalNavigation('https://zapfast-cloudflare-web.daviconcentrix.workers.dev.attacker.tld/'),false);
+ assert.equal(isSafeExternalNavigation('http://zapfast-cloudflare-web.daviconcentrix.workers.dev/'),false);
+ assert.equal(isSafeExternalNavigation('https://other.daviconcentrix.workers.dev/'),false);
+ assert.equal(isSafeExternalNavigation('https://example.org/?redirect=zapfast-cloudflare-web.daviconcentrix.workers.dev'),false);
 });
