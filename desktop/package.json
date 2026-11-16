@@ -27,7 +27,12 @@
       "main.mjs",
       "preload.cjs",
       "runtime-policy.mjs",
-      "package.json"
+      "package.json",
+      "launcher-policy.mjs",
+      "launcher-preload.cjs",
+      "launcher.html",
+      "launcher.css",
+      "launcher-ui.js"
     ],
     "extraResources": [
       {

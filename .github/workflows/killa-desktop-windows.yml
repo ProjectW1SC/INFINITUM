@@ -5,13 +5,15 @@ on:
   push:
     branches:
       - feat/infinitum-windows-desktop-20261116
+      - feat/killa-secure-launcher-20261116
+      - main
     paths:
-      - desktop/**
-      - .github/workflows/killa-desktop-windows.yml
-      - next.config.mjs
-      - lib/supabase-client.js
-      - lib/killa-realtime.mjs
-      - components/workspace-session-provider.jsx
+      - 'desktop/**'
+      - '.github/workflows/killa-desktop-windows.yml'
+      - 'next.config.mjs'
+      - 'lib/supabase-client.js'
+      - 'lib/killa-realtime.mjs'
+      - 'components/workspace-session-provider.jsx'
 
 permissions:
   contents: read
@@ -46,6 +48,11 @@ jobs:
         run: node desktop/verify-local-server.mjs
       - name: Instalar Electron
         run: npm install --prefix desktop --no-audit --no-fund
+      - name: Verificar launcher estático antes do empacotamento
+        run: |
+          node --check desktop/launcher-ui.js
+          node --check desktop/launcher-preload.cjs
+          node --check desktop/main.mjs
       - name: Compilar instalador EXE Windows x64
         run: npm --prefix desktop run dist:win
       - name: Guardar instalador para instalação

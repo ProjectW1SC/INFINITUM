@@ -7,9 +7,12 @@ import {randomBytes} from 'node:crypto';
 import {setTimeout as sleep} from 'node:timers/promises';
 import {validateDesktopConfig,safeStandaloneEnvironment,isLocalAppNavigation,
  isSafeExternalNavigation,shouldRunSignedUpdater} from './runtime-policy.mjs';
+import {safeLauncherSnapshot,normalizeUpdateProgress,canInstallSignedUpdate,isSignedUpdateConfiguration} from './launcher-policy.mjs';
 
 const CONFIG_ENDPOINT='https://ulkuhiibeoibbzhqrfya.supabase.co/functions/v1/killa-mcp/desktop-config';
-let nextProcess=null,port=0,desktopConfig=null,window=null,shuttingDown=false,localNonce='';
+let nextProcess=null,port=0,desktopConfig=null,window=null,launcherWindow=null,shuttingDown=false,localNonce='';
+let updater=null,updateCheck=null,appOpen=null;
+let launcherState=safeLauncherSnapshot({phase:'loading',version:app.getVersion(),message:'Inicializando canal de atualizações seguro.',signed:false});
 if(!app.requestSingleInstanceLock())app.quit();
 else app.on('second-instance',()=>{if(window){window.show();window.focus()}});
 app.setAppUserModelId('br.com.w1capital.infinitum.killa');
@@ -82,27 +85,147 @@ async function startLocalNext(){
  }
  throw Error('O servidor local não ficou disponível na porta privada.');
 }
-async function setupSignedUpdater(){
- if(!app.isPackaged||process.platform!=='win32')return;
- const marker=join(process.resourcesPath,'signed-updates.json');
- let enabled=false;
- try{enabled=JSON.parse(readFileSync(marker,'utf8')).enabled===true}catch{}
- if(!shouldRunSignedUpdater({packaged:app.isPackaged,win32:true,signedMarker:enabled}))return;
- try{
-  const updaterModule=await import('electron-updater');
-  const updater=updaterModule.autoUpdater||updaterModule.default?.autoUpdater;
-  if(!updater)return;
-  updater.autoDownload=true;
-  updater.autoInstallOnAppQuit=true;
-  // Updates are only enabled for builds signed with a verified Windows
-  // publisher certificate; unsigned pilot builds retain manual installs.
-  await updater.checkForUpdatesAndNotify();
-  // Signed releases check periodically without requiring the user to reopen the app.
-  const interval=setInterval(()=>void updater.checkForUpdatesAndNotify().catch(()=>{}),
-   6*60*60*1000);
-  interval.unref?.();
- }catch{}
+function pushLauncher(changes){
+ launcherState=safeLauncherSnapshot({...launcherState,...changes});
+ if(launcherWindow&&!launcherWindow.isDestroyed())
+  launcherWindow.webContents.send('launcher:state',launcherState);
+ return launcherState;
 }
+function isTrustedLauncherEvent(event){
+ return !!(launcherWindow&&!launcherWindow.isDestroyed()&&
+  event?.sender===launcherWindow.webContents&&
+  launcherWindow.webContents.getURL().startsWith('file://'));
+}
+async function checkForSignedUpdates(){
+ if(!updater||!launcherState.signed)return pushLauncher({
+  phase:'unsigned',message:'Esta instalação piloto não recebe executáveis automaticamente. Abra apenas releases assinados.'
+ });
+ if(updateCheck)return updateCheck;
+ pushLauncher({phase:'checking',message:'Consultando versões oficiais do GitHub Releases por HTTPS.'});
+ updateCheck=updater.checkForUpdates().catch(()=>{
+  pushLauncher({phase:'offline',message:'Não foi possível acessar o canal assinado. Você pode abrir a versão instalada.'});
+ }).finally(()=>{updateCheck=null});
+ await updateCheck;
+ return launcherState;
+}
+async function setupSignedUpdater(){
+ // A writable marker by itself cannot grant updater access. The installed
+ // app-update.yml must also contain the publisher's Authenticode identity.
+ const marker=join(process.resourcesPath,'signed-updates.json');
+ const updateManifest=join(process.resourcesPath,'app-update.yml');
+ let config=null,manifest='';
+ try{config=JSON.parse(readFileSync(marker,'utf8'))}catch{}
+ try{manifest=readFileSync(updateManifest,'utf8')}catch{}
+ const signed=process.platform==='win32'&&app.isPackaged&&
+  isSignedUpdateConfiguration(config,manifest)&&
+  shouldRunSignedUpdater({packaged:app.isPackaged,win32:true,signedMarker:config.enabled===true});
+ if(!signed){
+  pushLauncher({phase:'unsigned',signed:false,
+   message:'Instalação de teste: atualização de executáveis desativada até existir uma versão assinada.'});
+  return;
+ }
+ try{
+  const module=await import('electron-updater');
+  updater=module.autoUpdater||module.default?.autoUpdater;
+  if(!updater)throw Error('Updater unavailable');
+  updater.autoDownload=true;                // Download in background, verify Authenticode.
+  updater.autoInstallOnAppQuit=false;        // Never install without visible user approval.
+  updater.allowDowngrade=false;
+  updater.allowPrerelease=false;
+  updater.on('checking-for-update',()=>pushLauncher({
+   phase:'checking',message:'Verificando atualizações oficiais e integridade do canal.'
+  }));
+  updater.on('update-available',info=>pushLauncher({
+   phase:'downloading',downloaded:false,updateVersion:info?.version||'',
+   percent:0,message:'Atualização assinada encontrada. Download em andamento; instalação requer confirmação.'
+  }));
+  updater.on('download-progress',progress=>pushLauncher({
+   phase:'downloading',percent:normalizeUpdateProgress(progress),
+   message:'Baixando pacote assinado e verificando metadados de integridade.'
+  }));
+  updater.on('update-downloaded',info=>pushLauncher({
+   phase:'downloaded',downloaded:true,percent:100,updateVersion:info?.version||'',
+   message:'Download concluído. O instalador somente será aplicado após verificar a assinatura do editor.'
+  }));
+  updater.on('update-not-available',()=>pushLauncher({
+   phase:'ready',downloaded:false,percent:0,message:'Você já possui a versão publicada mais recente.'
+  }));
+  updater.on('error',()=>pushLauncher({
+   phase:'offline',downloaded:false,
+   message:'A atualização não foi validada. Nenhum executável foi instalado; a versão atual continua disponível.'
+  }));
+  await checkForSignedUpdates();
+ }catch{
+  updater=null;
+  pushLauncher({phase:'offline',signed:false,downloaded:false,
+   message:'Não foi possível inicializar o atualizador seguro. Nenhum pacote será instalado.'});
+ }
+}
+async function openLauncherWindow(){
+ launcherWindow=new BrowserWindow({
+  width:950,height:710,minWidth:850,minHeight:610,
+  backgroundColor:'#0b0a0f',show:false,autoHideMenuBar:true,
+  title:'W1 Capital · Launcher Killa AI',
+  webPreferences:{
+   preload:join(app.getAppPath(),'launcher-preload.cjs'),
+   contextIsolation:true,nodeIntegration:false,sandbox:true,webSecurity:true,
+   webviewTag:false,allowRunningInsecureContent:false
+  }
+ });
+ launcherWindow.webContents.session.setPermissionRequestHandler((_sender,_permission,cb)=>cb(false));
+ launcherWindow.webContents.setWindowOpenHandler(()=>({action:'deny'}));
+ launcherWindow.webContents.on('will-navigate',e=>e.preventDefault());
+ launcherWindow.on('closed',()=>{launcherWindow=null});
+ await launcherWindow.loadFile(join(app.getAppPath(),'launcher.html'));
+ launcherWindow.show();
+ pushLauncher({version:app.getVersion()});
+}
+function expectTrustedLauncher(event){
+ if(!isTrustedLauncherEvent(event))throw Object.assign(Error('Origem da operação não autorizada.'),{code:'LAUNCHER_NOT_TRUSTED'});
+}
+ipcMain.handle('launcher:get-state',event=>{
+ expectTrustedLauncher(event);
+ return launcherState;
+});
+ipcMain.handle('launcher:check-update',event=>{
+ expectTrustedLauncher(event);
+ return checkForSignedUpdates();
+});
+ipcMain.handle('launcher:open-downloads',async event=>{
+ expectTrustedLauncher(event);
+ await shell.openExternal('https://github.com/ProjectW1SC/INFINITUM/releases');
+ return launcherState;
+});
+ipcMain.handle('launcher:install-update',event=>{
+ expectTrustedLauncher(event);
+ if(!canInstallSignedUpdate(launcherState)||!updater)return pushLauncher({
+  message:'Nenhuma atualização assinada e validada está disponível para instalar.'
+ });
+ pushLauncher({phase:'installing',message:'Aplicando a atualização autorizada. O Windows validará a assinatura antes de executar.'});
+ try{updater.quitAndInstall(false,true)}catch{
+  pushLauncher({phase:'error',message:'Não foi possível iniciar a instalação. A versão atual foi preservada.'});
+ }
+ return launcherState;
+});
+ipcMain.handle('launcher:launch',async event=>{
+ expectTrustedLauncher(event);
+ if(appOpen)return appOpen;
+ appOpen=(async()=>{
+  pushLauncher({phase:'opening',message:'Iniciando seu servidor INFINITUM local, sem Vercel.'});
+  try{
+   desktopConfig=await loadPublicConfiguration();
+   await startLocalNext();
+   await openAppWindow();
+   if(launcherWindow&&!launcherWindow.isDestroyed())launcherWindow.close();
+   return launcherState;
+  }catch{
+   if(nextProcess&&!nextProcess.killed){try{nextProcess.kill()}catch{}}
+   nextProcess=null;
+   return pushLauncher({phase:'error',message:'Não foi possível iniciar o servidor local. Verifique a internet para autenticação Supabase e tente novamente.'});
+  }finally{appOpen=null}
+ })();
+ return appOpen;
+});
 async function openAppWindow(){
  window=new BrowserWindow({
   width:1300,height:840,minWidth:880,minHeight:600,
@@ -145,13 +268,11 @@ app.on('window-all-closed',()=>{if(process.platform!=='darwin')app.quit()});
 app.whenReady().then(async()=>{
  Menu.setApplicationMenu(null);
  try{
-  desktopConfig=await loadPublicConfiguration();
-  await startLocalNext();
-  await openAppWindow();
+  await openLauncherWindow();
   void setupSignedUpdater();
  }catch(error){
-  dialog.showErrorBox('INFINITUM · inicialização segura',
-   String(error?.message||'Falha ao iniciar o servidor local.').slice(0,350)+'\n\nO aplicativo não utiliza Vercel. Precisa de internet para validar login no Supabase.');
+  dialog.showErrorBox('INFINITUM · launcher seguro',
+   String(error?.message||'Falha ao iniciar o launcher local.').slice(0,240));
   app.quit();
  }
 }).catch(()=>app.quit());
