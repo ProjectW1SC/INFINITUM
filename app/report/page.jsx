@@ -14,6 +14,7 @@ import {sortTaskQueue} from '../../lib/tarefas.mjs';
 import {priorityDigest,limitSnippet} from '../../lib/report-priority.mjs';
 import ReportPrintDocument from '../../components/report-print-document';
 import EfferdKpi from '../../components/efferd-kpi';
+import KillaAtendimentoKpi from '../../components/killa-atendimento-kpi';
 
 const periods=[{id:'esta_semana',label:'Esta semana'},{id:'semana_passada',label:'Semana passada'},{id:'mes',label:'Mês atual'}];
 const periodLabel=Object.fromEntries(periods.map(p=>[p.id,p.label]));
