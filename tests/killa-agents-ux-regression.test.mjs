@@ -29,3 +29,14 @@ test('MCP setup shows role, error, activation steps and keeps admin-only writes'
  assert.match(s,/MFA/);
  assert.match(s,/disabled=\{!canEdit\|\|saving\}/);
 });
+
+test('Killa offers generative writing only after explicit consent using existing authenticated Superagente API',()=>{
+ const s=read('components/openbot-workbench.jsx');
+ assert.match(s,/\[onlineConsent,setOnlineConsent\]=useState\(false\)/);
+ assert.match(s,/if\(!onlineConsent\)throw Error/);
+ assert.match(s,/auth\.getSession\(\)|db\.auth\.getSession\(\)/);
+ assert.match(s,/fetch\('\/api\/superagente'/);
+ assert.match(s,/externalAiConsent:true/);
+ assert.match(s,/isGenerativeModel/);
+ assert.match(s,/value="online"/);
+});
