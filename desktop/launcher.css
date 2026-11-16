@@ -6,3 +6,5 @@
 .inf-mark img{width:83%;height:auto;max-height:120px;filter:drop-shadow(0 0 26px rgba(202,113,161,.49));object-fit:contain}
 .app-icon img{width:44px;height:36px;object-fit:contain;filter:drop-shadow(0 0 6px #d575a777)}
 @media(max-width:720px){.logo{gap:8px}.w1-brand{width:160px}.shop-label{font-size:8px;letter-spacing:0;margin-left:5px;padding-left:8px}.inf-mark{height:95px}.inf-mark img{max-height:84px}}
+
+.automatic{display:flex;gap:10px;align-items:flex-start;color:#d2bccc;font-size:11px;line-height:1.5;cursor:pointer;margin-top:8px}.automatic input{accent-color:#a73c70;margin-top:2px;width:16px;height:16px;flex:none}
