@@ -6,7 +6,7 @@ const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 test('Killa generates a useful draft without waiting for a heavy Qwen download',()=>{
  const s=read('components/openbot-workbench.jsx');
  assert.match(s,/useState\('deterministico'\)/);
- assert.match(s,/setDraft\(authoritative\)/);
+ assert.match(s,/setDraft\(authoritative(?:\.slice\(0,18000\))?\)/);
  assert.match(s,/setSource\(model\)/);
  assert.match(s,/Modelo local opcional/);
 });
