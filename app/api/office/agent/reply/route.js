@@ -147,17 +147,13 @@ export async function POST(request){
    const digits=String(archive.data?.phone||jid.split('@')[0]).replace(/\D/g,'');
    const suffix=digits.slice(-8);
    if(!terms.length&&suffix.length<8)invalid('Informe o nome do cliente ou um número válido.',400);
-   const searches=terms.slice(0,4).map(term=>{
-    const escaped=term.replace(/[%,()_*]/g,' ').trim();
-    return db.from('processos').select('id,cliente,telefone,protocolo_ref,status')
-     .eq('empresa_id',company).ilike('cliente','%'+escaped+'%').limit(18);
+   // Query only this authenticated tenant, normalizing telephone punctuation
+   // and the full names split by '/' or '-'. No auto authorization on matches.
+   const search=await db.rpc('find_openbot_process_candidates',{
+    p_label:query,p_phone:digits
    });
-   if(suffix.length===8)searches.push(db.from('processos')
-    .select('id,cliente,telefone,protocolo_ref,status').eq('empresa_id',company)
-    .ilike('telefone','%'+suffix+'%').limit(18));
-   const found=await Promise.all(searches);
-   if(found.some(x=>x.error))invalid('Não foi possível pesquisar os dados do cliente nesta empresa.',503);
-   const rows=[...new Map(found.flatMap(x=>x.data||[]).map(x=>[String(x.id),x])).values()];
+   if(search.error)invalid('Busca segura por nome composto e telefone indisponível.',503);
+   const rows=Array.isArray(search.data)?search.data:[];
    const candidates=rankProcessCandidates({profileName:query,phone:digits,cases:rows});
    return officeJson({ok:true,cases:candidates.map(x=>({
     id:x.id,cliente:x.cliente,protocolo_ref:x.protocolo_ref,status:x.status,
