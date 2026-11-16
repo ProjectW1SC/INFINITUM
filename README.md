@@ -26,6 +26,12 @@ Organização de clientes, processos, atendimentos, captção de leads e rotinas
 
 ---
 
+## Aplicativo Windows sem Vercel
+
+O INFINITUM possui um [projeto de instalador Windows](desktop/README.md) que distribui o próprio servidor Next.js local dentro do Electron. Cada funcionário entra pela conta individual do Supabase e recebe eventos autorizados de WhatsApp, histórico e recibos MCP em tempo real.
+
+O **MCP independente** continua em `https://ulkuhiibeoibbzhqrfya.supabase.co/functions/v1/killa-mcp`. A leitura e o QR somente podem ser liberados para usuário autenticado. A autenticação de aplicativos terceiros exige habilitar OAuth Server no Supabase. O instalador piloto não inclui chaves administrativas ou configuração de assinatura automática.
+
 ## Killa AI / OpenBot — MCP por usuário
 
 **MCP sem Vercel:** `https://ulkuhiibeoibbzhqrfya.supabase.co/functions/v1/killa-mcp` (Supabase Edge Function; independente dos builds do frontend).
