@@ -31,11 +31,12 @@ export default function StoreSuperadmin(){
     const r=await request('access');
     if(!live)return;
     setAccess(r);
-    if(r.needsMfa){
-     const res=await db.auth.mfa.listFactors();
-     const existing=(res.data?.totp||[]).find(x=>x.status==='verified');
-     if(live&&existing)setFactor(existing.id);
-    }else if(live)await refresh();
+    // Even an already-AAL2 superadmin needs the verified TOTP factor id
+    // to perform a FRESH challenge at the time of publication.
+    const res=await db.auth.mfa.listFactors();
+    const existing=(res.data?.totp||[]).find(x=>x.status==='verified');
+    if(live&&existing)setFactor(existing.id);
+    if(!r.needsMfa&&live)await refresh();
    }catch{if(live)setAccess({ok:false})}
   })();
   return()=>{live=false};
