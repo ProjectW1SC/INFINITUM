@@ -57,6 +57,25 @@ test('Next standalone desktop build and user-scoped Supabase Realtime are wired'
  const ui=read('components/workspace-session-provider.jsx');
  assert.match(ui,/subscribeKillaRealtime/);
 });
+test('Windows distribution contains Next dependencies and tests real packaged Electron before publishing',()=>{
+ const pkg=JSON.parse(read('desktop/package.json'));
+ assert.ok(pkg.build.extraResources.some(x=>x.to==='app-server/node_modules'&&x.from==='app-server/node_modules'));
+ assert.ok(pkg.build.extraResources.some(x=>x.to==='app-server'&&x.filter.includes('!node_modules/**')));
+ const stage=read('desktop/stage-standalone.mjs');
+ assert.match(stage,/Standalone incompleto: dependências Next\.js/);
+ const verify=read('desktop/verify-packaged-server.mjs');
+ assert.match(verify,/INFINITUM Killa AI\.exe/);
+ assert.match(verify,/ELECTRON_RUN_AS_NODE:'1'/);
+ assert.match(verify,/api\/desktop\/health/);
+ assert.match(read('desktop/main.mjs'),/DESKTOP_BUNDLE_INCOMPLETE/);
+ for(const path of ['.github/workflows/killa-desktop-windows.yml',
+  '.github/workflows/killa-desktop-free-release.yml',
+  '.github/workflows/killa-desktop-signed-release.yml']){
+  const workflow=read(path);
+  assert.match(workflow,/node desktop\/verify-packaged-server\.mjs/);
+  assert.match(workflow,/npm --prefix desktop run pack:win/);
+ }
+});
 test('EXE release is built on Windows and supports audited GitHub updates',()=>{
  const ci=read('.github/workflows/killa-desktop-windows.yml');
  assert.match(ci,/windows-latest/);

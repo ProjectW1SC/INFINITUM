@@ -60,6 +60,10 @@ jobs:
         run: |
           $p=Get-Content desktop/package.json -Raw | ConvertFrom-Json
           if ($p.build.forceCodeSigning -ne $true) { throw 'forceCodeSigning ausente' }
+      - name: Validar EXE Windows empacotado antes de publicar
+        run: |
+          npm --prefix desktop run pack:win
+          node desktop/verify-packaged-server.mjs
       - name: Publicar versão assinada
         run: npm --prefix desktop run dist:release
         env:
