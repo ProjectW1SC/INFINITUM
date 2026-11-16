@@ -23,7 +23,7 @@ test('MCP accepts Supabase OAuth AAL1 only with a recent server-verified MFA gra
 test('company MCP authorization verifies the private MFA grant for the exact user and OAuth client',()=>{
  const m=read('lib/killa-mcp.mjs');
  assert.match(m,/killa_check_mcp_mfa_grant/);
- assert.match(m,/p_client_id:\s*verified\.clientId/);
+ assert.match(m,/p_client_id:\s*identity\.clientId/);
  assert.match(m,/mfaGrantVerified/);
 });
 test('consent stores the AAL2 proof before approving or auto-redirecting OAuth',()=>{
@@ -42,7 +42,7 @@ test('MCP preserves 401 only for authentication failures and returns 403/503 for
  assert.doesNotMatch(r,/catch\{return killaMcpUnauthorized\(\)\}/);
 });
 test('MFA grant storage is private, short-lived, company-scoped and writable only through guarded RPC',()=>{
- const s=read('supabase/migrations/20261116190000_killa_mcp_oauth_mfa_grants.sql');
+ const s=read('supabase/migrations/20261116205000_killa_mcp_oauth_mfa_grants.sql');
  assert.match(s,/killa_mcp_oauth_mfa_grants/);
  assert.match(s,/ENABLE ROW LEVEL SECURITY/);
  assert.match(s,/REVOKE ALL.*authenticated/s);
