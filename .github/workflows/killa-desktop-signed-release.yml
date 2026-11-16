@@ -1,0 +1,61 @@
+name: INFINITUM Killa AI — release Windows assinado
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Versão (x.y.z) para publicar no GitHub Releases'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  signed-windows-release:
+    runs-on: windows-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Bloquear publicação sem certificado Windows
+        shell: pwsh
+        env:
+          WIN_CSC_LINK: ${{ secrets.KILLA_WINDOWS_CERT_P12 }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.KILLA_WINDOWS_CERT_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WIN_CSC_LINK) -or [string]::IsNullOrWhiteSpace($env:WIN_CSC_KEY_PASSWORD)) {
+            throw 'Configure o certificado de assinatura e senha nos GitHub Actions Secrets antes de publicar.'
+          }
+      - name: Preparar versão com autoatualização assinada
+        run: node desktop/prepare-signed-release.mjs '${{ inputs.version }}'
+      - name: Instalar dependências
+        run: npm install --no-audit --no-fund
+      - name: Validar testes e tipos
+        run: |
+          npm test
+          npm run typecheck
+      - name: Build standalone local
+        run: npm run build
+        env:
+          KILLA_DESKTOP_STANDALONE: '1'
+      - name: Preparar e testar servidor Next local
+        run: |
+          node desktop/stage-standalone.mjs
+          node desktop/verify-local-server.mjs
+      - name: Instalar empacotador
+        run: npm install --prefix desktop --no-audit --no-fund
+      - name: Publicar instalador com assinatura no GitHub Releases
+        run: npm --prefix desktop run dist:release
+        env:
+          WIN_CSC_LINK: ${{ secrets.KILLA_WINDOWS_CERT_P12 }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.KILLA_WINDOWS_CERT_PASSWORD }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: infinitum-killa-windows-signed
+          path: desktop/dist/*.exe
+          if-no-files-found: error
+          retention-days: 30

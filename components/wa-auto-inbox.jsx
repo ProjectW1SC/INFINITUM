@@ -128,6 +128,22 @@ export default function WaAutoInbox({db,userId}){
   return()=>window.clearInterval(id);
  },[loadArchiveChats,loadArchiveMessages,reloadChats,reloadMessages,selected?.jid,connected,query,groups]);
  useEffect(()=>{
+  let timer=null;
+  const onRealtime=event=>{
+   const table=event?.detail?.table;
+   if(table!=='office_wa_chat_archive'&&table!=='office_wa_message_archive')return;
+   if(document.visibilityState!=='visible')return;
+   if(timer!==null)window.clearTimeout(timer);
+   timer=window.setTimeout(()=>{
+    timer=null;
+    loadArchiveChats().catch(()=>{});
+    if(selected?.jid)loadArchiveMessages(selected.jid).catch(()=>{});
+   },650);
+  };
+  window.addEventListener('killa:realtime',onRealtime);
+  return()=>{window.removeEventListener('killa:realtime',onRealtime);if(timer!==null)window.clearTimeout(timer)};
+ },[loadArchiveChats,loadArchiveMessages,selected?.jid]);
+ useEffect(()=>{
   if(!connected||syncUnsupported)return;
   syncRecent();const id=window.setInterval(()=>{if(document.visibilityState==='visible')syncRecent()},45000);
   return()=>window.clearInterval(id);

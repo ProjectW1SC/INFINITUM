@@ -3,6 +3,7 @@ import {createContext,useContext,useEffect,useMemo,useState} from 'react';
 import {getClient} from '../lib/supabase-client';
 import {useCrmAccess} from '../lib/use-crm-access';
 import {withAuthDeadline} from '../lib/auth-deadline.mjs';
+import {subscribeKillaRealtime} from '../lib/killa-realtime.mjs';
 
 const WorkspaceContext=createContext(null);
 
@@ -15,6 +16,7 @@ export function WorkspaceSessionProvider({children}){
  const db=useMemo(()=>getClient(),[]);
  const [state,setState]=useState({session:null,loading:true,authFault:''});
  const access=useCrmAccess(db,state.session?.user);
+ const [realtimeVersion,setRealtimeVersion]=useState(0);
  useEffect(()=>{
   if(!db){setState({session:null,loading:false,authFault:''});return}
   let alive=true,subscription=null;
@@ -40,8 +42,18 @@ export function WorkspaceSessionProvider({children}){
   initialize();
   return()=>{alive=false;subscription?.unsubscribe()};
  },[db]);
- const value=useMemo(()=>({db,session:state.session,loading:state.loading,
-  authFault:state.authFault,access}),[db,state,access.loading,access.allowed,access.denied,access.error]);
+ useEffect(()=>{
+  const ownerId=state.session?.user?.id;
+  if(!db||!ownerId||access.allowed!==true)return undefined;
+  return subscribeKillaRealtime(db,ownerId,({table})=>{
+   setRealtimeVersion(v=>v+1);
+   // No client message content or personal data in cross-component signals.
+   if(typeof window!=='undefined')
+    window.dispatchEvent(new CustomEvent('killa:realtime',{detail:{table}}));
+  });
+ },[db,state.session?.user?.id,access.allowed]);
+ const value=useMemo(()=>({db,realtimeVersion,session:state.session,loading:state.loading,
+  authFault:state.authFault,access}),[db,state,realtimeVersion,access.loading,access.allowed,access.denied,access.error]);
  return <WorkspaceContext.Provider value={value}>{children}</WorkspaceContext.Provider>;
 }
 export function useWorkspaceSession(){

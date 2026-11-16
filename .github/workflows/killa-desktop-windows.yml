@@ -1,0 +1,57 @@
+name: INFINITUM Killa AI — instalador Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/infinitum-windows-desktop-20261116
+    paths:
+      - desktop/**
+      - .github/workflows/killa-desktop-windows.yml
+      - next.config.mjs
+      - lib/supabase-client.js
+      - lib/killa-realtime.mjs
+      - components/workspace-session-provider.jsx
+
+permissions:
+  contents: read
+
+jobs:
+  windows-exe:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@v4
+      - name: Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Instalar Next e dependências
+        run: npm install --no-audit --no-fund
+      - name: Testes e autorização
+        run: npm test
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Build completo standalone sem Vercel
+        run: npm run build
+        env:
+          KILLA_DESKTOP_STANDALONE: '1'
+          NODE_ENV: production
+          # Public config is fetched at runtime from the Supabase Edge Function.
+          # Never copy Vercel service_role, sb_secret or signing keys into the EXE.
+      - name: Copiar Next standalone e assets
+        run: node desktop/stage-standalone.mjs
+      - name: Smoke test do Next local em 127.0.0.1
+        run: node desktop/verify-local-server.mjs
+      - name: Instalar Electron
+        run: npm install --prefix desktop --no-audit --no-fund
+      - name: Compilar instalador EXE Windows x64
+        run: npm --prefix desktop run dist:win
+      - name: Guardar instalador para instalação
+        uses: actions/upload-artifact@v4
+        with:
+          name: infinitum-killa-windows-installer
+          path: desktop/dist/*.exe
+          if-no-files-found: error
+          retention-days: 14

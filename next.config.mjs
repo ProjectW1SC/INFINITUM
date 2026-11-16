@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig={
  reactStrictMode:true,poweredByHeader:false,
+ ...(process.env.KILLA_DESKTOP_STANDALONE==='1'?{output:'standalone'}:{}),
  async redirects(){
   return [
    {source:'/tarefas',destination:'/prazos',permanent:false},
