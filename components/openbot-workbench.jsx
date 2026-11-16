@@ -117,10 +117,10 @@ export default function OpenBotWorkbench({db,session}){
   }catch(error){setNotice('Não foi possível registrar a revisão: '+String(error.message||error).slice(0,180))}
   finally{setBusy(false)}
  }
- return <section className="inf-panel" aria-label="OpenBot · laboratório de agentes sob revisão" style={{marginTop:18}}>
+ return <section className="inf-panel" aria-label="Killa AI · laboratório de agentes sob revisão" style={{marginTop:18}}>
   <div className="blackhole-agents-header">
-   <div><small>INFINITUM • OPENBOT · ADAPTAÇÃO</small><h2>Central dos agentes e IA local</h2>
-    <p>Seis papéis do escritório, modelos do LexisPredict e análise do SheetsPredict. Esta versão é uma adaptação: não executa o servidor completo do OpenBot.</p>
+   <div><small>INFINITUM • KILLA AI · ADAPTAÇÃO</small><h2>Central dos agentes e IA local</h2>
+    <p>Seis papéis do escritório, modelos do LexisPredict e análise do SheetsPredict. Esta versão é uma adaptação: não executa o servidor completo do Killa AI.</p>
    </div>
   </div>
   <div className="office-agent-grid">{OPENBOT_COWORKERS.map(x=><article key={x.id} className="office-agent-card">
