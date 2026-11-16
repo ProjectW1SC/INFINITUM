@@ -97,6 +97,10 @@ async function setupSignedUpdater(){
   // Updates are only enabled for builds signed with a verified Windows
   // publisher certificate; unsigned pilot builds retain manual installs.
   await updater.checkForUpdatesAndNotify();
+  // Signed releases check periodically without requiring the user to reopen the app.
+  const interval=setInterval(()=>void updater.checkForUpdatesAndNotify().catch(()=>{}),
+   6*60*60*1000);
+  interval.unref?.();
  }catch{}
 }
 async function openAppWindow(){

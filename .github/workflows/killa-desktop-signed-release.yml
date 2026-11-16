@@ -48,7 +48,7 @@ jobs:
       - name: Instalar empacotador
         run: npm install --prefix desktop --no-audit --no-fund
       - name: Publicar instalador com assinatura no GitHub Releases
-        run: npm --prefix desktop exec electron-builder -- --win nsis --x64 --publish always
+        run: npm --prefix desktop run dist:release
         env:
           WIN_CSC_LINK: ${{ secrets.KILLA_WINDOWS_CERT_P12 }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.KILLA_WINDOWS_CERT_PASSWORD }}

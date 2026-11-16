@@ -7,7 +7,8 @@
   "main": "main.mjs",
   "scripts": {
     "dist:win": "electron-builder --win nsis --x64 --publish never",
-    "pack:win": "electron-builder --win dir --x64 --publish never"
+    "pack:win": "electron-builder --win dir --x64 --publish never",
+    "dist:release": "electron-builder --win nsis --x64 --publish always"
   },
   "dependencies": {
     "electron-updater": "6.8.11"
