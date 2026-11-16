@@ -11,7 +11,8 @@
   if(!['status','observe','draft'].includes(data.type))return;
   chrome.runtime.sendMessage({
    channel:CHANNEL,type:data.type,
-   text:data.type==='draft'?data.text:undefined
+   text:data.type==='draft'?data.text:undefined,
+   expectedTitle:data.type==='draft'?data.expectedTitle:undefined
   }).then(result=>{
    window.postMessage({channel:CHANNEL,direction:'response',requestId:data.requestId,
     result:result||{ok:false,reason:'Extensão indisponível'}},ORIGIN);
