@@ -15,6 +15,10 @@ if(existsSync(stat)){
  cpSync(stat,join(target,'.next','static'),{recursive:true});
 }
 if(!existsSync(join(target,'server.js')))throw Error('Empacotamento não contém server.js.');
+const nextPackage=join(target,'node_modules','next','package.json');
+const nextServer=join(target,'node_modules','next','dist','server','lib','start-server.js');
+if(!existsSync(nextPackage)||!existsSync(nextServer))
+ throw Error('Standalone incompleto: dependências Next.js não foram incluídas no staging.');
 // Defense in depth: do not ever bundle local private configuration.
 for(const file of readdirSync(target)){
  if(privateFile(file))throw Error('Arquivo privado identificado no pacote: '+basename(file));
