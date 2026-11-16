@@ -89,10 +89,19 @@ async function verifyPrepared(db,user,company,jid,providerId){
  const rules=await companyAgentPolicy(db,company,jid);
  const manual=rules.rule?.mode||'';
  const staffRepliedAfter=chat.rows.some(x=>x.is_from_me&&Date.parse(x.timestamp)>=Date.parse(chat.chosen.timestamp));
+ // The whole company's synced WhatsApp archive may contain messages sent by
+ // another operator's phone to this same client. Silence the bot in that case.
+ const staffSince=new Date(Date.now()-rules.policy.staff_handoff_hours*3600000).toISOString();
+ const others=await db.from('office_wa_message_archive').select('owner_id,timestamp')
+  .eq('empresa_id',company).eq('jid',jid).eq('is_from_me',true)
+  .neq('owner_id',user.id).gte('timestamp',staffSince)
+  .order('timestamp',{ascending:false}).limit(1);
+ if(others.error)invalid('Não foi possível verificar atendimentos de outros números; resposta bloqueada.',503);
+ const anotherStaffReplied=(others.data||[]).length>0;
  const routed=evaluateOpenBotInbound({
   policy:rules.policy,jid,contactName:rules.contact?.name||'',authorized:true,
   administrativeContact:manual==='administrative',
-  staffRepliedAfter,otherStaffActive:manual==='staff_active'||manual==='silence'||manual==='review',
+  staffRepliedAfter,otherStaffActive:anotherStaffReplied||manual==='staff_active'||manual==='silence'||manual==='review',
   text:chat.chosen.content||'',mediaType:chat.chosen.media_type||'',history:chat.rows
  });
  if(routed.decision==='ignore')invalid('Regra da empresa: não responder ('+routed.reason+').',409);
@@ -110,9 +119,12 @@ async function verifyPrepared(db,user,company,jid,providerId){
  if(!source.ok)invalid('Movimentação oficial não está recente ou exige leitura humana: '+source.reason,409);
  const sentAfter=staffRepliedAfter;
  const hearing=await nextConciliationHearing(db,company,p.id);
+ const learned=await db.from('office_agent_style_votes').select('tag,approved_count,rejected_count')
+  .eq('empresa_id',company).limit(50);
+ if(learned.error)invalid('Não foi possível conferir correções de redação aprovadas.',503);
  const reply=composeOpenBotCaseReply({
   sourceText:source.text,sourceAt:source.sourceAt,movementAt:p.datajud_ultimo_movimento,
-  lastReturnAt:p.ultimo_retorno,history:chat.rows,policy:rules.policy
+  lastReturnAt:p.ultimo_retorno,history:chat.rows,policy:rules.policy,learning:learned.data||[]
  });
  return {grant,p,chat,source:{...source,text:reply.text},sentAfter,predictLmReview,
    hearing,policy:rules.policy,replyMeta:reply,
