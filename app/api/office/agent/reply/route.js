@@ -8,6 +8,7 @@ import {planPredictLmLegalCores,classifyPredictLmFailure,predictLmCoreCatalog} f
 import {predictLmConfig} from '../../../../../lib/predictlm-gateway.mjs';
 import {normalizeOpenBotPolicy,contactNameVariants,rankProcessCandidates,evaluateOpenBotInbound,planNextOpenBotReturn,composeOpenBotCaseReply,isConciliationLinkRequest} from '../../../../../lib/openbot-company-agent.mjs';
 import {assessOpenBotPostReturnResearch} from '../../../../../lib/openbot-official-followup.mjs';
+import {evaluateKillaHandoff,validateKillaOutgoing} from '../../../../../lib/killa-ai-guard.mjs';
 import {GET as consultOfficialProcess} from '../../../processos/consulta/route.js';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -103,10 +104,12 @@ async function verifyPrepared(db,user,company,jid,providerId){
   .order('timestamp',{ascending:false}).limit(1);
  if(others.error)invalid('Não foi possível verificar atendimentos de outros números; resposta bloqueada.',503);
  const anotherStaffReplied=(others.data||[]).length>0;
+ const handoff=evaluateKillaHandoff({history:chat.rows,otherStaffMessages:others.data||[],
+  receivedAt:chat.chosen.timestamp,staffHandoffHours:rules.policy.staff_handoff_hours,actorId:user.id});
  const routed=evaluateOpenBotInbound({
   policy:rules.policy,jid,contactName:rules.contact?.name||'',authorized:true,
   administrativeContact:manual==='administrative',
-  staffRepliedAfter,otherStaffActive:anotherStaffReplied||manual==='staff_active'||manual==='silence'||manual==='review',
+  staffRepliedAfter,otherStaffActive:anotherStaffReplied||handoff.block||manual==='staff_active'||manual==='silence'||manual==='review',
   text:chat.chosen.content||'',mediaType:chat.chosen.media_type||'',history:chat.rows
  });
  if(routed.decision==='ignore')invalid('Regra da empresa: não responder ('+routed.reason+').',409);
@@ -319,6 +322,7 @@ export async function POST(request){
      (checked.hearing.time?' às '+checked.hearing.time:'')+
      '. Link para participar: '+checked.hearing.url:'';
   const finalText=proposed+hearingSuffix;
+  if(!validateKillaOutgoing(finalText).ok)invalid('Killa AI bloqueou informações internas.',403);
   if(finalText.length>3000)invalid('Mensagem completa excedeu o tamanho seguro.',400);
   const returnPlan=planNextOpenBotReturn({
    policy:checked.policy,movementAt:checked.p.datajud_ultimo_movimento||checked.p.ultima_movimentacao,

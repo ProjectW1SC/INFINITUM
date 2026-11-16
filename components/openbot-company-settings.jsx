@@ -8,7 +8,7 @@ const columns=[
 const categories=[
  {value:'staff_active',label:'Outro atendente assumiu a conversa'},
  {value:'silence',label:'Não atender este contato'},
- {value:'administrative',label:'Contato do administrativo: só quando mencionar o OpenBot'},
+ {value:'administrative',label:'Contato do administrativo: só quando mencionar o Killa AI'},
  {value:'review',label:'Encaminhar sempre para revisão humana'}
 ];
 const numbers=str=>String(str||'').replace(/\D/g,'');
@@ -19,7 +19,7 @@ export default function OpenBotCompanySettings({db,jid='',contactName='',isGroup
  const [canEdit,setCanEdit]=useState(false),[busy,setBusy]=useState('');
  const [notice,setNotice]=useState(''),[rules,setRules]=useState([]);
  const [excludedPhones,setExcludedPhones]=useState(''),[excludedNames,setExcludedNames]=useState('');
- const [groupIds,setGroupIds]=useState(''),[mentions,setMentions]=useState('@OpenBot');
+ const [groupIds,setGroupIds]=useState(''),[mentions,setMentions]=useState('@KillaAI');
  const [mode,setMode]=useState('staff_active'),[days,setDays]=useState(7);
  const [groupTask,setGroupTask]=useState('');
  const api=useCallback(async(method,data)=>{
@@ -77,7 +77,7 @@ export default function OpenBotCompanySettings({db,jid='',contactName='',isGroup
  });
  return <section style={{border:'1px solid #8885',borderRadius:10,margin:'10px 0',padding:10}}>
   <button type="button" className="wa-button ghost" onClick={()=>setOpened(v=>!v)}
-   aria-expanded={opened}>{opened?'Recolher configurações':'OpenBot · regras da empresa e atendentes'}</button>
+   aria-expanded={opened}>{opened?'Recolher configurações':'Killa AI · regras da empresa e atendentes'}</button>
   {opened&&<div style={{display:'grid',gap:10,marginTop:10}}>
    <p style={{fontSize:12,margin:0}}>As configurações são separadas por empresa. O modo de envio permanece em <strong>rascunho com confirmação humana</strong>, sem disparos em massa. {canEdit?'Você pode editar as regras.':'Somente o administrador da empresa pode editá-las.'}</p>
    {policy&&<>
@@ -88,16 +88,23 @@ export default function OpenBotCompanySettings({db,jid='',contactName='',isGroup
     <label style={{display:'grid',gap:4}}>Grupos
      <select disabled={!canEdit} value={policy.groups||'ignore'} onChange={e=>update('groups',e.target.value)}>
       <option value="ignore">Nunca responder ou registrar tarefas de grupos</option>
-      <option value="internal_only">Somente grupos internos permitidos, quando marcarem o OpenBot</option>
+      <option value="internal_only">Somente grupos internos permitidos, quando marcarem o Killa AI</option>
       <option value="draft_only">Grupos da lista permitida: apenas rascunhos e tarefas para revisão</option>
      </select></label>
     <label style={{display:'grid',gap:4}}>Administrativo
      <select disabled={!canEdit} value={policy.administrative||'mention_only'}
       onChange={e=>update('administrative',e.target.value)}>
       <option value="ignore">Nunca responder</option>
-      <option value="mention_only">Responder somente quando mencionarem @OpenBot e houver processo autorizado</option>
+      <option value="mention_only">Responder somente quando mencionarem @KillaAI e houver processo autorizado</option>
       <option value="manual_review">Sempre encaminhar para revisão humana</option>
      </select></label>
+    <label style={{display:'grid',gap:4}}>Nível de permissão do Killa AI
+     <select disabled={!canEdit} value={policy.permission_level||'basico'} onChange={e=>update('permission_level',e.target.value)}>
+      <option value="basico">Básico</option><option value="medio">Médio</option><option value="alto">Alto</option>
+      <option value="muito_alto">Muito alto</option><option value="maximo">Máximo</option>
+     </select>
+     <small>Nenhum nível permite envio automático, ignorar as regras da empresa ou divulgar dados internos.</small>
+    </label>
     <label style={{display:'grid',gap:4}}>Silenciar quando outro atendente falou com o mesmo cliente nas últimas (horas)
      <input type="number" min="1" max="48" disabled={!canEdit} style={{maxWidth:120}}
       value={Number(policy.staff_handoff_hours||8)}
@@ -132,7 +139,7 @@ export default function OpenBotCompanySettings({db,jid='',contactName='',isGroup
      <small>Identificador do grupo selecionado: {jid}</small>
      <button type="button" className="wa-button ghost" onClick={()=>{
       setGroupIds(old=>[...new Set([...old.split(/\r?\n/).filter(Boolean),jid])].join('\n'));
-      setNotice('Grupo adicionado à lista interna. Salve as regras; as mensagens continuarão dependendo de menção ao OpenBot.');
+      setNotice('Grupo adicionado à lista interna. Salve as regras; as mensagens continuarão dependendo de menção ao Killa AI.');
      }}>Permitir grupo atual para tarefas internas</button>
     </div>}
     <label style={{display:'grid',gap:4}}>Contatos excluídos — números, um por linha
@@ -146,7 +153,7 @@ export default function OpenBotCompanySettings({db,jid='',contactName='',isGroup
       onChange={e=>setGroupIds(e.target.value)} placeholder="120123456789012345@g.us"/></label>
     <label style={{display:'grid',gap:4}}>Como marcar o agente no WhatsApp
      <input disabled={!canEdit} maxLength={180} value={mentions}
-      onChange={e=>setMentions(e.target.value)} placeholder="@OpenBot"/></label>
+      onChange={e=>setMentions(e.target.value)} placeholder="@KillaAI"/></label>
     <button type="button" className="wa-button" disabled={!canEdit||!!busy} onClick={save}>
      {busy==='save'?'Salvando...':'Salvar regras desta empresa'}</button>
    </>}
@@ -167,9 +174,9 @@ export default function OpenBotCompanySettings({db,jid='',contactName='',isGroup
    </div>}
    {isGroup&&<div style={{padding:9,border:'1px solid #8884',borderRadius:8,display:'grid',gap:6}}>
     <strong>Transformar solicitação de grupo em tarefa</strong>
-    <small>Somente grupos autorizados com menção ao OpenBot. Sem resposta automática.</small>
+    <small>Somente grupos autorizados com menção ao Killa AI. Sem resposta automática.</small>
     <textarea rows={3} maxLength={450} value={groupTask} onChange={e=>setGroupTask(e.target.value)}
-     placeholder="@OpenBot anote a tarefa de pedir orientação ao advogado..."/>
+     placeholder="@KillaAI anote a tarefa de pedir orientação ao advogado..."/>
     <button type="button" className="wa-button ghost" disabled={!!busy||groupTask.trim().length<12}
      onClick={registerTask}>Registrar tarefa de grupo para revisão</button>
    </div>}
