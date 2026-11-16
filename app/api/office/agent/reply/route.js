@@ -7,6 +7,7 @@ import {selectOfficeAgentSkills} from '../../../../../lib/office-agent-skills.mj
 import {planPredictLmLegalCores,classifyPredictLmFailure,predictLmCoreCatalog} from '../../../../../lib/predictlm-office-cores.mjs';
 import {predictLmConfig} from '../../../../../lib/predictlm-gateway.mjs';
 import {normalizeOpenBotPolicy,contactNameVariants,rankProcessCandidates,evaluateOpenBotInbound,planNextOpenBotReturn,composeOpenBotCaseReply} from '../../../../../lib/openbot-company-agent.mjs';
+import {assessOpenBotPostReturnResearch} from '../../../../../lib/openbot-official-followup.mjs';
 import {GET as consultOfficialProcess} from '../../../processos/consulta/route.js';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -115,7 +116,22 @@ async function verifyPrepared(db,user,company,jid,providerId){
    officialConfirmed:p.datajud_last_ok,checkedAt:p.datajud_consultado_em
  });
  if(predictLmReview.requiresHumanReview)invalid('PredictLM identificou revisão necessária: '+predictLmReview.reason,409);
- const source=buildVerifiedReply({caseRow:p});
+ let freshCase=p;
+ const lastDate=Date.parse(p.ultimo_retorno||''),movementDate=Date.parse(p.datajud_ultimo_movimento||'');
+ if(Number.isFinite(lastDate)&&(!Number.isFinite(movementDate)||movementDate<=lastDate)){
+  const snaps=await db.from('crm_judicial_snapshots').select('source,checked_at,payload')
+   .eq('empresa_id',company).eq('actor_id',user.id)
+   .in('process_number',[p.protocolo_ref,String(p.protocolo_ref||'').replace(/\D/g,'')])
+   .in('source',['datajud','djen'])
+   .order('checked_at',{ascending:false}).limit(12);
+  if(snaps.error)invalid('Não foi possível verificar pesquisas oficiais posteriores ao último retorno.',503);
+  const proof=assessOpenBotPostReturnResearch({caseRow:p,snapshots:snaps.data||[]});
+  if(!proof.ok)invalid(proof.researchRequired?
+    'Sem movimentação recente confirmada desde o último retorno. Consulte DJEN e DataJud antes de preparar a resposta.':
+    'Existe movimentação oficial nova ou sem data verificável; a revisão por um atendente é necessária.',409);
+  if(proof.checkedAt)freshCase={...p,datajud_consultado_em:proof.checkedAt};
+ }
+ const source=buildVerifiedReply({caseRow:freshCase});
  if(!source.ok)invalid('Movimentação oficial não está recente ou exige leitura humana: '+source.reason,409);
  const sentAfter=staffRepliedAfter;
  const hearing=await nextConciliationHearing(db,company,p.id);
@@ -227,8 +243,12 @@ export async function POST(request){
      invalid('Fonte oficial não confirmada: '+recovery.userMessage,
        [400,401,403,404,409,429].includes(resp.status)?resp.status:503);
    }
-   return officeJson({ok:true,notice:'Consulta oficial concluída. Confira fonte, data e conteúdo antes do atendimento.',
-     processNumber:number,official:{source:result.source||null,checkedAt:result.checkedAt||null,notice:result.notice||null,fromCache:result.fromCache===true,stale:result.stale===true,items:Array.isArray(result.items)?result.items.slice(0,8).map(item=>({codigo:item.codigo||null,nome:String(item.nome||item.descricao||'').slice(0,250),dataHora:item.dataHora||item.data||null})):[]},skills:['judicial-research']});
+   const statuses=result.sourceStatus||null;
+   const full=result.ok===true&&result.partial!==true&&result.stale!==true;
+   return officeJson({ok:true,confirmedBoth:full,sourceStatus:statuses,
+    notice:full?'DJEN e DataJud consultados. Confira os documentos e as datas antes de responder.':
+     'Consulta parcial ou cache anterior. Não trate falta de resultado como ausência de movimentação.',
+    processNumber:number,official:{source:result.source||null,checkedAt:result.checkedAt||null,notice:result.notice||null,fromCache:result.fromCache===true,stale:result.stale===true,items:Array.isArray(result.items)?result.items.slice(0,8).map(item=>({codigo:item.codigo||null,nome:String(item.nome||item.descricao||'').slice(0,250),dataHora:item.dataHora||item.data||null})):[]},skills:['judicial-research']});
   }
   if(action==='record_return'){
    const eventId=String(data.reservation_id||'');
