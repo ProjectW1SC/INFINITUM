@@ -1,6 +1,6 @@
 {
   "name": "infinitum-killa-desktop",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "type": "module",
   "description": "INFINITUM Killa AI local Windows with Supabase owner-scoped realtime and remote MCP",
