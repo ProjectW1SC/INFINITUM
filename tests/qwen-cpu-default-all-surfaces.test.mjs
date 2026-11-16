@@ -10,11 +10,13 @@ test('CPU/WebAssembly is the default backend even when WebGPU is available',()=>
  assert.equal(v.device,'wasm');
  assert.equal(selectLocalQwenBackend({webgpu:false,memoryGb:4}).device,'wasm');
 });
-test('Qwen is selected by default in both agent screens with local execution pre-enabled',()=>{
+test('Killa starts with safe immediate draft while other AI screens retain existing explicit local settings',()=>{
  const workbench=read('components/openbot-workbench.jsx');
  const superagent=read('app/superagente/page.jsx');
  const legal=read('components/office-legal-agent-panel.jsx');
- assert.match(workbench,/useState\(true\).*setConsent|\[consent,setConsent\]=useState\(true\)/);
+ assert.match(workbench,/\[engine,setEngine\]=useState\('deterministico'\)/);
+ assert.match(workbench,/\[consent,setConsent\]=useState\(false\)/);
+ assert.match(workbench,/setDraft\(authoritative\.slice\(0,18000\)\)/);
  assert.match(workbench,/\[preferCpu,setPreferCpu\]=useState\(true\)/);
  assert.match(superagent,/\[engine,setEngine\]=useState\('qwen'\)/);
  assert.match(superagent,/consent:true,preferCpu:true/);
