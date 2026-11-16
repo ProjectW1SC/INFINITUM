@@ -23,6 +23,17 @@ async function availableTabs(){
  return tabs.filter(t=>{try{return new URL(t.url).origin==='https://web.whatsapp.com';}catch{return false;}})
   .map(t=>({id:t.id,active:t.active===true,title:String(t.title||'WhatsApp Web').slice(0,100),url:t.url}));
 }
+async function announceGrantToExistingCrmTabs(){
+ // A newly installed or newly authorized extension does not inject content scripts retroactively.
+ // Restrict injection to the explicit CRM origin; never touch any other web page.
+ const tabs=await chrome.tabs.query({url:'https://agentinfinitum.vercel.app/*'});
+ await Promise.all(tabs.map(async tab=>{
+  try{
+   if(new URL(tab.url).origin!=='https://agentinfinitum.vercel.app'||!Number.isInteger(tab.id))return;
+   await chrome.scripting.executeScript({target:{tabId:tab.id},files:['crm-bridge.js']});
+  }catch{} // A closed/restricted tab can be retried by refreshing the CRM page.
+ }));
+}
 async function getAuthorizedTab(){
  const grant=await grantRead();
  if(!grant)return null;
@@ -40,6 +51,7 @@ async function processPopup(request){
   const expiresAt=Date.now()+GRANT_MS;
   await grantWrite({tabId:id,expiresAt});
   await auditAction('grant',true);
+  await announceGrantToExistingCrmTabs().catch(()=>{});
   return {ok:true,authorized:true,tabId:id,expiresAt};
  }
  if(request.action==='status'){

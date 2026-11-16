@@ -48,6 +48,15 @@ test('browser extension has least-privilege manifest and no arbitrary browsing p
  assert.ok(!manifest.host_permissions.some(s=>s.includes('<all_urls>')));
  assert.equal(manifest.action.default_popup,'popup.html');
 });
+test('authorizing an open WhatsApp tab makes the bridge visible to an already-open CRM tab',()=>{
+ const background=read('browser-extension/infinitum-tab-bridge/background.js');
+ const bridge=read('browser-extension/infinitum-tab-bridge/crm-bridge.js');
+ assert.match(background,/announceGrantToExistingCrmTabs/);
+ assert.match(background,/files:\['crm-bridge\.js'\]/);
+ assert.match(background,/agentinfinitum\.vercel\.app/);
+ assert.match(bridge,/__infinitumWhatsappBridgeReady/);
+ assert.match(bridge,/direction:'ready'/);
+});
 test('no autonomous send: extension can only observe chat and insert a reviewable composer draft',()=>{
  const background=read('browser-extension/infinitum-tab-bridge/background.js');
  const inspector=read('browser-extension/infinitum-tab-bridge/whatsapp-tab.js');
