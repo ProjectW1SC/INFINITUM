@@ -77,7 +77,7 @@ try{
  }
  if(!success)throw Error('EXE Windows não iniciou o servidor Next empacotado.');
  // Prevent an installer with a 404 homepage from passing Windows CI.
- for(const route of [DESKTOP_ENTRY_PATH,'/whatsapp','/app-store/admin']){
+ for(const route of [DESKTOP_ENTRY_PATH,'/whatsapp','/app-store','/app-store/admin']){
   const result=await fetch('http://127.0.0.1:'+port+route,{
    redirect:'manual',cache:'no-store',signal:AbortSignal.timeout(7000)
   });
@@ -85,7 +85,7 @@ try{
    throw Error('EXE contém rota ausente: '+route+' (HTTP '+result.status+')');
   await result.arrayBuffer();
  }
- console.log('EXE empacotado validado: Next, login real, WhatsApp e administração sem 404.');
+ console.log('EXE empacotado validado: Next, login real, WhatsApp, Killa AI Store e administração sem 404.');
 }finally{
  if(!child.killed)child.kill();
 }
