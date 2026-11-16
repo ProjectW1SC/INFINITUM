@@ -13,7 +13,7 @@ test('store security is private, MFA required and release approval is independen
  const edge=file('supabase/functions/killa-store-admin/index.ts');
  assert.match(edge,/auth\.getUser/);
  assert.match(edge,/aal2/);
- assert.match(edge,/killa_private/);
+ assert.match(edge,/killa_store_admin_access/); // private schema is accessed only through service-only RPC
  assert.match(edge,/superadmin/i);
  assert.match(edge,/github/);
  assert.doesNotMatch(edge,/allowedOrigin:\s*'\*'/i);
