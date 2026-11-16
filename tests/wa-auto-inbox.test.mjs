@@ -17,6 +17,17 @@ test('Integracoes indicam o estado real do WA.Auto',()=>{
  assert.match(s,/wa\.connected/);
 });
 
+test('WA.Auto missing endpoint pauses repeated failing status requests but allows manual retry and ZapFast link',()=>{
+ const ui=file('components/wa-auto-inbox.jsx');
+ const pair=file('app/mcp/pair/page.jsx');
+ assert.match(ui,/statusPollingEnabled\.current=body\.configured===true/);
+ assert.match(ui,/statusPollingEnabled\.current=false/);
+ assert.match(ui,/statusPollingEnabled\.current\)/);
+ assert.match(ui,/wa_auto_upstream_route_missing/);
+ assert.match(ui,/sua sessão ZapFast/);
+ assert.match(pair,/statusPollingEnabled\.current/);
+ assert.match(pair,/Reverificar servidor WA.Auto/);
+});
 test('QR pronto do Baileys não é recodificado como texto',()=>{const ui=file('components/wa-auto-inbox.jsx');assert.ok(ui.includes('data:image'));assert.ok(ui.includes('setQrImage(String(connection.qr))'));assert.match(ui,/4000/);});
 
 
