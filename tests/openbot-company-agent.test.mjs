@@ -39,8 +39,8 @@ test('company exceptions, group and staff handoff suppress responses before the 
  assert.equal(evaluateOpenBotInbound({...base,staffRepliedAfter:true}).decision,'ignore');
  assert.equal(evaluateOpenBotInbound({...base,administrativeContact:true}).decision,'ignore');
  assert.equal(evaluateOpenBotInbound({...base,authorized:false}).decision,'review');
- assert.equal(evaluateOpenBotInbound({...base,text:'[Áudio]'}).decision,'research');
- assert.equal(evaluateOpenBotInbound({...base,text:'Mensagem de voz'}).askForTranscription,false);
+ assert.equal(evaluateOpenBotInbound({...base,mediaType:'audio',text:'[Áudio]'}).decision,'research');
+ assert.equal(evaluateOpenBotInbound({...base,mediaType:'ptt',text:'Mensagem de voz'}).askForTranscription,false);
 });
 test('only specified group with explicit mention may be routed to question/task review, never send',()=>{
  const policy=normalizeOpenBotPolicy({groups:'internal_only',allowed_group_jids:['120123456789012345@g.us'],
