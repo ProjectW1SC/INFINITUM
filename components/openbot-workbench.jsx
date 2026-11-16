@@ -150,6 +150,28 @@ export default function OpenBotWorkbench({db,session}){
     <p>Escreva seu pedido. O rascunho aparece abaixo, pronto para revisão. Nenhuma mensagem é enviada.</p>
    </div>
    <div className={ui.quickModes}><button type="button" disabled={busy} aria-pressed={mode==='texto'} onClick={()=>{setMode('texto');setDraft('')}}>Resposta ou resumo</button><button type="button" disabled={busy} aria-pressed={mode==='peca'} onClick={()=>{setMode('peca');setDraft('')}}>Minuta jurídica</button></div>
+    <label className={ui.quickField}>Motor da resposta
+     <select disabled={busy} aria-label="Motor da resposta" value={engine} onChange={e=>{
+      setEngine(e.target.value);setDraft('');setSource('');setApproved(false);setNotice('');
+      if(e.target.value==='qwen4')setPreferCpu(false);
+     }}>
+      <option value="deterministico">Rascunho rápido (sem modelo)</option>
+      <option value="online">IA online · redação livre</option>
+      <option value="qwen">Qwen local 0,5B</option>
+      <option value="qwen17">Qwen local 1,7B · mais memória</option>
+      <option value="qwen4">Qwen local 4B · GPU</option>
+     </select>
+    </label>
+    {engine==='online'&&<label className={ui.quickConsent}><input type="checkbox" disabled={busy}
+      checked={onlineConsent} onChange={e=>setOnlineConsent(e.target.checked)}/>
+      Autorizo enviar este pedido a um modelo de IA externo configurado.</label>}
+    {localSelected&&!consent&&<p className={ui.feedback}>Para ativar Qwen, abra “Modelo local opcional, revisão e ferramentas avançadas” e autorize o download.</p>}
+    {mode==='peca'&&<label className={ui.quickField}>Tipo de peça
+     <select disabled={busy} value={kind} onChange={e=>setKind(e.target.value)}>
+      <option value="manifestacao">Manifestação</option><option value="peticao_inicial">Petição inicial</option>
+      <option value="contestacao">Contestação</option><option value="recurso">Recurso · modalidade a confirmar</option>
+      <option value="relatorio">Relatório jurídico</option><option value="outro">Outra peça</option>
+     </select></label>}
     <div className={ui.composer}>
     <label htmlFor="killa-input" className={ui.srOnly}>Mensagem para Killa AI</label>
     <textarea id="killa-input" rows={3} disabled={busy} maxLength={6000} value={prompt} onChange={e=>setPrompt(e.target.value)}
@@ -159,7 +181,8 @@ export default function OpenBotWorkbench({db,session}){
     </div>
    </div>
    
-   {draft&&<article className={ui.answer}><small>Resposta proposta · revisão obrigatória</small>
+   {notice&&<p role="status" className={ui.feedback}>{notice}</p>}
+    {draft&&<article className={ui.answer}><small>Resposta proposta · revisão obrigatória</small>
     <p>{draft}</p><small>{source}</small><div className={ui.inlineActions}><button type="button" onClick={()=>{if(!navigator.clipboard?.writeText){setNotice('Selecione o texto para copiar.');return}navigator.clipboard.writeText(draft).then(()=>setNotice('Rascunho copiado. Nenhuma mensagem enviada.')).catch(()=>setNotice('Selecione o texto para copiar.'))}}>Copiar rascunho</button></div></article>}
   </div>
   <details className={ui.disclosure}><summary>Modelo local opcional, revisão e ferramentas avançadas</summary>
@@ -217,8 +240,6 @@ export default function OpenBotWorkbench({db,session}){
      <option value="qwen4">Qwen3 4B · GPU (8 GB RAM)</option>
     </select>
    </label>
-   {engine==='online'&&<label><input type="checkbox" checked={onlineConsent} onChange={e=>setOnlineConsent(e.target.checked)}/>
-     Autorizo enviar somente este pedido ao modelo externo configurado. Não inclua dados de clientes sem autorização.</label>}
    {localSelected&&<label><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/>
     Modelo local opcional, sem servidor Colibri/Needle. Os modelos grandes baixam pesos apenas quando escolhidos e exigem mais RAM. Desmarque para usar somente regras leves.
    </label>}
