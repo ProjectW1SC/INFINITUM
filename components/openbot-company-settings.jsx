@@ -98,6 +98,11 @@ export default function OpenBotCompanySettings({db,jid='',contactName='',isGroup
       <option value="mention_only">Responder somente quando mencionarem @OpenBot e houver processo autorizado</option>
       <option value="manual_review">Sempre encaminhar para revisão humana</option>
      </select></label>
+    <label style={{display:'grid',gap:4}}>Silenciar quando outro atendente falou com o mesmo cliente nas últimas (horas)
+     <input type="number" min="1" max="48" disabled={!canEdit} style={{maxWidth:120}}
+      value={Number(policy.staff_handoff_hours||8)}
+      onChange={e=>update('staff_handoff_hours',Number(e.target.value))}/>
+    </label>
     <label style={{display:'grid',gap:4}}>Áudio sem transcrição disponível
      <select disabled={!canEdit} value={policy.audio_without_transcript||'status_if_authorized'}
       onChange={e=>update('audio_without_transcript',e.target.value)}>
