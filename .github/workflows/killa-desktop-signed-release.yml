@@ -1,4 +1,4 @@
-name: INFINITUM Killa AI — release Windows Authenticode opcional
+name: INFINITUM Killa AI — publicação Windows Authenticode verificada
 
 on:
   workflow_dispatch:
@@ -35,7 +35,7 @@ jobs:
           WIN_CSC_LINK: ${{ secrets.KILLA_WINDOWS_CERT_P12 }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.KILLA_WINDOWS_CERT_PASSWORD }}
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:WIN_CSC_LINK) -or [string]::IsNullOrWhiteSpace($env:WIN_CSC_KEY_PASSWORD)) { throw 'Certificado Windows ausente; use o workflow gratuito Ed25519' }
+          if ([string]::IsNullOrWhiteSpace($env:WIN_CSC_LINK) -or [string]::IsNullOrWhiteSpace($env:WIN_CSC_KEY_PASSWORD)) { throw 'Publicação bloqueada: exigido certificado Authenticode confiável. Ed25519 sozinho não evita alerta do Windows.' }
       - name: Preparar metadados da versão
         run: node desktop/prepare-signed-release.mjs '${{ inputs.version }}'
       - name: Instalar dependências
@@ -60,16 +60,36 @@ jobs:
         run: |
           $p=Get-Content desktop/package.json -Raw | ConvertFrom-Json
           if ($p.build.forceCodeSigning -ne $true) { throw 'forceCodeSigning ausente' }
-      - name: Validar EXE Windows empacotado antes de publicar
+      - name: Validar EXE Windows empacotado e assinado
         run: |
           npm --prefix desktop run pack:win
           node desktop/verify-packaged-server.mjs
-      - name: Publicar versão assinada
-        run: npm --prefix desktop run dist:release
         env:
           WIN_CSC_LINK: ${{ secrets.KILLA_WINDOWS_CERT_P12 }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.KILLA_WINDOWS_CERT_PASSWORD }}
+      - name: Construir instalador assinado sem publicar
+        run: npm --prefix desktop run dist:win
+        env:
+          WIN_CSC_LINK: ${{ secrets.KILLA_WINDOWS_CERT_P12 }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.KILLA_WINDOWS_CERT_PASSWORD }}
+      - name: Validar assinatura do aplicativo e do instalador
+        shell: pwsh
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          ./desktop/verify-windows-signature.ps1 -AppExe 'desktop/dist/win-unpacked/INFINITUM Killa AI.exe' -Installer ('desktop/dist/INFINITUM-KillaAI-Setup-'+$env:VERSION+'-x64.exe')
+      - name: Publicar somente após validação Authenticode
+        shell: pwsh
+        env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          if (!(Test-Path 'desktop/dist/latest.yml')) { throw 'Manifesto de atualização Windows ausente. Publicação bloqueada.' }
+          gh release view ('v'+$env:VERSION) --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) { throw 'Versão já publicada: não sobrescrever.' }
+          $global:LASTEXITCODE=0
+          gh release create ('v'+$env:VERSION) --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --latest --title ('INFINITUM Killa AI v'+$env:VERSION) --notes 'Instalador e executável assinados com Authenticode confiável e validados no Windows.' ('desktop/dist/INFINITUM-KillaAI-Setup-'+$env:VERSION+'-x64.exe') 'desktop/dist/latest.yml'
+          if ($LASTEXITCODE -ne 0) { throw 'Falha ao publicar release assinada.' }
       - name: Guardar instalador
         uses: actions/upload-artifact@v4
         with:
