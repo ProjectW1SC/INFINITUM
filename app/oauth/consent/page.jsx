@@ -1,6 +1,28 @@
 'use client';
 import {useEffect,useState} from 'react';
 import {useWorkspaceSession} from '../../../components/workspace-session-provider.jsx';
+
+const SHARED_LEXIS_DB=process.env.NEXT_PUBLIC_LEXIS_SHARED_DB==='1';
+
+async function approvedClientsForUser(db,userId){
+ if(SHARED_LEXIS_DB){
+  const member=await db.from('usuarios').select('empresa_id').eq('auth_user_id',userId).limit(2);
+  if(member.error||member.data?.length!==1||!member.data[0]?.empresa_id)
+   throw Error('Não foi possível confirmar a empresa vinculada à conta.');
+  const settings=await db.from('office_agent_company_policies').select('config')
+   .eq('empresa_id',member.data[0].empresa_id).limit(1).maybeSingle();
+  if(settings.error)throw Error('Não foi possível ler a autorização MCP da empresa.');
+  const config=settings.data?.config||{};
+  return config.mcp_enabled===true&&Array.isArray(config.mcp_allowed_client_ids)
+   ?config.mcp_allowed_client_ids:[];
+ }
+ const settings=await db.from('killa_mcp_settings').select('mcp_enabled,allowed_client_ids')
+  .eq('owner_id',userId).maybeSingle();
+ if(settings.error)throw Error('Não foi possível ler a autorização MCP da conta.');
+ return settings.data?.mcp_enabled===true&&Array.isArray(settings.data?.allowed_client_ids)
+  ?settings.data.allowed_client_ids:[];
+}
+
 export default function KillaOAuthConsent(){
  const {db,session,loading}=useWorkspaceSession();
  const [authorizationId,setAuthorizationId]=useState('');
@@ -13,18 +35,18 @@ export default function KillaOAuthConsent(){
   let live=true;
   Promise.all([
    db.auth.oauth.getAuthorizationDetails(id),
-   db.from('killa_mcp_settings').select('mcp_enabled,allowed_client_ids')
-    .eq('owner_id',session.user.id).maybeSingle(),
+   approvedClientsForUser(db,session.user.id),
    db.auth.mfa.getAuthenticatorAssuranceLevel()
-  ]).then(([{data,error},settings,mfa])=>{
-   if(settings.error||mfa.error){setNotice('Verificação das permissões falhou. Nenhum cliente será autorizado.');return;}
-   setApprovedClients(settings.data?.mcp_enabled===true?settings.data?.allowed_client_ids||[]:[]);
-   setMfaOk(mfa.data?.currentLevel==='aal2');
+  ]).then(([authorization,clients,mfa])=>{
    if(!live)return;
+   const {data,error}=authorization;
+   if(mfa.error){setNotice('Verificação do segundo fator falhou. Nenhum cliente será autorizado.');return;}
+   setApprovedClients(clients);
+   setMfaOk(mfa.data?.currentLevel==='aal2');
    if(error)setNotice(error.message);
    else if(data?.redirect_url&&!data?.authorization_id)window.location.assign(data.redirect_url);
    else setDetails(data);
-  }).catch(()=>{if(live)setNotice('Não foi possível verificar a solicitação OAuth.')});
+  }).catch(e=>{if(live)setNotice(String(e?.message||'Não foi possível verificar a solicitação OAuth.').slice(0,230))});
   return()=>{live=false};
  },[db,session?.user?.id]);
  const clientId=String(details?.client?.id||details?.client?.client_id||details?.client_id||'');

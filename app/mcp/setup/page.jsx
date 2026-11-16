@@ -4,9 +4,25 @@ import {useWorkspaceSession} from '../../../components/workspace-session-provide
 import {withAuthDeadline} from '../../../lib/auth-deadline.mjs';
 import ui from '../../../components/killa-workbench.module.css';
 
-const MCP_URL='https://ulkuhiibeoibbzhqrfya.supabase.co/functions/v1/killa-mcp';
+const SHARED_LEXIS_DB=process.env.NEXT_PUBLIC_LEXIS_SHARED_DB==='1';
+const MCP_URL=SHARED_LEXIS_DB
+ ?'https://agentinfinitum.vercel.app/mcp'
+ :'https://ulkuhiibeoibbzhqrfya.supabase.co/functions/v1/killa-mcp';
 const DEFAULT_POLICY={mcp_enabled:false,permission_level:'basico',mcp_group_history_enabled:false,
- allowed_client_ids:[],require_mfa:true,mcp_pairing_enabled:false,mcp_send_enabled:false};
+ mcp_allowed_client_ids:[],allowed_client_ids:[],require_mfa:true,mcp_pairing_enabled:false,mcp_send_enabled:false};
+
+async function companyPolicyRequest(db,method,payload){
+ const auth=await db.auth.getSession();
+ const token=auth.data?.session?.access_token;
+ if(auth.error||!token)throw Error('Faça login novamente no INFINITUM.');
+ const response=await fetch('/api/office/agent/company',{method,cache:'no-store',headers:{
+  Authorization:'Bearer '+token,
+  ...(payload?{'Content-Type':'application/json'}:{})
+ },...(payload?{body:JSON.stringify(payload)}:{})});
+ const result=await response.json().catch(()=>({ok:false,error:'Resposta inválida da API da empresa.'}));
+ if(!response.ok||result?.ok!==true)throw Error(result?.error||'Não foi possível acessar as regras da empresa.');
+ return result;
+}
 
 export default function KillaMcpSetup(){
  const {db,session,loading,authFault}=useWorkspaceSession();
@@ -18,17 +34,26 @@ export default function KillaMcpSetup(){
   if(!db||!session?.user?.id)return;
   let active=true;setChecking(true);setError('');setNotice('');
   (async()=>{
-   const [membership,settings]=await withAuthDeadline(Promise.all([
-    db.from('crm_memberships').select('role,enabled').eq('user_id',session.user.id).maybeSingle(),
-    db.from('killa_mcp_settings').select('mcp_enabled,permission_level,mcp_group_history_enabled,allowed_client_ids,require_mfa,mcp_pairing_enabled,mcp_send_enabled')
-     .eq('owner_id',session.user.id).maybeSingle()
-   ]),12000);
-   if(membership.error)throw Error('Não foi possível verificar o perfil: '+membership.error.message);
-   if(settings.error)throw Error('Não foi possível ler as regras MCP: '+settings.error.message);
-   if(!active)return;
-   setRole(membership.data?.enabled===true?membership.data.role||'':'');
-   const saved={...DEFAULT_POLICY,...(settings.data||{})};
-   setPolicy(saved);setClientIdsText((saved.allowed_client_ids||[]).join('\n'));
+   if(SHARED_LEXIS_DB){
+    const company=await withAuthDeadline(companyPolicyRequest(db,'GET'),12000);
+    if(!active)return;
+    setRole(company.canConfigure===true?'admin':'operator');
+    const saved={...DEFAULT_POLICY,...(company.policy||{})};
+    setPolicy(saved);
+    setClientIdsText((saved.mcp_allowed_client_ids||[]).join('\n'));
+   }else{
+    const [membership,settings]=await withAuthDeadline(Promise.all([
+     db.from('crm_memberships').select('role,enabled').eq('user_id',session.user.id).maybeSingle(),
+     db.from('killa_mcp_settings').select('mcp_enabled,permission_level,mcp_group_history_enabled,allowed_client_ids,require_mfa,mcp_pairing_enabled,mcp_send_enabled')
+      .eq('owner_id',session.user.id).maybeSingle()
+    ]),12000);
+    if(membership.error)throw Error('Não foi possível verificar o perfil: '+membership.error.message);
+    if(settings.error)throw Error('Não foi possível ler as regras MCP: '+settings.error.message);
+    if(!active)return;
+    setRole(membership.data?.enabled===true?membership.data.role||'':'');
+    const saved={...DEFAULT_POLICY,...(settings.data||{})};
+    setPolicy(saved);setClientIdsText((saved.allowed_client_ids||[]).join('\n'));
+   }
    try{
     const mfa=await withAuthDeadline(db.auth.mfa.getAuthenticatorAssuranceLevel(),9000);
     if(active)setMfaStatus(mfa.error?'desconhecido':mfa.data?.currentLevel==='aal2'?'ativo':'pendente');
@@ -39,24 +64,35 @@ export default function KillaMcpSetup(){
  const canEdit=role==='admin'&&!checking&&!error;
  async function save(){
   if(!canEdit||!db||!session?.user?.id||saving)return;
-  const ids=clientIdsText.split(/[\n,]+/).map(x=>x.trim()).filter(Boolean);
+  const ids=[...new Set(clientIdsText.split(/[\n,]+/).map(x=>x.trim()).filter(Boolean))];
   if(ids.length>20||ids.some(x=>!/^[A-Za-z0-9._:-]{5,200}$/.test(x))){
    setError('Informe no máximo 20 IDs OAuth válidos, um por linha, sem senhas ou tokens.');return;
   }
   setSaving(true);setNotice('');setError('');
   try{
-   const payload={...policy,owner_id:session.user.id,allowed_client_ids:[...new Set(ids)],
-    require_mfa:true,mcp_enabled:policy.mcp_enabled===true,
-    mcp_group_history_enabled:policy.mcp_enabled&&policy.mcp_group_history_enabled===true,
-    mcp_pairing_enabled:policy.mcp_enabled&&policy.mcp_pairing_enabled===true,
-    mcp_send_enabled:policy.mcp_enabled&&policy.mcp_send_enabled===true,updated_at:new Date().toISOString()};
-   const result=await withAuthDeadline(db.from('killa_mcp_settings').upsert(payload,{onConflict:'owner_id'})
-    .select('mcp_enabled,permission_level,mcp_group_history_enabled,allowed_client_ids,require_mfa,mcp_pairing_enabled,mcp_send_enabled')
-    .single(),12000);
-   if(result.error||!result.data)throw Error(result.error?.message||'O banco não confirmou a gravação.');
-   setPolicy({...DEFAULT_POLICY,...result.data});
-   setClientIdsText((result.data.allowed_client_ids||[]).join('\n'));
-   setNotice('Regras salvas e confirmadas no Supabase. O aplicativo externo ainda precisa concluir OAuth e MFA.');
+   if(SHARED_LEXIS_DB){
+    const result=await withAuthDeadline(companyPolicyRequest(db,'POST',{action:'settings',policy:{
+     ...policy,mcp_enabled:policy.mcp_enabled===true,
+     mcp_group_history_enabled:policy.mcp_enabled&&policy.mcp_group_history_enabled===true,
+     mcp_allowed_client_ids:ids
+    }}),12000);
+    const saved={...DEFAULT_POLICY,...result.policy};
+    setPolicy(saved);setClientIdsText((saved.mcp_allowed_client_ids||[]).join('\n'));
+    setNotice(result.notice||'Regras MCP salvas na política da empresa.');
+   }else{
+    const payload={...policy,owner_id:session.user.id,allowed_client_ids:ids,
+     require_mfa:true,mcp_enabled:policy.mcp_enabled===true,
+     mcp_group_history_enabled:policy.mcp_enabled&&policy.mcp_group_history_enabled===true,
+     mcp_pairing_enabled:policy.mcp_enabled&&policy.mcp_pairing_enabled===true,
+     mcp_send_enabled:policy.mcp_enabled&&policy.mcp_send_enabled===true,updated_at:new Date().toISOString()};
+    const result=await withAuthDeadline(db.from('killa_mcp_settings').upsert(payload,{onConflict:'owner_id'})
+     .select('mcp_enabled,permission_level,mcp_group_history_enabled,allowed_client_ids,require_mfa,mcp_pairing_enabled,mcp_send_enabled')
+     .single(),12000);
+    if(result.error||!result.data)throw Error(result.error?.message||'O banco não confirmou a gravação.');
+    setPolicy({...DEFAULT_POLICY,...result.data});
+    setClientIdsText((result.data.allowed_client_ids||[]).join('\n'));
+    setNotice('Regras salvas e confirmadas no Supabase. O aplicativo externo ainda precisa concluir OAuth e MFA.');
+   }
   }catch(e){setError('Não foi possível salvar: '+String(e.message||e).slice(0,210))}
   finally{setSaving(false)}
  }
@@ -69,8 +105,10 @@ export default function KillaMcpSetup(){
    <>
     <section className={ui.mcpCard}>
      <h2>1. Permissões da sua conta</h2>
-     <p><strong>Perfil:</strong> {role||'sem acesso de administrador'} · <strong>MFA:</strong> {mfaStatus==='ativo'?'ativo':mfaStatus==='pendente'?'ainda não validado':'não verificado'}</p>
-     {!canEdit&&<p role="alert">Esta configuração exige perfil administrador ativo em crm_memberships. Um usuário comum não pode ativar o MCP. Peça ao administrador do CRM para habilitar sua conta.</p>}
+     <p><strong>Perfil:</strong> {role==='admin'?'Administrador':role==='operator'?'Sem permissão de administrador':role||'sem acesso de administrador'} · <strong>MFA:</strong> {mfaStatus==='ativo'?'ativo':mfaStatus==='pendente'?'ainda não validado':'não verificado'}</p>
+     {!canEdit&&<p role="alert">{SHARED_LEXIS_DB
+      ?'Esta configuração exige o perfil Administrador na carteira LexisPredict vinculada à sua conta. A autorização é verificada pela empresa, não por crm_memberships.'
+      :'Esta configuração exige perfil administrador ativo em crm_memberships. Um usuário comum não pode ativar o MCP. Peça ao administrador do CRM para habilitar sua conta.'}</p>}
      {mfaStatus!=='ativo'&&<p>O login de segundo fator (MFA/AAL2) é obrigatório para conectar apps externos. Ative e confirme o segundo fator no Supabase Auth antes do primeiro acesso MCP.</p>}
     </section>
     <section className={ui.mcpCard}>
@@ -89,7 +127,9 @@ export default function KillaMcpSetup(){
     </section>
     <section className={ui.mcpCard}>
      <h2>3. Aplicativos autorizados</h2>
-     <p>No painel de autenticação do Supabase, ative o <strong>OAuth Server</strong> e o consentimento do usuário. Quando o aplicativo externo registrar seu cliente OAuth, copie apenas o ID público para o campo abaixo.</p>
+     <p>{SHARED_LEXIS_DB
+      ?'Esta instalação usa a carteira compartilhada do LexisPredict. Ative o OAuth Server no projeto Supabase usado pelo login do INFINITUM. Depois, copie o ID público que o aplicativo MCP registrar.'
+      :'No painel de autenticação do Supabase, ative o OAuth Server e o consentimento do usuário. Quando o aplicativo externo registrar seu cliente OAuth, copie apenas o ID público para o campo abaixo.'}</p>
      <label className={ui.field}>IDs OAuth (um por linha)
       <textarea rows={3} disabled={!canEdit} spellCheck={false} value={clientIdsText} onChange={e=>setClientIdsText(e.target.value)}
        placeholder="ID público do aplicativo externo"/></label>
@@ -97,18 +137,23 @@ export default function KillaMcpSetup(){
      <div className={ui.mcpEndpoint}><code>{MCP_URL}</code>
       <button type="button" onClick={()=>{if(!navigator.clipboard?.writeText){setError('Copie o endereço manualmente.');return}navigator.clipboard.writeText(MCP_URL)
        .then(()=>setNotice('Endereço MCP copiado.')).catch(()=>setError('Copie o endereço manualmente.'))}}>Copiar URL</button></div>
-     <p>O link acima é do serviço MCP instalado no Supabase, independente da hospedagem do site na Vercel.</p>
+     <p>{SHARED_LEXIS_DB
+      ?'Este é o endpoint MCP do próprio INFINITUM. Ele usa a sessão e as regras da empresa no banco compartilhado, sem trocar o Supabase principal do CRM.'
+      :'O link acima é do serviço MCP instalado no Supabase, independente da hospedagem do site na Vercel.'}</p>
     </section>
     <details className={ui.mcpCard}><summary>Permissões adicionais (avançado)</summary>
      <label className={ui.mcpCheck}><input type="checkbox" disabled={!canEdit||!policy.mcp_enabled}
       checked={policy.mcp_group_history_enabled} onChange={e=>setPolicy(p=>({...p,mcp_group_history_enabled:e.target.checked}))}/>
       Leitura de grupos previamente arquivados</label>
-     <label className={ui.mcpCheck}><input type="checkbox" disabled={!canEdit||!policy.mcp_enabled}
-      checked={policy.mcp_pairing_enabled} onChange={e=>setPolicy(p=>({...p,mcp_pairing_enabled:e.target.checked}))}/>
-      Autorizar recursos sensíveis de pareamento a aplicativos aprovados</label>
-     <label className={ui.mcpCheck}><input type="checkbox" disabled={!canEdit||!policy.mcp_enabled}
-      checked={policy.mcp_send_enabled} onChange={e=>setPolicy(p=>({...p,mcp_send_enabled:e.target.checked}))}/>
-      Permitir solicitações de envio com aprovação humana individual (nunca envio direto)</label>
+     {!SHARED_LEXIS_DB&&<>
+      <label className={ui.mcpCheck}><input type="checkbox" disabled={!canEdit||!policy.mcp_enabled}
+       checked={policy.mcp_pairing_enabled} onChange={e=>setPolicy(p=>({...p,mcp_pairing_enabled:e.target.checked}))}/>
+       Autorizar recursos sensíveis de pareamento a aplicativos aprovados</label>
+      <label className={ui.mcpCheck}><input type="checkbox" disabled={!canEdit||!policy.mcp_enabled}
+       checked={policy.mcp_send_enabled} onChange={e=>setPolicy(p=>({...p,mcp_send_enabled:e.target.checked}))}/>
+       Permitir solicitações de envio com aprovação humana individual (nunca envio direto)</label>
+     </>}
+     {SHARED_LEXIS_DB&&<p>Na carteira compartilhada, o MCP permite leitura e preparação de rascunhos. Pareamento e envio pelo assistente externo permanecem desativados; qualquer mensagem ao cliente exige conferência e ação no INFINITUM.</p>}
      <a href="/mcp/pair">Vincular WhatsApp individual</a>
     </details>
     <div className={ui.mcpFooter}><button type="button" disabled={!canEdit||saving} onClick={save}>
