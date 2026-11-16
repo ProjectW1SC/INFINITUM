@@ -13,9 +13,9 @@ export default function OpenBotWorkbench({db,session}){
  const [prompt,setPrompt]=useState('');
  const [draft,setDraft]=useState('');
  const [source,setSource]=useState('');
- const [engine,setEngine]=useState('colibri-local');
- const [consent,setConsent]=useState(true);
- const [preferCpu,setPreferCpu]=useState(true),[tokenBudget,setTokenBudget]=useState(384);
+ const [engine,setEngine]=useState('deterministico');
+ const [consent,setConsent]=useState(false);
+ const [preferCpu,setPreferCpu]=useState(true),[tokenBudget,setTokenBudget]=useState(128);
  const [mode,setMode]=useState('texto'),[kind,setKind]=useState('manifestacao');
  const [timelineEvents,setTimelineEvents]=useState(''),[timelineSvg,setTimelineSvg]=useState('');
  const [busy,setBusy]=useState(false),[notice,setNotice]=useState('');
@@ -58,7 +58,8 @@ export default function OpenBotWorkbench({db,session}){
     answer=authoritative;
     model=isPetition?'Minuta determinística PredictLM/LexisPredict · não protocolada':
       'Motor determinístico · sem consulta judicial';
-    let profile={ok:false,reason:'Qwen não autorizado',device:'none'};
+    setDraft(authoritative.slice(0,18000));setSource(model);
+     let profile={ok:false,reason:'Qwen não autorizado',device:'none'};
     if(consent)profile=await checkBlackholeQwenSupport({preferCpu,modelId});
     const route=planColibriLocal({prompt:userText,allowLocalModel:consent,
       device:{webgpu:profile.device==='webgpu',memoryGb:Number(navigator?.deviceMemory||0),preferCpu},modelId});
@@ -126,22 +127,23 @@ export default function OpenBotWorkbench({db,session}){
    <div className={ui.top}><span className={ui.brand}><span className={ui.dot}/>KILLA <b>AI</b></span>
     <span className={ui.status}>IA local · protegida</span></div>
    <div className={ui.center}>
-    <div className={ui.orb} aria-hidden="true"/>
-    <h2>Como posso ajudar?</h2>
-    <p>Uma central de inteligência para atendimento e jurídico, sem perder o controle dos dados.</p>
+    
+    <h2>Prepare sua resposta</h2>
+    <p>Escreva seu pedido. O rascunho aparece abaixo, pronto para revisão. Nenhuma mensagem é enviada.</p>
    </div>
-   <div className={ui.composer}>
+   <div className={ui.quickModes}><button type="button" aria-pressed={mode==='texto'} onClick={()=>{setMode('texto');setDraft('')}}>Resposta ou resumo</button><button type="button" aria-pressed={mode==='peca'} onClick={()=>{setMode('peca');setDraft('')}}>Minuta jurídica</button></div>
+    <div className={ui.composer}>
     <label htmlFor="killa-input" className={ui.srOnly}>Mensagem para Killa AI</label>
     <textarea id="killa-input" rows={3} maxLength={6000} value={prompt} onChange={e=>setPrompt(e.target.value)}
      placeholder="Peça uma análise, um resumo ou uma resposta baseada em fatos confirmados…"/>
     <div className={ui.actions}><span>{mode==='peca'?'Peça jurídica':'Assistente local'}</span>
-     <button onClick={generate} type="button" disabled={busy||!prompt.trim()}>{busy?'Processando…':'Enviar para revisão →'}</button>
+     <button onClick={generate} type="button" disabled={busy||!prompt.trim()}>{busy?'Processando…':'Gerar rascunho'}</button>
     </div>
    </div>
    <nav className={ui.links}><a href="/mcp/setup">Conectar assistentes</a><a href="/whatsapp">Meu WhatsApp</a>
     <a href="/report">Atendimentos confirmados</a></nav>
    {draft&&<article className={ui.answer}><small>Resposta proposta · revisão obrigatória</small>
-    <p>{draft}</p><small>{source}</small></article>}
+    <p>{draft}</p><small>{source}</small><div className={ui.inlineActions}><button type="button" onClick={()=>navigator.clipboard?.writeText(draft).then(()=>setNotice('Rascunho copiado. Nenhuma mensagem enviada.')).catch(()=>setNotice('Selecione o texto para copiar.'))}>Copiar rascunho</button></div></article>}
   </div>
   <div className="blackhole-agents-header">
    <div><small>INFINITUM • KILLA AI · ADAPTAÇÃO</small><h2>Central dos agentes e IA local</h2>
@@ -254,5 +256,6 @@ export default function OpenBotWorkbench({db,session}){
    </details>
    {notice&&<p className="inf-note" role="status">{notice}</p>}
   </div>
+  </details>
  </section>;
 }
