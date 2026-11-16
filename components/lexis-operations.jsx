@@ -33,6 +33,12 @@ export default function LexisOperations({db,session,area='deadlines'}){
  const [validSources,setValidSources]=useState({processes:false,hearings:false});
  const [visibleLimit,setVisibleLimit]=useState(60);
  useEffect(()=>{setVisibleLimit(60)},[area,search,filter,month]);
+ useEffect(()=>{
+  if(area!=='deadlines'||typeof window==='undefined')return;
+  const value=new URLSearchParams(window.location.search).get('status');
+  if(['atendimentos_hoje','meus_atendimentos','vencido','vencidos','hoje','proximos'].includes(value))
+   setFilter(value==='vencidos'?'vencido':value);
+ },[area]);
  const [selected,setSelected]=useState(null),[editing,setEditing]=useState(false),[form,setForm]=useState({title:'',due_on:brazilToday(),kind:'tarefa',priority:'normal',notes:'',responsible:''});
  const currentYear=Number(month.slice(0,4)),currentMonth=Number(month.slice(5,7))-1;
  const first=iso(currentYear,currentMonth,1),last=iso(currentYear,currentMonth+1,0);

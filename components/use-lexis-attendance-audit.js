@@ -5,10 +5,13 @@ const today=()=>new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Pau
 export function useLexisAttendanceAudit(db,company,userId){
  const [state,setState]=useState({loading:true,error:'',data:null});
  const lastRequest=useRef(0);
+ const scope=useRef('');
  const refresh=useCallback(async()=>{
   const request=++lastRequest.current;
-  if(!company||!userId){setState({loading:false,error:'',data:null});return}
-  setState(old=>({...old,loading:true,error:''}));
+  const nextScope=String(company||'')+'|'+String(userId||'');
+  if(!company||!userId){scope.current=nextScope;setState({loading:false,error:'',data:null});return}
+  if(scope.current!==nextScope){scope.current=nextScope;setState({loading:true,error:'',data:null});}
+  else setState(old=>({...old,loading:true,error:''}));
   try{
    const data=await fetchLexisAttendanceAudit(db,company,{userId,today:today()});
    if(request===lastRequest.current)setState({loading:false,error:'',data});

@@ -48,3 +48,19 @@ test('dashboard e prazos exibem auditoria, nunca reutilizam retornos concluidos 
  assert.match(dashboard,/useLexisAttendanceAudit/);
  assert.match(dashboard,/LexisAttendanceBoard/);
 });
+
+test('filtro do painel abre a auditoria de hoje sem confundir prazo vencido',()=>{
+ const operations=read('components/lexis-operations.jsx');
+ assert.match(operations,/new URLSearchParams\(window.location.search\)/);
+ assert.match(operations,/atendimentos_hoje/);
+ assert.match(operations,/meus_atendimentos/);
+ assert.match(operations,/Agendamentos concluídos por data/);
+});
+test('registrar atendimento confirmado atualiza a auditoria e troca de empresa limpa dados antigos',()=>{
+ const office=read('components/lexis-shared-office.jsx');
+ assert.match(office,/if\(error\|\|data\?\.ok!==true\)throw/);
+ assert.match(office,/window.dispatchEvent\(new Event\('lexis:attendance-registered'\)\)/);
+ const hook=read('components/use-lexis-attendance-audit.js');
+ assert.match(hook,/lexis:attendance-registered/);
+ assert.match(hook,/scope.current!==nextScope/);
+});
