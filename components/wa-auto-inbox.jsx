@@ -1,5 +1,5 @@
 'use client';
-import {useCallback,useEffect,useMemo,useState} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {archiveChats,archiveMessages,mergeChats,mergeMessages,messageState} from '../lib/wa-auto-archive.mjs';
 import {ZAPFAST_SINGLE_SESSION_URL} from '../lib/openbot-workspace-policy.mjs';
 import OfficeLegalAgentPanel from './office-legal-agent-panel';
@@ -17,6 +17,7 @@ export default function WaAutoInbox({db,userId}){
  const [showConnect,setShowConnect]=useState(false),[showNew,setShowNew]=useState(false),[qrImage,setQrImage]=useState('');
  const [lastSync,setLastSync]=useState(''),[archiveWarning,setArchiveWarning]=useState(''),[archiveAt,setArchiveAt]=useState('');
  const [syncUnsupported,setSyncUnsupported]=useState(false);
+ const statusPollingEnabled=useRef(true);
  const connected=status?.configured&&status?.connected;
  const connection=status?.connection||{};
  const api=useCallback(async(action,payload=null)=>{
@@ -33,9 +34,16 @@ export default function WaAutoInbox({db,userId}){
   return body;
  },[db]);
  const reloadStatus=useCallback(async()=>{
-  const body=await api('status');
-  setStatus(body);setLastSync(new Date().toISOString());
-  return body;
+  try{
+   const body=await api('status');
+   // Pause polling when the upstream integration is unavailable; manual refresh remains possible.
+   statusPollingEnabled.current=body.configured===true;
+   setStatus(body);setLastSync(new Date().toISOString());
+   return body;
+  }catch(error){
+   statusPollingEnabled.current=false;
+   throw error;
+  }
  },[api]);
  const loadArchiveChats=useCallback(async()=>{
   if(!userId)return [];
@@ -103,7 +111,10 @@ export default function WaAutoInbox({db,userId}){
   loadArchiveChats().catch(e=>{if(alive)setArchiveWarning(e.message)});
   reloadStatus().then(s=>{if(alive&&s.connected){reloadChats().catch(e=>{if(alive)setError(e.message)});}})
    .catch(e=>{if(alive)setError(e.message)});
-  const id=window.setInterval(()=>{if(document.visibilityState==='visible')reloadStatus().catch(()=>setStatus(old=>old?{...old,connected:false}:old))},4000);
+  const id=window.setInterval(()=>{
+   if(document.visibilityState==='visible'&&statusPollingEnabled.current)
+    reloadStatus().catch(e=>{if(alive){setStatus(old=>old?{...old,connected:false}:old);setError(e.message)}});
+  },4000);
   return()=>{alive=false;window.clearInterval(id)};
  },[reloadStatus,reloadChats,loadArchiveChats]);
  useEffect(()=>{
@@ -198,7 +209,7 @@ export default function WaAutoInbox({db,userId}){
   <header className="wa-heading"><div><small>PROJECTW1SC / COMUNICAÇÃO</small><h1>WhatsApp <span>Workspace</span></h1><p>Use a sessão WA.Auto ou conecte à aba WhatsApp Web já aberta no seu computador, sem novo QR Code. Cada forma de acesso é independente.</p></div>
    <div className="wa-heading-actions">
     <a className="wa-button ghost" href={ZAPFAST_SINGLE_SESSION_URL} target="_blank" rel="noopener noreferrer" title="Abrir sessão já vinculada no ZapFast, sem gerar outro QR Code"><ExternalLink size={15}/> ZapFast · sessão existente</a>
-    <span className={'wa-state '+(connected?'online':'offline')}><span className="wa-dot"/>{connected?'WhatsApp conectado':status?.configured?'Desconectado':'Aguardando configuração'}</span>
+    <span className={'wa-state '+(connected?'online':'offline')}><span className="wa-dot"/>{connected?'WhatsApp conectado':status?.code==='wa_auto_upstream_route_missing'?'WA.Auto sem rota':status?.configured?'Desconectado':'Aguardando configuração'}</span>
     <button className="wa-icon-btn" aria-label="Atualizar WhatsApp" type="button" disabled={!!busy} onClick={refresh}><RefreshCw size={17}/></button>
     <button className="wa-button" type="button" onClick={()=>setShowConnect(v=>!v)}><Smartphone size={16}/> Conexão</button>
    </div>
@@ -208,8 +219,10 @@ export default function WaAutoInbox({db,userId}){
   {notice&&<div className="wa-alert" role="status"><CheckCircle2 size={17}/>{notice}</div>}
   <WhatsappTabBridgePanel/>
   {(!status?.configured||showConnect||!connected)&&<section className="wa-connection">
-    <div className="wa-connection-title"><div className="wa-device-icon">{connected?<Wifi size={21}/>:<WifiOff size={21}/>}</div><div><strong>Seu WhatsApp · Conexão individual</strong><p>{status?.configured?tiny(connection.message)||'Sessão vinculada à sua conta do CRM.':'Serviço WA.Auto indisponível no servidor. Não informe credenciais nesta página.'}</p></div></div>
-    {!status?.configured?<div className="wa-help">O servidor WhatsApp precisa estar disponível para gerar o QR. A identidade e as credenciais são verificadas no servidor; nunca cole tokens nesta página.</div>:<div className="wa-connect-content">
+    <div className="wa-connection-title"><div className="wa-device-icon">{connected?<Wifi size={21}/>:<WifiOff size={21}/>}</div><div><strong>Seu WhatsApp · Conexão individual</strong><p>{status?.configured?tiny(connection.message)||'Sessão vinculada à sua conta do CRM.':tiny(status?.message)||'Serviço WA.Auto indisponível no servidor. Não informe credenciais nesta página.'}</p></div></div>
+    {!status?.configured?<div className="wa-help">{status?.code==='wa_auto_upstream_route_missing'?
+     <>A integração WA.Auto não oferece a rota esperada (HTTP 404). A consulta automática foi pausada. Você pode tentar novamente pelo botão atualizar ou abrir <a href={ZAPFAST_SINGLE_SESSION_URL} target="_blank" rel="noopener noreferrer">sua sessão ZapFast</a>, sem criar outro QR Code.</>:
+     'O servidor WhatsApp precisa estar disponível para gerar o QR. A identidade e as credenciais são verificadas no servidor; nunca cole tokens nesta página.'}</div>:<div className="wa-connect-content">
      {connected&&connection.account?.phone&&<p className="wa-linked-number">Número vinculado somente à sua conta: <strong>+{String(connection.account.phone).replace(/\D/g,'')}</strong></p>}
      {qrImage&&connection.status!=='ready'&&<div className="wa-qr"><img src={qrImage} alt="QR Code para vincular WhatsApp" width={235} height={235}/><small>Abra o WhatsApp no celular → Aparelhos conectados → Conectar aparelho. QR vincula somente sua sessão.</small></div>}
      {connection.pairingCode&&<div className="wa-pair-code">Código de pareamento: <strong>{connection.pairingCode}</strong></div>}
