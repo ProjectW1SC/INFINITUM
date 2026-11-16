@@ -32,7 +32,8 @@
       "launcher-preload.cjs",
       "launcher.html",
       "launcher.css",
-      "launcher-ui.js"
+      "launcher-ui.js",
+      "branding/**/*"
     ],
     "extraResources": [
       {
@@ -57,7 +58,8 @@
         "nsis"
       ],
       "artifactName": "INFINITUM-KillaAI-Setup-${version}-${arch}.exe",
-      "verifyUpdateCodeSignature": true
+      "verifyUpdateCodeSignature": true,
+      "icon": "branding/infinitum-app.ico"
     },
     "nsis": {
       "oneClick": false,
