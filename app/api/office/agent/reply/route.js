@@ -118,12 +118,6 @@ async function verifyPrepared(db,user,company,jid,providerId){
   invalid('Assunto sensível ou administrativo: encaminhe para atendimento humano.',409);
  if(type==='ignore'&&routed.decision!=='research'&&routed.decision!=='draft')
   invalid('Mensagem fora do assunto processual; o agente não responderá.',422);
- const predictLmReview=planPredictLmLegalCores({
-   prompt:chat.chosen.content||'Qual é o andamento do processo?',movement:p.datajud_ultimo_nome,source:'DataJud',
-   officialConfirmed:p.datajud_last_ok,checkedAt:p.datajud_consultado_em
- });
- if(predictLmReview.requiresHumanReview&&!hearingOnly)
-  invalid('PredictLM identificou revisão necessária: '+predictLmReview.reason,409);
  let freshCase=p;
  const lastDate=Date.parse(p.ultimo_retorno||''),movementDate=Date.parse(p.datajud_ultimo_movimento||'');
  if(!hearingOnly&&Number.isFinite(lastDate)&&(!Number.isFinite(movementDate)||movementDate<=lastDate)){
@@ -139,6 +133,13 @@ async function verifyPrepared(db,user,company,jid,providerId){
     'Existe movimentação oficial nova ou sem data verificável; a revisão por um atendente é necessária.',409);
   if(proof.checkedAt)freshCase={...p,datajud_consultado_em:proof.checkedAt};
  }
+ const predictLmReview=planPredictLmLegalCores({
+  prompt:chat.chosen.content||'Qual é o andamento do processo?',movement:freshCase.datajud_ultimo_nome,
+  source:'DataJud',officialConfirmed:freshCase.datajud_last_ok,
+  checkedAt:freshCase.datajud_consultado_em
+ });
+ if(predictLmReview.requiresHumanReview&&!hearingOnly)
+  invalid('PredictLM identificou revisão necessária: '+predictLmReview.reason,409);
  const source=hearingOnly?{
   ok:true,source:'Agenda oficial',sourceAt:hearing.verifiedAt,
   text:'A audiência de conciliação consta na agenda do processo para '+hearing.date+
