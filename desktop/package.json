@@ -1,6 +1,6 @@
 {
   "name": "infinitum-killa-desktop",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "INFINITUM Killa AI local Windows with Supabase owner-scoped realtime and remote MCP",
@@ -42,6 +42,18 @@
       {
         "from": "app-server",
         "to": "app-server",
+        "filter": [
+          "**/*",
+          "!node_modules/**",
+          "!**/.env",
+          "!**/.env.*",
+          "!**/*.pem",
+          "!**/service-role*"
+        ]
+      },
+      {
+        "from": "app-server/node_modules",
+        "to": "app-server/node_modules",
         "filter": [
           "**/*",
           "!**/.env",
