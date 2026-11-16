@@ -117,6 +117,24 @@ export default function OpenBotCompanySettings({db,jid='',contactName='',isGroup
          value={Number(policy[key]||15)} onChange={e=>update(key,Number(e.target.value))} style={{maxWidth:130}}/>
        </label>)}
     </div>
+    {jid&&!isGroup&&canEdit&&<div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+     <button type="button" className="wa-button ghost" onClick={()=>{
+      const num=numbers(jid.split('@')[0]);
+      setExcludedPhones(old=>[...new Set([...old.split(/\r?\n/).filter(Boolean),num])].join('\n'));
+      setNotice('Número adicionado à lista de exclusões; clique em Salvar regras desta empresa.');
+     }}>Excluir conversa atual por número</button>
+     {contactName&&<button type="button" className="wa-button ghost" onClick={()=>{
+      setExcludedNames(old=>[...new Set([...old.split(/\r?\n/).filter(Boolean),contactName])].join('\n'));
+      setNotice('Nome adicionado à lista de exclusões; clique em Salvar regras desta empresa.');
+     }}>Excluir conversa atual por nome</button>}
+    </div>}
+    {isGroup&&canEdit&&<div style={{display:'grid',gap:4}}>
+     <small>Identificador do grupo selecionado: {jid}</small>
+     <button type="button" className="wa-button ghost" onClick={()=>{
+      setGroupIds(old=>[...new Set([...old.split(/\r?\n/).filter(Boolean),jid])].join('\n'));
+      setNotice('Grupo adicionado à lista interna. Salve as regras; as mensagens continuarão dependendo de menção ao OpenBot.');
+     }}>Permitir grupo atual para tarefas internas</button>
+    </div>}
     <label style={{display:'grid',gap:4}}>Contatos excluídos — números, um por linha
      <textarea rows={3} disabled={!canEdit} maxLength={2500} value={excludedPhones}
       onChange={e=>setExcludedPhones(e.target.value)} placeholder="5511999999999"/></label>
