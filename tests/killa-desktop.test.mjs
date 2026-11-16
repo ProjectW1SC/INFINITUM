@@ -49,7 +49,7 @@ test('Next standalone desktop build and user-scoped Supabase Realtime are wired'
  assert.ok(main.includes('contextIsolation:true'));
  assert.ok(main.includes('nodeIntegration:false'));
  assert.ok(main.includes('sandbox:true'));
- assert.match(main,/ELECTRON_RUN_AS_NODE/);
+ assert.match(main,/safeStandaloneEnvironment/);
  const realtime=read('lib/killa-realtime.mjs');
  assert.match(realtime,/postgres_changes/);
  assert.match(realtime,/owner_id=eq/);
