@@ -10,7 +10,7 @@ function PairView({db,session}){
   const res=await fetch('/api/office/whatsapp/bridge?action=status',{
    headers:{Authorization:'Bearer '+auth.access_token},cache:'no-store'});
   const data=await res.json();
-  if(!res.ok||data.ok===false)throw Error('Não foi possível consultar a conexão individual.');
+  if(!res.ok||data.ok===false)throw Error(String(data.error||'Não foi possível consultar a conexão individual.').slice(0,240));
   setConnection(data);
   return data;
  },[db]);
@@ -19,7 +19,7 @@ function PairView({db,session}){
   refresh().catch(e=>{if(active)setNotice(e.message)});
   const clock=window.setInterval(()=>{
    if(document.visibilityState==='visible'&&active)
-    refresh().catch(()=>{if(active)setNotice('Conexão indisponível. Atualize para tentar novamente.')});
+    refresh().catch(e=>{if(active)setNotice(String(e?.message||'Conexão indisponível.').slice(0,240))});
   },4000);
   return()=>{active=false;window.clearInterval(clock)};
  },[refresh]);
