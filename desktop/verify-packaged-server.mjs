@@ -1,3 +1,4 @@
+import {DESKTOP_ENTRY_PATH} from './runtime-policy.mjs';
 // Executed on Windows AFTER electron-builder has created the final win-unpacked payload.
 // A pre-pack Next smoke test is insufficient: electron-builder can omit nested node_modules
 // when copying standalone files into extraResources.
@@ -75,7 +76,16 @@ try{
   await delay(350);
  }
  if(!success)throw Error('EXE Windows não iniciou o servidor Next empacotado.');
- console.log('EXE empacotado validado: next/node_modules presentes e healthcheck local respondendo.');
+ // Prevent an installer with a 404 homepage from passing Windows CI.
+ for(const route of [DESKTOP_ENTRY_PATH,'/whatsapp','/app-store/admin']){
+  const result=await fetch('http://127.0.0.1:'+port+route,{
+   redirect:'manual',cache:'no-store',signal:AbortSignal.timeout(7000)
+  });
+  if(result.status !== 200 || !result.headers.get('content-type')?.includes('text/html'))
+   throw Error('EXE contém rota ausente: '+route+' (HTTP '+result.status+')');
+  await result.arrayBuffer();
+ }
+ console.log('EXE empacotado validado: Next, login real, WhatsApp e administração sem 404.');
 }finally{
  if(!child.killed)child.kill();
 }

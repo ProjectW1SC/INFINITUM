@@ -1,3 +1,4 @@
+import {DESKTOP_ENTRY_PATH} from './runtime-policy.mjs';
 import {spawn} from 'node:child_process';
 import {createServer} from 'node:net';
 import {existsSync} from 'node:fs';
@@ -38,6 +39,16 @@ try{
    if(error.message?.includes('origem local'))throw error;
   }
   await delay(330);
+ }
+ if(!success)throw Error('O servidor Next local não passou na verificação de integridade.');
+ // A green healthcheck does not prove the Electron landing page exists.
+ for(const route of [DESKTOP_ENTRY_PATH,'/whatsapp','/app-store/admin']){
+  const response=await fetch('http://127.0.0.1:'+port+route,{
+   cache:'no-store',redirect:'manual',signal:AbortSignal.timeout(7000)
+  });
+  if(response.status !== 200 || !response.headers.get('content-type')?.includes('text/html'))
+   throw Error('Rota do aplicativo indisponível no instalador: '+route+' (HTTP '+response.status+')');
+  await response.arrayBuffer();
  }
 }finally{
  child.kill();
