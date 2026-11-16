@@ -6,7 +6,7 @@ import {assessQwenReview} from '../../../../../lib/qwen-review-guard.mjs';
 import {selectOfficeAgentSkills} from '../../../../../lib/office-agent-skills.mjs';
 import {planPredictLmLegalCores,classifyPredictLmFailure,predictLmCoreCatalog} from '../../../../../lib/predictlm-office-cores.mjs';
 import {predictLmConfig} from '../../../../../lib/predictlm-gateway.mjs';
-import {normalizeOpenBotPolicy,contactNameVariants,rankProcessCandidates,evaluateOpenBotInbound,planNextOpenBotReturn,composeOpenBotCaseReply} from '../../../../../lib/openbot-company-agent.mjs';
+import {normalizeOpenBotPolicy,contactNameVariants,rankProcessCandidates,evaluateOpenBotInbound,planNextOpenBotReturn,composeOpenBotCaseReply,isConciliationLinkRequest} from '../../../../../lib/openbot-company-agent.mjs';
 import {assessOpenBotPostReturnResearch} from '../../../../../lib/openbot-official-followup.mjs';
 import {GET as consultOfficialProcess} from '../../../processos/consulta/route.js';
 export const runtime='nodejs';
@@ -78,7 +78,9 @@ async function nextConciliationHearing(db,company,caseId){
   .order('data_evento',{ascending:true}).limit(10);
  if(r.error)invalid('Não foi possível conferir a agenda de audiências; não envie link sem validação.',503);
  const match=(r.data||[]).find(x=>/concilia/i.test(x.tipo||'')&&!/cancelad|suspens|remarcad/i.test(x.situacao||'')
-  &&hearingLinkAllowed(x.meeting_url)&&x.verificado_em);
+  &&hearingLinkAllowed(x.meeting_url)&&x.verificado_em
+  &&Date.parse(x.verificado_em)<=Date.now()+300000
+  &&Date.now()-Date.parse(x.verificado_em)<=90*86400000);
  return match?{date:match.data_evento,time:match.hora_local||null,url:match.meeting_url,verifiedAt:match.verificado_em}:null;
 }
 async function verifyPrepared(db,user,company,jid,providerId){
@@ -107,18 +109,22 @@ async function verifyPrepared(db,user,company,jid,providerId){
  });
  if(routed.decision==='ignore')invalid('Regra da empresa: não responder ('+routed.reason+').',409);
  if(routed.decision==='review')invalid('Este atendimento precisa de revisão humana ('+routed.reason+').',409);
+ const hearing=await nextConciliationHearing(db,company,p.id);
+ const hearingOnly=Boolean(hearing&&isConciliationLinkRequest(chat.chosen.content));
  const type=routeInboundQuestion(chat.chosen.content,{jid,fromMe:false});
- if(type==='human_review')invalid('Assunto sensível ou administrativo: encaminhe para atendimento humano.',409);
+ if(type==='human_review'&&!hearingOnly)
+  invalid('Assunto sensível ou administrativo: encaminhe para atendimento humano.',409);
  if(type==='ignore'&&routed.decision!=='research'&&routed.decision!=='draft')
   invalid('Mensagem fora do assunto processual; o agente não responderá.',422);
  const predictLmReview=planPredictLmLegalCores({
    prompt:chat.chosen.content||'Qual é o andamento do processo?',movement:p.datajud_ultimo_nome,source:'DataJud',
    officialConfirmed:p.datajud_last_ok,checkedAt:p.datajud_consultado_em
  });
- if(predictLmReview.requiresHumanReview)invalid('PredictLM identificou revisão necessária: '+predictLmReview.reason,409);
+ if(predictLmReview.requiresHumanReview&&!hearingOnly)
+  invalid('PredictLM identificou revisão necessária: '+predictLmReview.reason,409);
  let freshCase=p;
  const lastDate=Date.parse(p.ultimo_retorno||''),movementDate=Date.parse(p.datajud_ultimo_movimento||'');
- if(Number.isFinite(lastDate)&&(!Number.isFinite(movementDate)||movementDate<=lastDate)){
+ if(!hearingOnly&&Number.isFinite(lastDate)&&(!Number.isFinite(movementDate)||movementDate<=lastDate)){
   const snaps=await db.from('crm_judicial_snapshots').select('source,checked_at,payload')
    .eq('empresa_id',company).eq('actor_id',user.id)
    .in('process_number',[p.protocolo_ref,String(p.protocolo_ref||'').replace(/\D/g,'')])
@@ -131,19 +137,23 @@ async function verifyPrepared(db,user,company,jid,providerId){
     'Existe movimentação oficial nova ou sem data verificável; a revisão por um atendente é necessária.',409);
   if(proof.checkedAt)freshCase={...p,datajud_consultado_em:proof.checkedAt};
  }
- const source=buildVerifiedReply({caseRow:freshCase});
+ const source=hearingOnly?{
+  ok:true,source:'Agenda oficial',sourceAt:hearing.verifiedAt,
+  text:'A audiência de conciliação consta na agenda do processo para '+hearing.date+
+   (hearing.time?' às '+hearing.time:'')+
+   '. O endereço de participação só será enviado após conferência e autorização do atendente.'
+ }:buildVerifiedReply({caseRow:freshCase});
  if(!source.ok)invalid('Movimentação oficial não está recente ou exige leitura humana: '+source.reason,409);
  const sentAfter=staffRepliedAfter;
- const hearing=await nextConciliationHearing(db,company,p.id);
  const learned=await db.from('office_agent_style_votes').select('tag,approved_count,rejected_count')
   .eq('empresa_id',company).limit(50);
  if(learned.error)invalid('Não foi possível conferir correções de redação aprovadas.',503);
  const reply=composeOpenBotCaseReply({
-  sourceText:source.text,sourceAt:source.sourceAt,movementAt:p.datajud_ultimo_movimento,
+  sourceText:source.text,sourceAt:source.sourceAt,sourceLabel:source.source,movementAt:p.datajud_ultimo_movimento,
   lastReturnAt:p.ultimo_retorno,history:chat.rows,policy:rules.policy,learning:learned.data||[]
  });
  return {grant,p,chat,source:{...source,text:reply.text},sentAfter,predictLmReview,
-   hearing,policy:rules.policy,replyMeta:reply,
+   hearing,hearingOnly,policy:rules.policy,replyMeta:reply,
    skills:selectOfficeAgentSkills({question:chat.chosen.content||'andamento do processo',action:'preview'})};
 }
 export async function POST(request){
@@ -274,7 +284,7 @@ export async function POST(request){
       caseNumber:checked.p.protocolo_ref,source:checked.source.source,
       sourceAt:checked.source.sourceAt,reply:checked.source.text,
       history:checked.chat.history,contextNote:memo.error?'':(memo.data?.summary||''),
-      hearing:checked.hearing,companyPolicy:{
+      hearing:checked.hearing,hearingOnly:checked.hearingOnly,companyPolicy:{
        return_min_days:checked.policy.return_min_days,
        return_max_days:checked.policy.return_max_days,return_stalled_days:checked.policy.return_stalled_days,
        groups:checked.policy.groups,reply_mode:checked.policy.reply_mode
