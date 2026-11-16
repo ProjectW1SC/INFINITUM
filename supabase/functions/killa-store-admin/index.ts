@@ -64,6 +64,13 @@ async function authorized(req,{requireMfa=true,client='firstparty'}={}){
  const server=serviceDb();
  const role=await adminRpc(server,'killa_store_admin_access',{p_user_id:user.id});
  if(role.error||role.data?.allowed!==true)throw Error('superadmin_required');
+ // Revoked/logged-out sessions must be denied even while their JWT has not expired.
+ if(typeof jwt?.session_id!=='string'||!/^[-0-9a-f]{36}$/i.test(jwt.session_id))
+  throw Error('session_revoked');
+ const alive=await adminRpc(server,'killa_store_validate_session',{
+  p_user_id:user.id,p_session_id:jwt.session_id
+ });
+ if(alive.error||alive.data!==true)throw Error('session_revoked');
  if(client==='oauth'){
   if(role.data.storeMcpEnabled!==true)throw Error('store_mcp_disabled');
   const permission=await db.from('killa_mcp_settings')
@@ -161,6 +168,12 @@ async function submitRequest(ctx,input){
 }
 async function approveRequest(ctx,input){
  if(ctx.jwt?.client_id)throw Error('first_party_only');
+ // Require a FRESH TOTP (5 minutes), not just a stale AAL2 session.
+ const recentTotp=Array.isArray(ctx.jwt?.amr)&&ctx.jwt.amr.some(m=>
+  typeof m==='object'&&['totp','mfa/totp'].includes(m?.method)
+  &&Number.isInteger(m?.timestamp)
+  &&Math.abs(Date.now()/1000-m.timestamp)<=300);
+ if(!recentTotp)throw Error('fresh_totp_required');
  const id=String(input?.requestId||''),version=String(input?.typedVersion||'');
  if(!/^[a-f0-9]{8}-[a-f0-9-]{27,}$/i.test(id)||!VALID_VERSION.test(version)
   ||input?.confirm!==true||input?.confirmation!=='PUBLICAR '+version)
@@ -216,7 +229,8 @@ async function httpAdmin(req){
  }catch(e){
   const code=String(e?.message||'forbidden');
   const rejected=['unauthorized','mfa_required','superadmin_required','third_party_not_allowed',
-   'oauth_client_not_allowed','oauth_required','store_mcp_disabled','invalid_request'];
+   'oauth_client_not_allowed','oauth_required','store_mcp_disabled','invalid_request',
+   'session_revoked','fresh_totp_required'];
   return json(req,{ok:false,error:code},rejected.includes(code)?403:code==='github_dispatch_not_configured'?503:400);
  }
 }
