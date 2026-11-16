@@ -1,7 +1,7 @@
 'use client';
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useState} from 'react';
 import ui from './killa-workbench.module.css';
-import {OPENBOT_COWORKERS,planAgentTask,ZAPFAST_SINGLE_SESSION_URL} from '../lib/openbot-workspace-policy.mjs';
+import {ZAPFAST_SINGLE_SESSION_URL} from '../lib/openbot-workspace-policy.mjs';
 import {runBlackholeQwen,stopBlackholeQwen,checkBlackholeQwenSupport,getQwenCacheStatus} from '../lib/blackhole-local-llm.mjs';
 import {offlineBlackholeReply} from '../lib/blackhole-chat.mjs';
 import {planColibriLocal} from '../lib/colibri-local.mjs';
@@ -22,7 +22,7 @@ export default function OpenBotWorkbench({db,session}){
  const [busy,setBusy]=useState(false),[notice,setNotice]=useState('');
  const [approved,setApproved]=useState(false),[reviewNote,setReviewNote]=useState('');
  const [cacheInfo,setCacheInfo]=useState(null);
- const plan=useMemo(()=>planAgentTask(prompt),[prompt]);
+
  const localSelected=['colibri-local','qwen','qwen17','qwen4'].includes(engine);
  const modelId=resolveLocalQwenModel(engine);
  useEffect(()=>()=>stopBlackholeQwen(),[]);
@@ -47,7 +47,7 @@ export default function OpenBotWorkbench({db,session}){
  },[]);
  async function generate(){
   if(!prompt.trim()||busy)return;
-  const userText=prompt.trim().slice(0,6000);
+  const userText=prompt.trim().slice(0,3500);
   setBusy(true);setDraft('');setApproved(false);setSource('');setNotice('');
   try{
    let answer,model;
@@ -140,164 +140,136 @@ export default function OpenBotWorkbench({db,session}){
   }catch(error){setNotice('Não foi possível registrar a revisão: '+String(error.message||error).slice(0,180))}
   finally{setBusy(false)}
  }
- return <section className="inf-panel" aria-label="Killa AI · laboratório de agentes sob revisão" style={{marginTop:18}}>
+ return <section className="inf-panel" aria-label="Killa AI · gerar e revisar rascunhos" style={{marginTop:16}}>
   <div className={ui.shell}>
-   <div className={ui.top}><span className={ui.brand}><span className={ui.dot}/>KILLA <b>AI</b></span>
-    <span className={ui.status}>IA local · protegida</span></div>
-   <div className={ui.center}>
-    
-    <h2>Prepare sua resposta</h2>
-    <p>Escreva seu pedido. O rascunho aparece abaixo, pronto para revisão. Nenhuma mensagem é enviada.</p>
+   <div className={ui.top}>
+    <span className={ui.brand}><span className={ui.dot}/>KILLA <b>AI</b></span>
+    <span className={ui.status}>{engine==='online'?'IA online · com autorização':localSelected?'Qwen local · opcional':'Motor leve · sem download'}</span>
    </div>
-   <div className={ui.quickModes}><button type="button" disabled={busy} aria-pressed={mode==='texto'} onClick={()=>{setMode('texto');setDraft('')}}>Resposta ou resumo</button><button type="button" disabled={busy} aria-pressed={mode==='peca'} onClick={()=>{setMode('peca');setDraft('')}}>Minuta jurídica</button></div>
-    <label className={ui.quickField}>Motor da resposta
-     <select disabled={busy} aria-label="Motor da resposta" value={engine} onChange={e=>{
-      setEngine(e.target.value);setDraft('');setSource('');setApproved(false);setNotice('');
-      if(e.target.value==='qwen4')setPreferCpu(false);
-     }}>
-      <option value="deterministico">Rascunho rápido (sem modelo)</option>
-      <option value="online">IA online · redação livre</option>
-      <option value="qwen">Qwen local 0,5B</option>
-      <option value="qwen17">Qwen local 1,7B · mais memória</option>
-      <option value="qwen4">Qwen local 4B · GPU</option>
-     </select>
-    </label>
-    {engine==='online'&&<label className={ui.quickConsent}><input type="checkbox" disabled={busy}
-      checked={onlineConsent} onChange={e=>setOnlineConsent(e.target.checked)}/>
-      Autorizo enviar este pedido a um modelo de IA externo configurado.</label>}
-    {localSelected&&!consent&&<p className={ui.feedback}>Para ativar Qwen, abra “Modelo local opcional, revisão e ferramentas avançadas” e autorize o download.</p>}
-    {mode==='peca'&&<label className={ui.quickField}>Tipo de peça
-     <select disabled={busy} value={kind} onChange={e=>setKind(e.target.value)}>
-      <option value="manifestacao">Manifestação</option><option value="peticao_inicial">Petição inicial</option>
-      <option value="contestacao">Contestação</option><option value="recurso">Recurso · modalidade a confirmar</option>
-      <option value="relatorio">Relatório jurídico</option><option value="outro">Outra peça</option>
-     </select></label>}
-    <div className={ui.composer}>
+   <div className={ui.center}>
+    <h2>Prepare sua resposta</h2>
+    <p>Um pedido, um motor e um rascunho. Confira o resultado antes de copiar ou utilizar.</p>
+   </div>
+   <div className={ui.quickModes} role="group" aria-label="Tipo de trabalho">
+    <button type="button" disabled={busy} aria-pressed={mode==='texto'}
+     onClick={()=>{setMode('texto');setDraft('');setNotice('');setApproved(false)}}>Resposta ou resumo</button>
+    <button type="button" disabled={busy} aria-pressed={mode==='peca'}
+     onClick={()=>{setMode('peca');setDraft('');setNotice('');setApproved(false)}}>Minuta jurídica</button>
+   </div>
+   <label className={ui.quickField}>Motor da resposta
+    <select aria-label="Motor da resposta" disabled={busy} value={engine} onChange={e=>{
+     setEngine(e.target.value);setDraft('');setSource('');setNotice('');setApproved(false);
+     if(e.target.value==='qwen4')setPreferCpu(false);
+    }}>
+     <option value="deterministico">Motor leve · regras e cálculos</option>
+     <option value="online">IA online · escrever uma resposta livre</option>
+     <option value="qwen">Qwen local · 0,5B</option>
+     <option value="colibri-local">Colibri local · Qwen 0,5B</option>
+     <option value="qwen17">Qwen3 1,7B · exige mais memória</option>
+     <option value="qwen4">Qwen3 4B · exige GPU</option>
+    </select>
+   </label>
+   {engine==='deterministico'&&<p className={ui.helper}>Respostas rápidas sem IA generativa. Para redigir mensagens livres, selecione IA online.</p>}
+   {engine==='online'&&<label className={ui.quickConsent}><input type="checkbox" checked={onlineConsent} disabled={busy}
+     onChange={e=>setOnlineConsent(e.target.checked)}/>Autorizo enviar somente este pedido ao provedor de IA externo configurado.</label>}
+   {localSelected&&<label className={ui.quickConsent}><input type="checkbox" checked={consent} disabled={busy}
+     onChange={e=>setConsent(e.target.checked)}/>Autorizo o download e a execução do Qwen neste navegador.</label>}
+   {localSelected&&!consent&&<p className={ui.helper}>Sem esta autorização, o Killa mostra somente o rascunho feito por regras, sem carregar o Qwen.</p>}
+   {mode==='peca'&&<label className={ui.quickField}>Tipo de peça
+    <select disabled={busy} value={kind} onChange={e=>setKind(e.target.value)}>
+     <option value="manifestacao">Manifestação</option><option value="peticao_inicial">Petição inicial</option>
+     <option value="contestacao">Contestação</option><option value="recurso">Recurso · modalidade a conferir</option>
+     <option value="relatorio">Relatório jurídico</option><option value="outro">Outro documento</option>
+    </select>
+   </label>}
+   <div className={ui.composer}>
     <label htmlFor="killa-input" className={ui.srOnly}>Mensagem para Killa AI</label>
-    <textarea id="killa-input" rows={3} disabled={busy} maxLength={6000} value={prompt} onChange={e=>setPrompt(e.target.value)}
-     placeholder="Peça uma análise, um resumo ou uma resposta baseada em fatos confirmados…"/>
-    <div className={ui.actions}><span>{engine==='deterministico'?'Rascunho rápido · sem baixar modelo':engine==='online'?'IA online · autorização necessária':'Qwen opcional · processamento no navegador'}</span>
-     <button onClick={generate} type="button" disabled={busy||!prompt.trim()}>{busy?'Processando…':'Gerar rascunho'}</button>
+    <textarea id="killa-input" maxLength={3500} rows={4} disabled={busy}
+     value={prompt} onChange={e=>setPrompt(e.target.value)}
+     placeholder={mode==='peca'?'Descreva o objetivo, os fatos confirmados e a peça necessária.':'Escreva seu pedido. Ex.: redija uma resposta cordial a partir dos fatos que vou informar.'}/>
+    <div className={ui.actions}>
+     <span>{engine==='online'?'Modelo externo: somente com sua autorização':localSelected?'Modelo no seu aparelho · pode exigir download':'Modo rápido · não consulta tribunais'}</span>
+     <button type="button" onClick={generate} disabled={busy||!prompt.trim()}>
+      {busy?'Processando…':mode==='peca'?'Gerar minuta':'Gerar resposta'}</button>
     </div>
    </div>
-   
+   {busy&&localSelected&&<div className={ui.inlineActions}>
+    <span className={ui.helper}>O rascunho leve fica disponível enquanto o Qwen processa.</span>
+    <button type="button" onClick={()=>{stopBlackholeQwen();setNotice('Qwen interrompido. O texto inicial foi preservado.')}}>Parar Qwen</button>
+   </div>}
    {notice&&<p role="status" className={ui.feedback}>{notice}</p>}
-    {draft&&<article className={ui.answer}><small>Resposta proposta · revisão obrigatória</small>
-    <p>{draft}</p><small>{source}</small><div className={ui.inlineActions}><button type="button" onClick={()=>{if(!navigator.clipboard?.writeText){setNotice('Selecione o texto para copiar.');return}navigator.clipboard.writeText(draft).then(()=>setNotice('Rascunho copiado. Nenhuma mensagem enviada.')).catch(()=>setNotice('Selecione o texto para copiar.'))}}>Copiar rascunho</button></div></article>}
-  </div>
-  <details className={ui.disclosure}><summary>Modelo local opcional, revisão e ferramentas avançadas</summary>
-   <div className="blackhole-agents-header">
-   <div><small>INFINITUM • KILLA AI · ADAPTAÇÃO</small><h2>Central dos agentes e IA local</h2>
-    <p>Motores LexisPredict, PredictLM e modelos locais, com ferramentas MCP autenticadas e revisão humana para assuntos jurídicos.</p>
-   </div>
-  </div>
-  <div className="office-agent-grid">{OPENBOT_COWORKERS.map(x=><article key={x.id} className="office-agent-card">
-   <span className="inf-badge">Apenas revisão</span><strong>{x.label}</strong><p>{x.role}</p>
-  </article>)}</div>
-  <div className="inf-note" style={{marginTop:15}}>
-   <a href="/mcp/setup" className="inf-btn" style={{display:'inline-block',marginBottom:10}}>Configurar MCP do Killa AI</a>
-   <p>Conecte assistentes externos por OAuth para ler conversas autorizadas e preparar rascunhos. Nenhuma ferramenta MCP envia WhatsApp.</p>
-   <strong>WhatsApp com um único QR Code.</strong> Acesse a sessão atual pelo
-   {' '}<a href={ZAPFAST_SINGLE_SESSION_URL} target="_blank" rel="noopener noreferrer">ZapFast Web (Cloudflare)</a>
-   {' '}ou utilize o WA.Auto já configurado no INFINITUM. Não vincule o mesmo número a dois motores ao mesmo tempo.
-  </div>
-  <div className="office-form-col" style={{marginTop:15}}>
-   <label>Tipo de trabalho
-    <select value={mode} onChange={e=>{setMode(e.target.value);setDraft('');setApproved(false)}}>
-     <option value="texto">Respostas e tarefas de IA</option>
-     <option value="peca">Peças jurídicas · PredictLM + Qwen local</option>
-    </select>
-   </label>
-   {mode==='peca'&&<label>Modelo de peça
-    <select value={kind} onChange={e=>setKind(e.target.value)}>
-     <option value="manifestacao">Manifestação</option><option value="peticao_inicial">Petição inicial</option>
-     <option value="contestacao">Contestação</option><option value="recurso">Recurso (modalidade a confirmar)</option>
-     <option value="relatorio">Relatório jurídico</option><option value="outro">Outra peça</option>
-    </select>
-   </label>}
-   <label>{mode==='peca'?'Objetivo e fatos fornecidos pelo advogado':'Pedido para os agentes'}
-    <textarea rows={5} maxLength={6000} value={prompt} onChange={e=>setPrompt(e.target.value)}
-      placeholder={mode==='peca'?'Descreva a finalidade e os fatos confirmados. A IA não inventará número CNJ, jurisprudência ou decisão.':'Ex.: prepare um resumo em linguagem simples do andamento confirmado.'}/>
-   </label>
-   <p className="office-hint">Roteamento: {OPENBOT_COWORKERS.find(x=>x.id===plan.role)?.label} · revisão humana obrigatória.
-    A IA não consulta nem envia automaticamente dados confidenciais da carteira.
-    A Vercel hospeda o aplicativo; Qwen roda na CPU/WebAssembly por padrão, sem WebGPU. O uso de GPU é opcional.
-    Nenhum servidor PredictLM pago é necessário. Os pesos ficam salvos no cache deste domínio após o primeiro download;
-    quando o navegador autoriza armazenamento persistente, evita exclusão automática dos arquivos. A CPU usa uma thread. Qwen3 4B exige WebGPU; Qwen3 1,7B exige mais memória.
-    Os templates de peças e diagramas são gerados por código; nenhum documento é protocolado automaticamente.
-    {' '}Cache: {cacheInfo?.complete?'Qwen já preparado no disco':
-    cacheInfo?.preinstallChunks>0?cacheInfo.preinstallChunks+' de '+cacheInfo.preinstallTotalChunks+' partes salvas; a preparação continuará após F5':
-    cacheInfo?.cachedFiles>0?cacheInfo.cachedFiles+' arquivos pequenos preparados':'preparação automática iniciada ao abrir o domínio fixo'}.
-    {' '}{cacheInfo?.persisted?'Persistência autorizada.':'Persistência sujeita às regras do navegador.'}
-    {' '}Acesse o <a href="https://agentinfinitum.vercel.app/agentes">domínio fixo do INFINITUM</a> para reutilizar os arquivos.</p>
-   <label>Motor de inteligência
-    <select value={engine} onChange={e=>{setEngine(e.target.value);if(e.target.value==='qwen4')setPreferCpu(false);setDraft('');setApproved(false)}}>
-     <option value="colibri-local">Qwen local · CPU padrão, grátis e ativo</option>
-     <option value="deterministico">Motor leve · sem baixar modelo (padrão)</option>
-     <option value="online">IA online configurada · geração livre com autorização</option>
-     <option value="qwen">Qwen 0,5B · CPU/WebAssembly</option>
-     <option value="qwen17">Qwen3 1,7B · CPU (8 GB RAM) ou GPU</option>
-     <option value="qwen4">Qwen3 4B · GPU (8 GB RAM)</option>
-    </select>
-   </label>
-   {localSelected&&<label><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/>
-    Modelo local opcional, sem servidor Colibri/Needle. Os modelos grandes baixam pesos apenas quando escolhidos e exigem mais RAM. Desmarque para usar somente regras leves.
-   </label>}
-   {localSelected&&<div className="office-action-row">
-    <label><input type="checkbox" checked={!preferCpu} onChange={e=>setPreferCpu(!e.target.checked)}/>
-     Usar GPU opcionalmente (CPU é o padrão)
-    </label>
-    <label>Tamanho da resposta por geração
-     <select value={tokenBudget} onChange={e=>setTokenBudget(Number(e.target.value))}>
-      {[128,256,384,512,768,1024,1536,2048].map(n=><option key={n} value={n}>{n} tokens</option>)}
-     </select>
-    </label>
-    <p className="office-hint">Sem cota diária de tokens ou perguntas da IA local. O tamanho é por resposta e pode ser ajustado; respostas longas podem levar mais tempo na CPU.</p>
-   </div>
-   }
-   <div className="office-action-row"><button type="button" className="inf-btn primary" onClick={generate}
-     disabled={busy||!prompt.trim()}>
-     {busy?'Executando...':mode==='peca'?'Gerar minuta e sugestão da IA':'Gerar rascunho para revisão'}
-   </button>
-   {busy&&localSelected&&<button type="button" className="inf-btn" onClick={()=>{stopBlackholeQwen();setBusy(false)}}>Parar IA local</button>}
-   </div>
-   {draft&&<div className="inf-note"><strong>Rascunho para revisão humana · {source}</strong><p style={{whiteSpace:'pre-wrap'}}>{draft}</p>
-    {mode==='peca'&&<button type="button" className="inf-btn" onClick={()=>{
+   {draft&&<article className={ui.answer}>
+    <strong>Resposta para revisão</strong>
+    <small>{source||'Origem não informada'}</small>
+    <p>{draft}</p>
+    <div className={ui.inlineActions}>
+     <button type="button" onClick={()=>{
+      if(!navigator.clipboard?.writeText){setNotice('Selecione o texto acima para copiar.');return}
+      navigator.clipboard.writeText(draft).then(()=>setNotice('Resposta copiada. Nenhuma mensagem foi enviada.'))
+       .catch(()=>setNotice('Selecione o texto acima para copiar.'));
+     }}>Copiar resposta</button>
+     {mode==='peca'&&<button type="button" onClick={()=>{
       const html=createLegalDocumentHtml({title:'Minuta '+kind.replace(/_/g,' '),body:draft});
       const url=URL.createObjectURL(new Blob([html],{type:'text/html;charset=utf-8'}));
       const a=document.createElement('a');a.href=url;a.download='minuta-juridica-interna.html';a.click();
       setTimeout(()=>URL.revokeObjectURL(url),1000);
-    }}>Baixar minuta editável em HTML (imprimir em PDF)</button>}
-    <p>NÃO é uma atualização oficial do tribunal. Não pode ser enviada automaticamente.</p>
-    <label>Motivo e responsável pela revisão<textarea rows={2} value={reviewNote} maxLength={450}
-      onChange={e=>setReviewNote(e.target.value)} placeholder="Descreva o que foi conferido nos autos e a decisão do operador."/></label>
-    <div className="office-action-row">
-     <button type="button" className="inf-btn primary" disabled={busy||!reviewNote.trim()} onClick={()=>review('approved')}>Aprovar para uso manual</button>
-     <button type="button" className="inf-btn" disabled={busy||!reviewNote.trim()} onClick={()=>review('rejected')}>Rejeitar e registrar</button>
-     {approved&&<button type="button" className="inf-btn" onClick={()=>navigator.clipboard?.writeText(draft).then(()=>setNotice('Copiado para revisão manual; nenhum envio realizado.')).catch(()=>setNotice('Não foi possível copiar.'))}>Copiar rascunho</button>}
+     }}>Baixar minuta editável</button>}
     </div>
-   </div>}
-   <details className="inf-note" style={{marginTop:14}}>
-    <summary>Diagramas para peças · PredictLM visual local (SVG)</summary>
-    <p>Insira datas e fatos já conferidos, um por linha: DD/MM/AAAA | descrição. O desenho não é prova judicial nem imagem neural.</p>
-    <textarea rows={4} maxLength={1900} value={timelineEvents} onChange={e=>setTimelineEvents(e.target.value)}
-      placeholder={'12/11/2026 | Documento juntado\n14/11/2026 | Processo encaminhado ao juiz'}/>
-    <div className="office-action-row">
-     <button type="button" className="inf-btn" onClick={()=>{
-      try{setTimelineSvg(createLegalTimelineSvg({events:timelineEvents}));setNotice('Linha do tempo local gerada. Confira datas e eventos.')}
-      catch(error){setNotice(String(error.message||error));}
-     }}>Gerar linha do tempo</button>
-     {timelineSvg&&<button type="button" className="inf-btn" onClick={()=>{
-      const url=URL.createObjectURL(new Blob([timelineSvg],{type:'image/svg+xml'}));
-      const a=document.createElement('a');a.href=url;a.download='linha-do-tempo-nao-verificada.svg';a.click();
-      setTimeout(()=>URL.revokeObjectURL(url),1000);
-     }}>Baixar SVG</button>}
-    </div>
-    {timelineSvg&&<img alt="Linha do tempo ilustrativa, sem verificação judicial" style={{maxWidth:'100%',borderRadius:8}}
-      src={'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(timelineSvg)}/>}
-   </details>
-
+    <details className={ui.innerDisclosure}>
+     <summary>Registrar revisão no CRM (opcional)</summary>
+     <label className={ui.reviewLabel}>Motivo da revisão
+      <textarea rows={2} maxLength={450} value={reviewNote} onChange={e=>setReviewNote(e.target.value)}
+       placeholder="Registre o que você conferiu e por que aprova ou rejeita o texto."/></label>
+     <div className={ui.inlineActions}>
+      <button type="button" disabled={busy||!reviewNote.trim()} onClick={()=>review('approved')}>Aprovar e registrar</button>
+      <button type="button" disabled={busy||!reviewNote.trim()} onClick={()=>review('rejected')}>Rejeitar e registrar</button>
+     </div>
+     {approved&&<p>Revisão aprovada para uso manual, sem envio automático.</p>}
+    </details>
+   </article>}
   </div>
+  <details className={ui.disclosure}>
+   <summary>Modelo local opcional · desempenho e memória</summary>
+   <p>O Qwen exige CPU ou GPU, memória livre e arquivos de modelo. Para evitar travamentos, ele só é carregado após você selecionar um modelo e autorizar o uso. Sem cota diária de tokens ou perguntas no modo local; o limite por resposta depende do aparelho.</p>
+   {localSelected?<div className={ui.advancedGrid}>
+    <label>GPU disponível (opcional)<input type="checkbox" checked={!preferCpu} disabled={busy||engine==='qwen4'}
+     onChange={e=>setPreferCpu(!e.target.checked)}/></label>
+    <label>Limite de geração
+     <select value={tokenBudget} disabled={busy} onChange={e=>setTokenBudget(Number(e.target.value))}>
+      {[128,256,384,512,768,1024,1536,2048].map(n=><option key={n} value={n}>{n} tokens</option>)}
+     </select></label>
+    <p>Cache: {cacheInfo?.complete?'Arquivos preparados no navegador.':
+      cacheInfo?.cachedFiles>0?'Arquivos parciais disponíveis; o download pode continuar.':'Ainda não foi possível confirmar os arquivos do modelo.'}</p>
+   </div>:<p>Selecione Qwen acima para mostrar as opções de desempenho.</p>}
+  </details>
+  <details className={ui.disclosure}>
+   <summary>Linha do tempo jurídica · ferramenta extra</summary>
+   <p>Uma data e um fato conferido por linha: DD/MM/AAAA | descrição.</p>
+   <textarea rows={4} maxLength={1900} value={timelineEvents} onChange={e=>setTimelineEvents(e.target.value)}
+    placeholder={'12/11/2026 | Documento juntado\n14/11/2026 | Processo encaminhado ao juiz'}/>
+   <div className={ui.inlineActions}>
+    <button type="button" onClick={()=>{
+     try{setTimelineSvg(createLegalTimelineSvg({events:timelineEvents}));setNotice('Linha do tempo ilustrativa gerada; confira as datas.')}
+     catch(e){setNotice(String(e.message||e))}
+    }}>Gerar linha do tempo</button>
+    {timelineSvg&&<button type="button" onClick={()=>{
+     const url=URL.createObjectURL(new Blob([timelineSvg],{type:'image/svg+xml'}));
+     const a=document.createElement('a');a.href=url;a.download='linha-do-tempo-ilustrativa.svg';a.click();
+     setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }}>Baixar SVG</button>}
+   </div>
+   {timelineSvg&&<img alt="Linha do tempo ilustrativa não verificada" style={{maxWidth:'100%'}}
+    src={'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(timelineSvg)}/>}
+  </details>
+  <details className={ui.disclosure}>
+   <summary>Integrações externas · WhatsApp e MCP</summary>
+   <p>O MCP conecta assistentes externos com permissões próprias. Ele não configura o motor de resposta acima nem conecta o WhatsApp automaticamente.</p>
+   <nav className={ui.links}>
+    <a href="/mcp/setup">Configurar MCP</a>
+    <a href="/whatsapp">Meu WhatsApp</a>
+    <a href={ZAPFAST_SINGLE_SESSION_URL} target="_blank" rel="noopener noreferrer">Abrir ZapFast</a>
+   </nav>
+   <p>O WhatsApp exige uma sessão própria. Não vincule o mesmo número em dois motores ao mesmo tempo.</p>
   </details>
  </section>;
 }
