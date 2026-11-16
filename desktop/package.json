@@ -51,7 +51,7 @@
         "nsis"
       ],
       "artifactName": "INFINITUM-KillaAI-Setup-${version}-${arch}.exe",
-      "publisherName": "W1 Capital Assessoria Financeira Ltda."
+      "verifyUpdateCodeSignature": true
     },
     "nsis": {
       "oneClick": false,
@@ -59,13 +59,7 @@
       "perMachine": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
-    },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "ProjectW1SC",
-        "repo": "INFINITUM"
-      }
-    ]
-  }
+    }
+  },
+  "author": "W1 Capital"
 }
