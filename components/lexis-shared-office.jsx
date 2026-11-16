@@ -192,7 +192,7 @@ export default function LexisSharedOffice({area='dashboard',db,session}){
    });
    if(error||data?.ok!==true)throw Error(error?.message||'Atendimento não confirmado pelo banco.');
    setNotice('Atendimento registrado: '+data.responsavel+' · '+DATE_LABEL(data.ultimo_atendimento)+' · próximo retorno '+DATE_LABEL(data.proximo_atendimento)+'.');
-   if(typeof window!=='undefined')window.dispatchEvent(new Event('lexis:attendance-registered'));
+   if(typeof window!=='undefined')window.dispatchEvent(new window.Event('lexis:attendance-registered'));
    historyRequest.current++;setHistoryLoading(false);setHistory([]);
    setAttendNote('');setSelected(null);await load();
   }catch(e){setNotice('Atendimento não registrado: '+e.message)}

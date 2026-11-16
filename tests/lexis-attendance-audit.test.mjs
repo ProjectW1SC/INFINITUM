@@ -59,7 +59,7 @@ test('filtro do painel abre a auditoria de hoje sem confundir prazo vencido',()=
 test('registrar atendimento confirmado atualiza a auditoria e troca de empresa limpa dados antigos',()=>{
  const office=read('components/lexis-shared-office.jsx');
  assert.match(office,/if\(error\|\|data\?\.ok!==true\)throw/);
- assert.match(office,/window.dispatchEvent\(new Event\('lexis:attendance-registered'\)\)/);
+ assert.match(office,/window.dispatchEvent\(new window.Event\('lexis:attendance-registered'\)\)/);
  const hook=read('components/use-lexis-attendance-audit.js');
  assert.match(hook,/lexis:attendance-registered/);
  assert.match(hook,/scope.current!==nextScope/);
