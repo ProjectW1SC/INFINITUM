@@ -31,6 +31,12 @@ O pacote raiz instala **TypeScript 5.9.3** e executa `tsc --project tsconfig.typ
 | React / React DOM | `19.1.2` | Interface |
 | TypeScript | `5.9.3` | Checagem estática de JavaScript |
 | Supabase JS | `2.119.0` | Auth, banco e integrações no cliente |
+| Google Auth Library | `9.15.1` | Autenticação e integrações Google no servidor |
+| Firebase | `13.3.0` | SDK e serviços Firebase usados pelo projeto |
+| lucide-react | `0.468.0` | Ícones da interface |
+| read-excel-file | `9.3.10` | Leitura de planilhas Excel |
+| qrcode | `1.5.4` | Geração de QR codes |
+| jsdom | `26.1.0` | Ambiente de testes DOM |
 | Electron | `45.3.2` | Aplicativo Windows |
 | electron-builder | `26.18.0` | Empacotamento NSIS x64 |
 | electron-updater | `6.8.11` | Canal de atualização compatível com as políticas de assinatura |
