@@ -1,0 +1,67 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {generateKeyPairSync,sign} from 'node:crypto';
+import {readFileSync} from 'node:fs';
+import {
+ verifyUpdateManifest,versionIsNewer,releaseArtifactUrl,
+ publicKeyFingerprint
+} from '../desktop/release-trust.mjs';
+const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
+const payload=(version='1.2.3')=>({
+ schema:1,channel:'stable',appId:'br.com.w1capital.infinitum.killa',
+ version,tag:'v'+version,
+ asset:{name:'INFINITUM-KillaAI-Setup-'+version+'-x64.exe',
+  url:'https://github.com/ProjectW1SC/INFINITUM/releases/download/v'+version+'/INFINITUM-KillaAI-Setup-'+version+'-x64.exe',
+  size:1000000,sha512:Buffer.alloc(64,7).toString('base64') }
+});
+test('free signed manifest rejects tampering, downgrade, external URLs and an unsigned ZIP from main',()=>{
+ const {privateKey,publicKey}=generateKeyPairSync('ed25519');
+ const data=payload();
+ const raw=Buffer.from(JSON.stringify(data),'utf8');
+ const doc={format:'w1-signed-release-v1',payload:raw.toString('base64'),
+   signature:sign(null,raw,privateKey).toString('base64')};
+ assert.equal(verifyUpdateManifest(doc,publicKey,'1.0.0').version,'1.2.3');
+ assert.throws(()=>verifyUpdateManifest({...doc,signature:Buffer.alloc(64).toString('base64')},publicKey,'1.0.0'),/assinatura|signature/i);
+ assert.throws(()=>verifyUpdateManifest({...doc,payload:Buffer.from(JSON.stringify({...data,version:'1.4.0'})).toString('base64')},publicKey,'1.0.0'),/assinatura|signature/i);
+ assert.throws(()=>verifyUpdateManifest(doc,publicKey,'1.2.3'),/nova versão|newer/i);
+ const external=payload();external.asset.url='https://evil.invalid/exe';
+ const rawExternal=Buffer.from(JSON.stringify(external),'utf8');
+ const docExternal={format:doc.format,payload:rawExternal.toString('base64'),signature:sign(null,rawExternal,privateKey).toString('base64')};
+ assert.throws(()=>verifyUpdateManifest(docExternal,publicKey,'1.0.0'),/origem|URL|GitHub/i);
+ assert.equal(versionIsNewer('1.0.1','1.0.0'),true);
+ assert.equal(versionIsNewer('0.9.9','1.0.0'),false);
+ assert.equal(releaseArtifactUrl('1.2.3'),data.asset.url);
+ assert.match(publicKeyFingerprint(publicKey),/^[a-f0-9]{64}$/);
+});
+test('brand assets: W1 Capital actual logo and original INFINITUM infinity (not Ethereum)',()=>{
+ const html=read('desktop/launcher.html');
+ assert.match(html,/branding\/w1-wordmark\.svg/);
+ assert.match(html,/branding\/infinitum-symbol\.svg/);
+ assert.doesNotMatch(html,/ethereum|etherum/i);
+ const w1=read('desktop/branding/w1-wordmark.svg');
+ assert.match(w1,/W1 CAPITAL/);
+ const inf=read('desktop/branding/infinitum-symbol.svg');
+ assert.match(inf,/viewBox="0 0 205 94"/);
+ assert.doesNotMatch(inf,/ethereum|etherum/i);
+ const pkg=JSON.parse(read('desktop/package.json'));
+ assert.ok(pkg.build.files.includes('branding/**/*'));
+ assert.match(pkg.build.win.icon,/infinitum-app\.ico/);
+});
+test('free release distribution requires manual approval, private signing secret, no main ZIP execution',()=>{
+ const ci=read('.github/workflows/killa-desktop-free-release.yml');
+ assert.match(ci,/workflow_dispatch/);
+ assert.match(ci,/desktop-production/);
+ assert.match(ci,/refs\/heads\/main/);
+ assert.match(ci,/KILLA_ED25519_PRIVATE_KEY_B64/);
+ assert.match(ci,/gh release create/);
+ assert.doesNotMatch(ci,/vercel|git archive|main\.zip|\/archive\/refs\/heads\/main/i);
+ const signed=read('desktop/sign-free-release.mjs');
+ assert.match(signed,/createPrivateKey|sign\(/);
+ assert.match(signed,/publicKeyFingerprint/);
+ assert.doesNotMatch(signed,/BEGIN PRIVATE KEY[\\s\\S]*END PRIVATE KEY/);
+ const update=read('desktop/free-update-client.mjs');
+ assert.match(update,/verifyUpdateManifest/);
+ assert.match(update,/createHash\\('sha512'\\)/);
+ assert.match(update,/getPath\\('userData'\\)/);
+ assert.doesNotMatch(update,/execSync|eval\(|https:\/\/.*vercel/);
+});
