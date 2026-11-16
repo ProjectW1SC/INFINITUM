@@ -8,7 +8,7 @@ Informe vulnerabilidades de forma privada (GitHub Security Advisories, quando ha
 
 ## Autenticação, isolamento e ameaças
 
-- **Identidade:** login da própria empresa em Supabase Auth, segundo fator (MFA/AAL2), OAuth 2.1 com cliente \`client_id\` aprovado expressamente por administrador. Senhas não são fornecidas a modelos de IA.
+- **Identidade:** login da própria empresa em Supabase Auth, segundo fator verificado (MFA/AAL2) na tela de consentimento, OAuth 2.1 com cliente `client_id` aprovado expressamente por administrador. Como o Supabase pode emitir sessões OAuth em AAL1, o INFINITUM grava uma prova MFA privada vinculada ao usuário, empresa e cliente, com validade de 8 horas; o backend valida essa prova antes de expor ferramentas. Senhas não são fornecidas a modelos de IA.
 - **Escopo:** owner_id do usuário autenticado e empresa_id validada no servidor. O LLM não pode escolher outra empresa, falsificar permissões ou obter a carteira completa por consulta geral.
 - **OAuth somente leitura:** tokens com \`client_id\` são aceitos apenas na rota MCP, nunca nas demais rotas do CRM. No PostgreSQL, políticas RLS \`RESTRICTIVE\` bloqueiam INSERT, UPDATE e DELETE com tokens OAuth diretamente na Data API; TRUNCATE e escrita anônima são revogados.
 - **Registros de atendimentos:** KPI OpenBot conta somente aceite do WA.Auto persistido e comprovado; rascunhos, timeouts e mensagens sem recibo não entram como atendimento. Aceite não significa entrega nem leitura.
