@@ -12,7 +12,7 @@
 
 ## Gerar instalador Windows
 
-No GitHub, execute o workflow \`INFINITUM Killa AI — instalador Windows\`. Ele prepara o Next.js standalone e gera \`INFINITUM-KillaAI-Setup-0.1.0-x64.exe\` como artefato GitHub Actions. O usuário que instalar **não precisa do Vercel nem do Node**.
+No GitHub, execute o workflow \`INFINITUM Killa AI — instalador Windows\`. Ele prepara o Next.js standalone e gera \`INFINITUM-KillaAI-Setup-0.1.1-x64.exe\` como artefato GitHub Actions. O usuário que instalar **não precisa do Vercel nem do Node**.
 
 Localmente, com Node.js 24 e Windows:
 
@@ -22,10 +22,18 @@ $env:KILLA_DESKTOP_STANDALONE="1"
 npm run build
 node desktop/stage-standalone.mjs
 npm install --prefix desktop
+npm --prefix desktop run pack:win
+node desktop/verify-packaged-server.mjs
 npm --prefix desktop run dist:win
 \`\`\`
 
 Este protótipo pode ser distribuído como **instalador não assinado** nos testes. O Windows SmartScreen pode avisar. O canal gratuito Ed25519 agora permite atualizações autenticadas sem certificado Windows, após a primeira release oficial. O Authenticode reconhecido pelo Windows é opcional e não deve ser confundido com a assinatura própria do launcher.
+
+## Verificação do instalador Windows
+
+O smoke test do Next antes do empacotamento não detectava a perda de dependências ao gerar o pacote Electron. O instalador 0.1.1 inclui explicitamente o node_modules do Next standalone como recurso separado. Os workflows agora executam o EXE de verdade em modo Node em 127.0.0.1 e exigem a resposta autenticada do healthcheck antes de liberar o instalador. Se faltarem arquivos, o workflow falha e não publica o pacote.
+
+O instalador 0.1.0 antigo não deve ser usado para validar o conserto; ele precisa ser substituído pelo 0.1.1 gerado após essas verificações.
 
 ## Segurança e limites
 
