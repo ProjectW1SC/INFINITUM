@@ -271,26 +271,43 @@ ipcMain.handle('launcher:set-auto-update',(event,value)=>{
   :'Instalação automática desligada; você pode atualizar manualmente no launcher.'});
  return launcherState;
 });
-ipcMain.handle('launcher:launch',async event=>{
- expectTrustedLauncher(event);
- if(appOpen)return appOpen;
+async function launchLocalCRM(target='/login'){
+ if(window&&!window.isDestroyed()){
+  if(target!=='/login')await window.loadURL('http://127.0.0.1:'+port+target);
+  window.show();window.focus();
+  return launcherState;
+ }
+ if(appOpen){await appOpen;
+  if(window&&target!=='/login')await window.loadURL('http://127.0.0.1:'+port+target);
+  return launcherState;
+ }
  appOpen=(async()=>{
-  pushLauncher({phase:'opening',message:'Iniciando seu servidor INFINITUM local, sem Vercel.'});
+  pushLauncher({phase:'opening',message:'Iniciando servidor local autorizado, sem Vercel.'});
   try{
    desktopConfig=await loadPublicConfiguration();
    await startLocalNext();
-   await openAppWindow();
+   await openAppWindow(target);
    if(launcherWindow&&!launcherWindow.isDestroyed())launcherWindow.close();
    return launcherState;
   }catch{
    if(nextProcess&&!nextProcess.killed){try{nextProcess.kill()}catch{}}
    nextProcess=null;
-   return pushLauncher({phase:'error',message:'Não foi possível iniciar o servidor local. Verifique a internet para autenticação Supabase e tente novamente.'});
+   return pushLauncher({phase:'error',message:'O servidor local não iniciou. Verifique a autenticação no Supabase.'});
   }finally{appOpen=null}
  })();
  return appOpen;
+}
+ipcMain.handle('launcher:launch',event=>{
+ expectTrustedLauncher(event);
+ return launchLocalCRM('/login');
 });
-async function openAppWindow(){
+ipcMain.handle('launcher:open-admin',event=>{
+ expectTrustedLauncher(event);
+ // A launcher button only navigates. The private Supabase Edge Function still
+ // enforces the exclusive superadmin allowlist and MFA for every request.
+ return launchLocalCRM('/app-store/admin');
+});
+async function openAppWindow(target='/login'){
  window=new BrowserWindow({
   width:1300,height:840,minWidth:880,minHeight:600,
   show:false,backgroundColor:'#120c15',autoHideMenuBar:true,
@@ -312,7 +329,7 @@ async function openAppWindow(){
   if(isSafeExternalNavigation(target))void shell.openExternal(target);
  });
  window.on('closed',()=>{window=null});
- await window.loadURL('http://127.0.0.1:'+port+'/login');
+ await window.loadURL('http://127.0.0.1:'+port+target);
  window.show();
 }
 function cleanup(){

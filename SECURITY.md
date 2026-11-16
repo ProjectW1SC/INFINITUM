@@ -47,3 +47,8 @@ Para envio, a IA apenas cria uma solicitação com validade de cinco minutos. A 
 ## Canal gratuito de atualização da central W1 Capital
 
 O launcher empacota os logos oficiais, valida a chave Ed25519 da W1 Capital embutida no EXE, manifesto de versão específico, URL oficial GitHub Releases e hash SHA-512 antes de executar um instalador. Não executa ZIPs da main, scripts remotos, mensagens de clientes ou instruções de LLM como atualizações. A chave privada deve existir somente no ambiente protegido de release GitHub Actions com revisão, jamais no Supabase, frontend, banco ou EXE. O instalador autêntico pode ainda receber alertas do Windows SmartScreen porque a assinatura Ed25519 própria não é Authenticode reconhecido pelo sistema. Não contornar os avisos do Windows nem importar certificados raiz automaticamente.
+
+
+## Console W1 Capital — segregação de superadmin
+
+Schema `killa_private` com privilégios revogados para anon/authenticated, allowlist exclusiva, MFA `aal2`, validação de sessão revogada e TOTP recente para publicações. Logs brutos e valores de Env não saem do GitHub/servidor. MCP externo só solicita releases; confirmação é pelo superadmin e o GitHub exige o ambiente protegido. Consulte [guia de segurança da loja](docs/killa-store-superadmin.md).

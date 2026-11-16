@@ -2,7 +2,7 @@
 
 ## O que este instalador faz
 
-- Executa a aplicação INFINITUM **integralmente de um servidor Next.js standalone local** dentro de um processo Node embutido no Electron, em \`127.0.0.1\` com porta temporária. **Não abre o site Vercel** nem exige Node.js instalado no PC.
+- Executa a aplicação INFINITUM **integralmente de um servidor Next.js standalone local** dentro de um processo Node embutido no Electron, em \`127.0.0.1\` com porta persistente por perfil Windows. **Não abre o site Vercel** nem exige Node.js instalado no PC.
 - Cada funcionário entra na própria conta Supabase, com sessão no perfil do Windows; RLS e permissões da empresa continuam no servidor.
 - Supabase Realtime assina mudanças de mensagens e sessões por \`owner_id\`; dados privados nunca são transmitidos em eventos globais.
 - OpenBot, motores PredictLM, Qwen local e QR do WA.Auto usam a interface existente do INFINITUM.
@@ -95,3 +95,10 @@ A assinatura Ed25519 autentica criptograficamente uma atualização para o launc
 Os segredos de assinatura só são lidos no GitHub Actions de publicação, nunca no aplicativo ou no Supabase. Uma atualização com assinatura incorreta, hash adulterado, origem imprevista ou versão inferior é recusada. A instalação ocorre no perfil do usuário com NSIS, sem scripts ocultos nem elevação de privilégios forçada. Se a chave privada for comprometida, suspenda imediatamente o canal e faça rotação controlada da confiança — nenhum mecanismo é invulnerável ao roubo da chave de publicação.
 
 Dados de clientes, WhatsApp e autenticação não são hospedados pelo serviço de releases. O Supabase continua guardando dados sob RLS por usuário, e o launcher não depende da Vercel.
+
+
+## Administração de builds e MCP
+
+Abra **Killa Launcher → Administração · Build Logs / Typecheck / Env**. Só o superadmin com MFA pode consultar os dados privados. A Edge Function e o console Next local não dependem de Vercel. O MCP pode consultar as execuções e solicitar publicação, nunca aprovar diretamente.
+
+[Guia de superadmin e autorização](../docs/killa-store-superadmin.md).
