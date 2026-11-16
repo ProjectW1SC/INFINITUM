@@ -23,11 +23,21 @@ async function approvedClientsForUser(db,userId){
   ?settings.data.allowed_client_ids:[];
 }
 
+async function recordMfaGrant(db,authorizationId){
+ const {data,error}=await db.rpc('killa_record_mcp_mfa_grant',{p_authorization_id:authorizationId});
+ if(error||data?.ok!==true)
+  throw Error(error?.message||data?.error||'Não foi possível registrar a confirmação MFA desta conexão.');
+ return data;
+}
+
 export default function KillaOAuthConsent(){
  const {db,session,loading}=useWorkspaceSession();
  const [authorizationId,setAuthorizationId]=useState('');
  const [approvedClients,setApprovedClients]=useState([]),[mfaOk,setMfaOk]=useState(false);
- const [details,setDetails]=useState(null),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);
+ const [mfaFactorId,setMfaFactorId]=useState(''),[mfaCode,setMfaCode]=useState('');
+ const [pendingRedirect,setPendingRedirect]=useState('');
+ const [details,setDetails]=useState(null),[notice,setNotice]=useState('');
+ const [busy,setBusy]=useState(false),[mfaBusy,setMfaBusy]=useState(false);
  useEffect(()=>{
   const id=new URLSearchParams(window.location.search).get('authorization_id')||'';
   setAuthorizationId(id);
@@ -36,25 +46,60 @@ export default function KillaOAuthConsent(){
   Promise.all([
    db.auth.oauth.getAuthorizationDetails(id),
    approvedClientsForUser(db,session.user.id),
-   db.auth.mfa.getAuthenticatorAssuranceLevel()
-  ]).then(([authorization,clients,mfa])=>{
+   db.auth.mfa.getAuthenticatorAssuranceLevel(),
+   db.auth.mfa.listFactors()
+  ]).then(async([authorization,clients,mfa,factors])=>{
    if(!live)return;
    const {data,error}=authorization;
-   if(mfa.error){setNotice('Verificação do segundo fator falhou. Nenhum cliente será autorizado.');return;}
+   if(mfa.error||factors.error){
+    setNotice('Não foi possível verificar o segundo fator. Nenhum cliente será autorizado.');
+    return;
+   }
    setApprovedClients(clients);
-   setMfaOk(mfa.data?.currentLevel==='aal2');
-   if(error)setNotice(error.message);
-   else if(data?.redirect_url&&!data?.authorization_id)window.location.assign(data.redirect_url);
-   else setDetails(data);
+   const verifiedFactor=(factors.data?.totp||[]).find(x=>x.status==='verified');
+   setMfaFactorId(verifiedFactor?.id||'');
+   const verified=mfa.data?.currentLevel==='aal2';
+   setMfaOk(verified);
+   if(error){setNotice(error.message);return;}
+   if(data?.redirect_url&&!data?.authorization_id){
+    setDetails(data);
+    setPendingRedirect(data.redirect_url);
+    if(verified){
+     try{
+      await recordMfaGrant(db,id);
+      if(live)window.location.assign(data.redirect_url);
+     }catch(e){if(live)setNotice(String(e?.message||e).slice(0,230))}
+    }else{
+     setNotice('Este aplicativo já tinha autorização anterior. Confirme novamente seu segundo fator para continuar.');
+    }
+   }else setDetails(data);
   }).catch(e=>{if(live)setNotice(String(e?.message||'Não foi possível verificar a solicitação OAuth.').slice(0,230))});
   return()=>{live=false};
  },[db,session?.user?.id]);
  const clientId=String(details?.client?.id||details?.client?.client_id||details?.client_id||'');
  const clientApproved=clientId.length>0&&approvedClients.includes(clientId)&&mfaOk;
+ async function verifyMfa(){
+  if(!db||!mfaFactorId||mfaBusy||!/^\d{6}$/.test(mfaCode))return;
+  setMfaBusy(true);setNotice('');
+  try{
+   const result=await db.auth.mfa.challengeAndVerify({factorId:mfaFactorId,code:mfaCode});
+   if(result.error)throw result.error;
+   const assurance=await db.auth.mfa.getAuthenticatorAssuranceLevel();
+   if(assurance.error||assurance.data?.currentLevel!=='aal2')
+    throw Error('O Supabase ainda não confirmou o nível AAL2. Digite um código novo.');
+   setMfaOk(true);setMfaCode('');
+   if(pendingRedirect){
+    await recordMfaGrant(db,authorizationId);
+    window.location.assign(pendingRedirect);
+   }else setNotice('Segundo fator confirmado. Agora você pode autorizar a leitura.');
+  }catch(e){setNotice(String(e?.message||e).slice(0,230))}
+  finally{setMfaBusy(false)}
+ }
  async function decide(approved){
   if(!db?.auth?.oauth||!authorizationId||busy||(approved&&!clientApproved))return;
   setBusy(true);setNotice('');
   try{
+   if(approved)await recordMfaGrant(db,authorizationId);
    const result=approved?
     await db.auth.oauth.approveAuthorization(authorizationId):
     await db.auth.oauth.denyAuthorization(authorizationId);
@@ -66,21 +111,35 @@ export default function KillaOAuthConsent(){
   <h1>Autorizar Killa AI MCP</h1>
   <p>Um assistente externo solicita acesso de leitura ao INFINITUM. O MCP consulta apenas a empresa e as conversas permitidas para sua conta. Nenhuma ferramenta MCP envia mensagens de WhatsApp.</p>
   {loading&&<p>Verificando sessão...</p>}
-  {!loading&&!session?.user&&<p>Entre no INFINITUM neste navegador e volte a este endereço para autorizar a conexão.</p>}
+  {!loading&&!session?.user&&<p>Entre no INFINITUM neste navegador e volte a este endereço para autorizar a conexão. <a href="/">Entrar</a></p>}
   {!authorizationId&&<p>Solicitação OAuth não identificada.</p>}
   {session?.user&&!db?.auth?.oauth&&<p>O cliente de autenticação precisa ser atualizado para suportar OAuth 2.1.</p>}
   {details&&<section style={{padding:'12px 0'}}>
-   <p>Aplicativo: <strong>{details.client?.name||'Cliente MCP'}</strong></p>
-   <p>ID OAuth: <code>{clientId||'indisponível'}</code></p>
-   {!approvedClients.includes(clientId)&&<p role="alert">Este aplicativo ainda não está na lista de clientes OAuth autorizados em <a href="/mcp/setup">/mcp/setup</a>. Copie o ID exato e peça autorização ao administrador.</p>}
-   {!mfaOk&&<p role="alert">MFA (segundo fator) obrigatório. Ative e valide um segundo fator na sua conta antes de permitir acesso externo.</p>}
-   <p>Permissões solicitadas: {String(details.scope||'não informadas')}</p>
-   <p>Destino de retorno: {details.redirect_uri}</p>
-   <p>Confirme somente se reconhece este aplicativo. As regras da sua empresa ainda podem bloquear o acesso.</p>
-   <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
-    <button type="button" disabled={busy||!clientApproved} onClick={()=>decide(true)}>Autorizar leitura</button>
-    <button type="button" disabled={busy} onClick={()=>decide(false)}>Negar acesso</button>
-   </div>
+   {clientId?
+    <><p>Aplicativo: <strong>{details.client?.name||'Cliente MCP'}</strong></p>
+     <p>ID OAuth: <code>{clientId}</code></p>
+     {!approvedClients.includes(clientId)&&<p role="alert">Este aplicativo ainda não está na lista de clientes OAuth autorizados em <a href="/mcp/setup">/mcp/setup</a>. Copie o ID exato e peça autorização ao administrador.</p>}
+     <p>Permissões solicitadas: {String(details.scope||'não informadas')}</p>
+     <p>Destino de retorno: {details.redirect_uri}</p>
+    </>
+    :<p>Aplicativo MCP com autorização anterior. Confirme novamente o segundo fator para continuar.</p>}
+   {!mfaOk&&<div style={{padding:14,border:'1px solid #8a6a25',borderRadius:10,margin:'14px 0'}}>
+    <p role="alert">O segundo fator precisa ser confirmado nesta sessão antes de liberar o token OAuth.</p>
+    {mfaFactorId?
+     <><label htmlFor="killa-mfa-code">Código do aplicativo autenticador</label>
+      <input id="killa-mfa-code" type="text" inputMode="numeric" autoComplete="one-time-code" maxLength={6}
+       value={mfaCode} onChange={e=>setMfaCode(e.target.value.replace(/\D/g,'').slice(0,6))}
+       style={{display:'block',margin:'8px 0',padding:10,width:'100%'}}/>
+      <button type="button" disabled={mfaBusy||!/^\d{6}$/.test(mfaCode)} onClick={verifyMfa}>
+       {mfaBusy?'Confirmando…':'Confirmar segundo fator'}
+      </button></>
+     :<p>Não há autenticador verificado nesta conta. <a href="/mcp/setup">Configure o segundo fator no INFINITUM</a>.</p>}
+   </div>}
+   {clientId&&<><p>Confirme somente se reconhece este aplicativo. O acesso permanece limitado às regras da sua empresa.</p>
+    <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
+     <button type="button" disabled={busy||!clientApproved} onClick={()=>decide(true)}>Autorizar leitura</button>
+     <button type="button" disabled={busy} onClick={()=>decide(false)}>Negar acesso</button>
+    </div></>}
   </section>}
   {notice&&<p role="alert">{notice}</p>}
  </main>;
