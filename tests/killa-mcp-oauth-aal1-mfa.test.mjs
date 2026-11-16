@@ -38,7 +38,7 @@ test('MCP preserves 401 only for authentication failures and returns 403/503 for
  const r=read('app/mcp/route.js');
  assert.match(r,/error\?\.status/);
  assert.match(r,/status===401/);
- assert.match(r,/status===403/);
+ assert.match(r,/\[403,429,503\]/);
  assert.doesNotMatch(r,/catch\{return killaMcpUnauthorized\(\)\}/);
 });
 test('MFA grant storage is private, short-lived, company-scoped and writable only through guarded RPC',()=>{
@@ -48,7 +48,7 @@ test('MFA grant storage is private, short-lived, company-scoped and writable onl
  assert.match(s,/REVOKE ALL.*authenticated/s);
  assert.match(s,/auth\.jwt\(\)->>'aal'.*aal2/s);
  assert.match(s,/mcp_allowed_client_ids/);
- assert.match(s,/INTERVAL '8 hours'/);
+ assert.match(s,/interval '8 hours'/i);
  assert.match(s,/killa_record_mcp_mfa_grant/);
  assert.match(s,/killa_check_mcp_mfa_grant/);
 });
