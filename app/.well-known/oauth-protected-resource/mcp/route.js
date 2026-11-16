@@ -1,1 +1,1 @@
-export {GET,dynamic} from '../../route.js';
+export {GET,dynamic} from '../route.js';
