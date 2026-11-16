@@ -138,12 +138,32 @@ export async function POST(request){
    });
   }
   if(action==='cases'){
-   const query=String(data.q||'').trim().replace(/[^\p{L}\p{N} .-]/gu,'').slice(0,60);
-   if(query.length<3)invalid('Informe ao menos três caracteres para pesquisar.',400);
-   const search=await db.from('processos').select('id,cliente,protocolo_ref,status')
-     .eq('empresa_id',company).ilike('cliente','%'+query+'%').limit(12);
-   if(search.error)invalid('Pesquisa na carteira indisponível.',503);
-   return officeJson({ok:true,cases:search.data||[],source:'LexisPredict',limit:12});
+   if(!validJid(jid))invalid('Selecione uma conversa privada para pesquisar clientes.',422);
+   const archive=await db.from('office_wa_chat_archive').select('name,phone')
+     .eq('owner_id',user.id).eq('empresa_id',company).eq('jid',jid).limit(1).maybeSingle();
+   if(archive.error)invalid('Histórico do contato indisponível.',503);
+   const query=String(data.q||archive.data?.name||'').trim().slice(0,80);
+   const terms=contactNameVariants(query);
+   const digits=String(archive.data?.phone||jid.split('@')[0]).replace(/\D/g,'');
+   const suffix=digits.slice(-8);
+   if(!terms.length&&suffix.length<8)invalid('Informe o nome do cliente ou um número válido.',400);
+   const searches=terms.slice(0,4).map(term=>{
+    const escaped=term.replace(/[%,()_*]/g,' ').trim();
+    return db.from('processos').select('id,cliente,telefone,protocolo_ref,status')
+     .eq('empresa_id',company).ilike('cliente','%'+escaped+'%').limit(18);
+   });
+   if(suffix.length===8)searches.push(db.from('processos')
+    .select('id,cliente,telefone,protocolo_ref,status').eq('empresa_id',company)
+    .ilike('telefone','%'+suffix+'%').limit(18));
+   const found=await Promise.all(searches);
+   if(found.some(x=>x.error))invalid('Não foi possível pesquisar os dados do cliente nesta empresa.',503);
+   const rows=[...new Map(found.flatMap(x=>x.data||[]).map(x=>[String(x.id),x])).values()];
+   const candidates=rankProcessCandidates({profileName:query,phone:digits,cases:rows});
+   return officeJson({ok:true,cases:candidates.map(x=>({
+    id:x.id,cliente:x.cliente,protocolo_ref:x.protocolo_ref,status:x.status,
+    matchedBy:x.matchedBy,score:x.score,candidateOnly:true
+   })),source:'INFINITUM',limit:12,manualIdentityRequired:true,
+   notice:'Nomes compostos e telefones apenas sugerem candidatos; confirme a identidade e o processo antes de autorizar.'});
   }
   if(action==='authorize'){
    if(!validJid(jid))invalid('Confirme um número WhatsApp privado (não LID ou grupo).',422);
@@ -202,6 +222,20 @@ export async function POST(request){
    return officeJson({ok:true,notice:'Consulta oficial concluída. Confira fonte, data e conteúdo antes do atendimento.',
      processNumber:number,official:{source:result.source||null,checkedAt:result.checkedAt||null,notice:result.notice||null,fromCache:result.fromCache===true,stale:result.stale===true,items:Array.isArray(result.items)?result.items.slice(0,8).map(item=>({codigo:item.codigo||null,nome:String(item.nome||item.descricao||'').slice(0,250),dataHora:item.dataHora||item.data||null})):[]},skills:['judicial-research']});
   }
+  if(action==='record_return'){
+   const eventId=String(data.reservation_id||'');
+   if(!/^[0-9a-f-]{36}$/i.test(eventId))invalid('Envio aceito não identificado para registrar retorno.',400);
+   const event=await db.from('office_agent_reply_events').select('id,status,provider_message_id')
+    .eq('owner_id',user.id).eq('empresa_id',company).eq('id',eventId).limit(1).maybeSingle();
+   if(event.error||event.data?.status!=='accepted'||!event.data?.provider_message_id)
+    invalid('Só se registra retorno após mensagem efetivamente aceita pelo WhatsApp.',409);
+   const r=await db.rpc('register_office_agent_return',{
+    p_reply_event_id:eventId,p_next_return:String(data.next_return||'')
+   });
+   if(r.error||r.data?.ok!==true)invalid('O retorno não foi registrado: '+String(r.error?.message||'confira as permissões'),503);
+   return officeJson({ok:true,returnDate:r.data.next_return,recorded:true,
+    notice:'Último e próximo retorno atualizados no processo; responsável OpenBot e operador registrados.'});
+  }
   if(action!=='preview'&&action!=='send')invalid('Ação do agente não permitida.',400);
   const messageId=String(data.inbound_message_id||'');
   const checked=await verifyPrepared(db,user,company,jid,messageId);
@@ -212,6 +246,15 @@ export async function POST(request){
       caseNumber:checked.p.protocolo_ref,source:checked.source.source,
       sourceAt:checked.source.sourceAt,reply:checked.source.text,
       history:checked.chat.history,contextNote:memo.error?'':(memo.data?.summary||''),
+      hearing:checked.hearing,companyPolicy:{
+       return_min_days:checked.policy.return_min_days,
+       return_max_days:checked.policy.return_max_days,return_stalled_days:checked.policy.return_stalled_days,
+       groups:checked.policy.groups,reply_mode:checked.policy.reply_mode
+      },
+      suggestedReturn:planNextOpenBotReturn({
+       policy:checked.policy,movementAt:checked.p.datajud_ultimo_movimento||checked.p.ultima_movimentacao,
+       previousReturnAt:checked.p.ultimo_retorno,previousNextAt:checked.p.proximo_retorno
+      }),repeatedUpdate:checked.replyMeta.repeatedUpdate,
       skills:checked.skills.map(x=>({id:x.id,title:x.title})),
       predictLmReview:{
         tier:checked.predictLmReview.tier,route:checked.predictLmReview.route,
@@ -230,6 +273,16 @@ export async function POST(request){
    const tested=assessQwenReview(checked.source.text,proposed);
    if(!tested.ok)invalid('Qwen alterou dado importante: '+tested.reason+'. Envio bloqueado.',409);
   }
+  const hearingSuffix=data.include_hearing_link===true&&checked.hearing
+   ?'\n\nAudiência de conciliação: '+checked.hearing.date+
+     (checked.hearing.time?' às '+checked.hearing.time:'')+
+     '. Link para participar: '+checked.hearing.url:'';
+  const finalText=proposed+hearingSuffix;
+  if(finalText.length>3000)invalid('Mensagem completa excedeu o tamanho seguro.',400);
+  const returnPlan=planNextOpenBotReturn({
+   policy:checked.policy,movementAt:checked.p.datajud_ultimo_movimento||checked.p.ultima_movimentacao,
+   previousReturnAt:checked.p.ultimo_retorno,previousNextAt:checked.p.proximo_retorno
+  });
   const to=validateReplyTarget({jid,approvedJid:checked.grant.jid});
   if(!to)invalid('Destino não coincide com a autorização do cadastro.',403);
   const daily=await db.from('office_agent_reply_events').select('jid,created_at,status')
@@ -248,13 +301,13 @@ export async function POST(request){
   // One transactional reservation per inbound message. A timeout is uncertain,
   // NOT a reason to retry or to claim a delivered WhatsApp message.
   const reservation=await db.rpc('reserve_office_agent_reply',{
-    p_jid:jid,p_inbound_message_id:messageId,p_processo_id:checked.p.id,p_reply:proposed.slice(0,700)});
+    p_jid:jid,p_inbound_message_id:messageId,p_processo_id:checked.p.id,p_reply:finalText.slice(0,700)});
   if(reservation.error||reservation.data?.ok!==true)
    invalid('Envio não reservado: '+String(reservation.data?.reason||reservation.error?.message||'restrição'),409);
   const reservationId=reservation.data.reservation_id;
   let transport=null,status='uncertain';
   try{
-   transport=await waAutoOperation('send',user.id,{to,message:proposed,approved:true},process.env,fetch,jwt);
+   transport=await waAutoOperation('send',user.id,{to,message:finalText,approved:true},process.env,fetch,jwt);
    if(transport?.ok===true&&transport.accepted===true)status='accepted';
   }catch(error){
    // Delivery can be accepted by WhatsApp even when the response times out.
@@ -269,6 +322,17 @@ export async function POST(request){
   }
   const finish=await db.rpc('finalize_office_agent_reply',{
     p_id:reservationId,p_status:'accepted',p_provider_message_id:transport.messageId||null});
+  let returnRecorded=false,returnDate=null,returnWarning=null;
+  if(!finish.error&&finish.data===true&&transport?.messageId){
+   try{
+    const returnWrite=await db.rpc('register_office_agent_return',{
+     p_reply_event_id:reservationId,p_next_return:returnPlan.dueDate
+    });
+    if(returnWrite.error||returnWrite.data?.ok!==true)
+     returnWarning='WhatsApp aceitou a mensagem, mas o retorno do processo precisa de conferência.';
+    else{returnRecorded=true;returnDate=returnWrite.data.next_return}
+   }catch{returnWarning='WhatsApp aceitou a mensagem, mas não foi possível registrar o retorno.'}
+  }else returnWarning='Entrega ainda não comprovada ou confirmação do envio incompleta; retorno não registrado.';
   // Keep the operator's handwritten note intact. Do not overwrite the
   // customer's conversation memory with auto-generated content on every send.
   let memory={error:true};
@@ -287,6 +351,8 @@ export async function POST(request){
   }catch{}
   return officeJson({ok:true,accepted:true,delivered:false,read:false,messageId:transport.messageId||null,
     reservationId,recorded:!finish.error&&finish.data===true,
-    memorySaved:!memory.error,notice:'WA.Auto aceitou a resposta ao cliente autorizado. Isso não confirma entrega ou leitura.'});
+    returnRecorded,returnDate,returnWarning,
+    memorySaved:!memory.error,notice:'WA.Auto aceitou a resposta ao cliente autorizado. Isso não confirma entrega ou leitura.'+
+     (returnRecorded?' Próximo retorno: '+returnDate+'.':returnWarning?' '+returnWarning:'')});
  }catch(error){return safeOfficeError(error)}
 }
