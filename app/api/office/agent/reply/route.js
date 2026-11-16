@@ -6,6 +6,7 @@ import {assessQwenReview} from '../../../../../lib/qwen-review-guard.mjs';
 import {selectOfficeAgentSkills} from '../../../../../lib/office-agent-skills.mjs';
 import {planPredictLmLegalCores,classifyPredictLmFailure,predictLmCoreCatalog} from '../../../../../lib/predictlm-office-cores.mjs';
 import {predictLmConfig} from '../../../../../lib/predictlm-gateway.mjs';
+import {normalizeOpenBotPolicy,contactNameVariants,rankProcessCandidates,evaluateOpenBotInbound,planNextOpenBotReturn,composeOpenBotCaseReply} from '../../../../../lib/openbot-company-agent.mjs';
 import {GET as consultOfficialProcess} from '../../../processos/consulta/route.js';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -24,7 +25,7 @@ async function companyFor(db,user){
 async function processFor(db,company,caseId){
  const id=parseNumber(caseId);
  if(!id)invalid('Selecione um processo válido.',400);
- const r=await db.from('processos').select('id,empresa_id,cliente,protocolo_ref,datajud_last_ok,datajud_consultado_em,datajud_ultimo_movimento,datajud_ultimo_nome,observacoes')
+ const r=await db.from('processos').select('id,empresa_id,cliente,protocolo_ref,datajud_last_ok,datajud_consultado_em,datajud_ultimo_movimento,datajud_ultimo_nome,observacoes,telefone,ultimo_retorno,proximo_retorno,ultima_movimentacao')
   .eq('empresa_id',company).eq('id',id).limit(1).maybeSingle();
  if(r.error)invalid('Cadastro processual temporariamente indisponível.',503);
  if(!r.data||r.data.empresa_id!==company)invalid('Processo fora da carteira da empresa.',403);
@@ -40,15 +41,44 @@ async function granted(db,user,company,jid){
 }
 async function conversation(db,user,company,jid,providerId){
  const r=await db.from('office_wa_message_archive')
-   .select('provider_message_id,content,is_from_me,jid,timestamp')
+   .select('provider_message_id,content,is_from_me,jid,timestamp,media_type')
    .eq('owner_id',user.id).eq('empresa_id',company).eq('jid',jid)
    .order('timestamp',{ascending:false}).limit(20);
  if(r.error)invalid('Histórico do WhatsApp indisponível. Nenhuma resposta foi enviada.',503);
  const rows=r.data||[];
  const chosen=rows.find(x=>x.provider_message_id===providerId&&!x.is_from_me);
- if(!chosen||!chosen.content||Date.parse(chosen.timestamp)<Date.now()-24*3600000)
+ if(!chosen||(!chosen.content&&!/audio|ptt|voice/i.test(chosen.media_type||''))||Date.parse(chosen.timestamp)<Date.now()-24*3600000)
    invalid('A mensagem recebida não está confirmada no histórico recente.',409);
  return {chosen,rows,history:prepareConversationMemory(rows.slice(0,8).reverse(),jid)};
+}
+async function companyAgentPolicy(db,company,jid){
+ const [config,exception,contact]=await Promise.all([
+  db.from('office_agent_company_policies').select('config').eq('empresa_id',company).limit(1).maybeSingle(),
+  db.from('office_agent_contact_rules').select('mode,suppress_until,assigned_staff')
+   .eq('empresa_id',company).eq('jid',jid).limit(1).maybeSingle(),
+  db.from('office_wa_chat_archive').select('name,phone,is_group')
+   .eq('empresa_id',company).eq('jid',jid).limit(1).maybeSingle()
+ ]);
+ if(config.error||exception.error||contact.error)invalid('Regras da empresa ou histórico do contato indisponíveis.',503);
+ const rule=exception.data&&Date.parse(exception.data.suppress_until)>Date.now()?exception.data:null;
+ return {policy:normalizeOpenBotPolicy(config.data?.config||{}),rule,contact:contact.data};
+}
+function hearingLinkAllowed(raw){
+ try{
+  const u=new URL(raw);
+  if(u.protocol!=='https:'||u.username||u.password||u.port)return false;
+  return /(^|\.)(jus\.br|zoom\.us|webex\.com|meet\.google\.com|teams\.microsoft\.com)$/.test(u.hostname.toLowerCase());
+ }catch{return false}
+}
+async function nextConciliationHearing(db,company,caseId){
+ const today=new Date().toISOString().slice(0,10);
+ const r=await db.from('audiencias_monitoradas').select('tipo,data_evento,hora_local,meeting_url,situacao,verificado_em')
+  .eq('empresa_id',company).eq('processo_id',caseId).gte('data_evento',today)
+  .order('data_evento',{ascending:true}).limit(10);
+ if(r.error)invalid('Não foi possível conferir a agenda de audiências; não envie link sem validação.',503);
+ const match=(r.data||[]).find(x=>/concilia/i.test(x.tipo||'')&&!/cancelad|suspens|remarcad/i.test(x.situacao||'')
+  &&hearingLinkAllowed(x.meeting_url)&&x.verificado_em);
+ return match?{date:match.data_evento,time:match.hora_local||null,url:match.meeting_url,verifiedAt:match.verificado_em}:null;
 }
 async function verifyPrepared(db,user,company,jid,providerId){
  if(!validJid(jid))invalid('Contato privado não reconhecido. IDs LID e grupos exigem conferência manual.',422);
@@ -56,19 +86,37 @@ async function verifyPrepared(db,user,company,jid,providerId){
  const grant=await granted(db,user,company,jid);
  const p=await processFor(db,company,grant.processo_id);
  const chat=await conversation(db,user,company,jid,providerId);
+ const rules=await companyAgentPolicy(db,company,jid);
+ const manual=rules.rule?.mode||'';
+ const staffRepliedAfter=chat.rows.some(x=>x.is_from_me&&Date.parse(x.timestamp)>=Date.parse(chat.chosen.timestamp));
+ const routed=evaluateOpenBotInbound({
+  policy:rules.policy,jid,contactName:rules.contact?.name||'',authorized:true,
+  administrativeContact:manual==='administrative',
+  staffRepliedAfter,otherStaffActive:manual==='staff_active'||manual==='silence'||manual==='review',
+  text:chat.chosen.content||'',mediaType:chat.chosen.media_type||'',history:chat.rows
+ });
+ if(routed.decision==='ignore')invalid('Regra da empresa: não responder ('+routed.reason+').',409);
+ if(routed.decision==='review')invalid('Este atendimento precisa de revisão humana ('+routed.reason+').',409);
  const type=routeInboundQuestion(chat.chosen.content,{jid,fromMe:false});
- if(type==='ignore')invalid('Mensagem fora do assunto processual. O agente não responderá.',422);
  if(type==='human_review')invalid('Assunto sensível ou administrativo: encaminhe para atendimento humano.',409);
+ if(type==='ignore'&&routed.decision!=='research'&&routed.decision!=='draft')
+  invalid('Mensagem fora do assunto processual; o agente não responderá.',422);
  const predictLmReview=planPredictLmLegalCores({
-   prompt:chat.chosen.content,movement:p.datajud_ultimo_nome,source:'DataJud',
+   prompt:chat.chosen.content||'Qual é o andamento do processo?',movement:p.datajud_ultimo_nome,source:'DataJud',
    officialConfirmed:p.datajud_last_ok,checkedAt:p.datajud_consultado_em
  });
  if(predictLmReview.requiresHumanReview)invalid('PredictLM identificou revisão necessária: '+predictLmReview.reason,409);
  const source=buildVerifiedReply({caseRow:p});
  if(!source.ok)invalid('Movimentação oficial não está recente ou exige leitura humana: '+source.reason,409);
- const sentAfter=chat.rows.some(x=>x.is_from_me&&Date.parse(x.timestamp)>=Date.parse(chat.chosen.timestamp));
- return {grant,p,chat,source,sentAfter,predictLmReview,
-   skills:selectOfficeAgentSkills({question:chat.chosen.content,action:'preview'})};
+ const sentAfter=staffRepliedAfter;
+ const hearing=await nextConciliationHearing(db,company,p.id);
+ const reply=composeOpenBotCaseReply({
+  sourceText:source.text,sourceAt:source.sourceAt,movementAt:p.datajud_ultimo_movimento,
+  lastReturnAt:p.ultimo_retorno,history:chat.rows,policy:rules.policy
+ });
+ return {grant,p,chat,source:{...source,text:reply.text},sentAfter,predictLmReview,
+   hearing,policy:rules.policy,replyMeta:reply,
+   skills:selectOfficeAgentSkills({question:chat.chosen.content||'andamento do processo',action:'preview'})};
 }
 export async function POST(request){
  try{
