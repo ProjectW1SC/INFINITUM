@@ -1,5 +1,5 @@
 import {officeAuth} from '../../lib/office-server.mjs';
-import {handleKillaMcpMessage} from '../../lib/killa-mcp.mjs';
+import {handleKillaMcpMessage,authorizeKillaMcpSession} from '../../lib/killa-mcp.mjs';
 import {killaResourceMetadata,killaMcpUnauthorized} from '../../lib/killa-mcp-oauth.mjs';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
@@ -12,13 +12,14 @@ export async function POST(request){
  let message;try{message=JSON.parse(raw)}catch{return Response.json({jsonrpc:'2.0',id:null,error:{code:-32700,message:'JSON inválido.'}},{status:400,headers})}
  if(Array.isArray(message))return Response.json({jsonrpc:'2.0',id:null,error:{code:-32600,message:'Requisições em lote não são aceitas.'}},{status:400,headers});
  const method=String(message?.method||'');
+ // No MCP method can bypass OAuth by sending "initialize" or "tools/list".
  let ctx={};
- if(method==='tools/call'){
-  try{
-   const auth=await officeAuth(request);
-   ctx={...auth,authorization:request.headers.get('authorization')||''};
-  }catch{return killaMcpUnauthorized()}
- }
+ try{
+  const auth=await officeAuth(request,{allowOAuth:true});
+  await authorizeKillaMcpSession(auth);
+  ctx={...auth,authorization:request.headers.get('authorization')||''};
+ }catch{return killaMcpUnauthorized()}
+ // Rate controls belong on the authenticated endpoint; never trust a client-supplied owner or company.
  const result=await handleKillaMcpMessage(message,ctx);
  return result===null?new Response(null,{status:202,headers:{'Cache-Control':'no-store'}}):
   Response.json(result,{status:200,headers});

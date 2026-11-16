@@ -4,7 +4,7 @@ import {useWorkspaceSession} from '../../../components/workspace-session-provide
 export default function KillaMcpSetup(){
  const {db,session,loading}=useWorkspaceSession();
  const [role,setRole]=useState(''),[policy,setPolicy]=useState({
-  mcp_enabled:false,permission_level:'basico',mcp_group_history_enabled:false
+  mcp_enabled:false,permission_level:'basico',mcp_group_history_enabled:false,allowed_client_ids:[],require_mfa:true
  });
  const [saving,setSaving]=useState(false),[notice,setNotice]=useState('');
  useEffect(()=>{
@@ -13,7 +13,7 @@ export default function KillaMcpSetup(){
   (async()=>{
    const [membership,settings]=await Promise.all([
     db.from('crm_memberships').select('role,enabled').eq('user_id',session.user.id).maybeSingle(),
-    db.from('killa_mcp_settings').select('mcp_enabled,permission_level,mcp_group_history_enabled')
+    db.from('killa_mcp_settings').select('mcp_enabled,permission_level,mcp_group_history_enabled,allowed_client_ids,require_mfa')
      .eq('owner_id',session.user.id).maybeSingle()
    ]);
    if(!active)return;
@@ -32,6 +32,7 @@ export default function KillaMcpSetup(){
     owner_id:session.user.id,mcp_enabled:policy.mcp_enabled===true,
     permission_level:policy.permission_level,
     mcp_group_history_enabled:policy.mcp_group_history_enabled===true,
+    allowed_client_ids:Array.isArray(policy.allowed_client_ids)?policy.allowed_client_ids:[],require_mfa:true,
     updated_at:new Date().toISOString()
    },{onConflict:'owner_id'});
    if(result.error)throw result.error;
@@ -65,6 +66,13 @@ export default function KillaMcpSetup(){
       onChange={e=>setPolicy(v=>({...v,mcp_group_history_enabled:e.target.checked}))}/>
     Autorizar leitura de grupos já arquivados para esta conta
    </label>
+   <p>Segurança: exigimos OAuth por aplicativo com segundo fator (MFA/AAL2). Sem MFA configurado, o acesso MCP fica bloqueado.</p>
+   <label style={{display:'block',marginTop:16}}>IDs dos aplicativos OAuth permitidos (um por linha)<br/>
+    <textarea rows={4} disabled={!canEdit} value={(policy.allowed_client_ids||[]).join('\n')}
+     onChange={e=>setPolicy(v=>({...v,allowed_client_ids:e.target.value.split(/[\n,]+/).map(x=>x.trim()).filter(x=>/^[A-Za-z0-9._:-]{5,200}$/.test(x)).slice(0,20)}))}/>
+   </label>
+   <p>Copie apenas o identificador público de cada aplicativo registrado no OAuth Server. Não cole segredos, tokens nem senhas. Cada funcionário tem sua própria autorização.</p>
+   <p><a href="/mcp/pair">Abrir pareamento WhatsApp individual com QR atualizado</a></p>
    <p>O MCP não tem permissão para enviar mensagens, divulgar backlogs ou acessar arquivos de outros usuários. Cada cliente externo exige login OAuth e consentimento.</p>
    <button type="button" onClick={save} disabled={!canEdit||saving}>{saving?'Salvando...':'Salvar regras MCP'}</button>
   </>}

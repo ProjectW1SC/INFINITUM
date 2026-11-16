@@ -8,13 +8,13 @@ test('MCP handshake and listing expose only read-only tools without secrets or c
  const init=await handleKillaMcpMessage({jsonrpc:'2.0',id:1,method:'initialize',params:{}});
  assert.equal(init.result.protocolVersion,MCP_VERSION);
  const list=await handleKillaMcpMessage({jsonrpc:'2.0',id:2,method:'tools/list'});
- assert.equal(list.result.tools.length,5);
+ assert.equal(list.result.tools.length,6);
  assert.ok(list.result.tools.every(t=>t.annotations.readOnlyHint===true&&!/send_reply|send_whatsapp/.test(t.name)));
  assert.ok(KILLA_MCP_TOOLS.some(t=>t.name==='killa_preview_reply'));
 });
 test('MCP declines batch and authenticates every data tool call',()=>{
  const r=read('app/mcp/route.js');
- assert.match(r,/officeAuth\(request\)/);
+ assert.match(r,/officeAuth\(request,\{allowOAuth:true\}\)/);
  assert.match(r,/killaMcpUnauthorized/);
  assert.match(r,/Array\.isArray\(message\)/);
  assert.doesNotMatch(r,/service_role|SUPABASE_SERVICE_ROLE_KEY/);
