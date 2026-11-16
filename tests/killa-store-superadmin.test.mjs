@@ -19,8 +19,7 @@ test('store security is private, MFA required and release approval is independen
  assert.doesNotMatch(edge,/allowedOrigin:\s*'\*'/i);
  const ui=file('app/app-store/admin/page.jsx');
  assert.match(ui,/mfa\.enroll/);
- assert.match(ui,/mfa\.challenge/);
- assert.match(ui,/mfa\.verify/);
+ assert.match(ui,/mfa\.challengeAndVerify/);
  assert.match(ui,/typecheck/i);
  assert.match(ui,/build logs/i);
  assert.match(ui,/Env/);
