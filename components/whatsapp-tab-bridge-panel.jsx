@@ -35,14 +35,14 @@ export default function WhatsappTabBridgePanel(){
    }
   };
  },[]);
- const request=useCallback((type,text)=>new Promise((resolve,reject)=>{
+ const request=useCallback((type,text,expectedTitle)=>new Promise((resolve,reject)=>{
   if(!['status','observe','draft'].includes(type))return reject(Error('Operação não permitida.'));
   const requestId='infinitum-'+Date.now()+'-'+Math.random().toString(36).slice(2);
   const timeout=setTimeout(()=>{
    pending.current.delete(requestId);reject(Error('Extensão não detectada ou sem resposta. Instale e autorize a aba no Chrome.'));
   },7000);
   pending.current.set(requestId,{resolve,reject,timeout});
-  window.postMessage({channel:CHANNEL,direction:'request',requestId,type,...(type==='draft'?{text}:{})},
+  window.postMessage({channel:CHANNEL,direction:'request',requestId,type,...(type==='draft'?{text,expectedTitle}:{})},
     window.location.origin);
  }),[]);
  const run=async(name,operation)=>{
@@ -85,7 +85,7 @@ export default function WhatsappTabBridgePanel(){
  const prepare=()=>run('draft',async()=>{
   if(!snapshot||!draft.trim())throw Error('Leia a conversa e revise o texto antes de preparar o rascunho.');
   if(!window.confirm('Preparar este texto na aba WhatsApp Web aberta? Nenhuma mensagem será enviada automaticamente.'))return;
-  const result=await request('draft',draft.trim());
+  const result=await request('draft',draft.trim(),snapshot.title);
   if(!result.ok)throw Error(result.reason||'O WhatsApp Web não aceitou a preparação.');
   setMessage('Rascunho inserido na aba autorizada. Confira o destinatário e envie manualmente pelo WhatsApp Web.');
  });
