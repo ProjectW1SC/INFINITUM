@@ -40,6 +40,19 @@ test('WA.Auto authentication failures preserve their HTTP status without exposin
   error=>error.status===502&&/não JSON/.test(error.message)
  );
 });
+test('missing upstream HTML 404 disables status polling without ever treating a proxy page as a QR',async()=>{
+ const response=async()=>({ok:false,status:404,text:async()=>'<html>not found; private proxy details</html>'});
+ const state=await waAutoOperation('status',uidA,{},env,response,'jwt');
+ assert.equal(state.ok,true);
+ assert.equal(state.configured,false);
+ assert.equal(state.connected,false);
+ assert.equal(state.code,'wa_auto_upstream_route_missing');
+ assert.equal(state.connection.status,'unavailable');
+ assert.match(state.message,/HTTP 404/);
+ assert.doesNotMatch(state.message,/private proxy details/);
+ await assert.rejects(waAutoOperation('connect',uidA,{},env,response,'jwt'),
+  error=>error.status===503&&/HTTP 404/.test(error.message));
+});
 test('send requires explicit confirmation and never claims delivery',async()=>{
  await assert.rejects(waAutoOperation('send',uidA,{to:'5511999999999',message:'Oi',approved:false},env,async()=>{throw Error('invalid')} ,'jwt'),/Confirme/);
  let count=0;const r=await waAutoOperation('send',uidA,{to:'5511999999999',message:'Ola',approved:true},env,async()=>{count++;return {ok:true,status:201,text:async()=>JSON.stringify({ok:true,userScoped:true,messageId:'id-1'})}},'jwt');
