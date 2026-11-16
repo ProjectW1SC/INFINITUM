@@ -4,7 +4,7 @@ const ids={installed:document.getElementById('installed-version'),title:document
  bar:document.getElementById('progress-block'),fill:document.getElementById('progress-fill'),
  progress:document.getElementById('progress-text'),install:document.getElementById('install-update'),
  launch:document.getElementById('launch'),check:document.getElementById('check'),
- releases:document.getElementById('releases'),auto:document.getElementById('auto-updates')};
+ releases:document.getElementById('releases'),admin:document.getElementById('admin-diagnostics'),auto:document.getElementById('auto-updates')};
 const TITLES={loading:'Iniciando launcher',checking:'Buscando atualização segura',
  ready:'Aplicativo atualizado',available:'Atualização disponível',
  downloading:'Baixando atualização',downloaded:'Atualização pronta para instalar',
@@ -44,5 +44,6 @@ if(bridge){
  connect('launch',bridge.launch);
  connect('install',bridge.install);
  connect('releases',bridge.releases);
+ connect('admin',bridge.openAdmin);
  if(ids.auto)ids.auto.addEventListener('change',()=>bridge.setAutoUpdate(ids.auto.checked).then(render).catch(()=>{ids.auto.checked=!ids.auto.checked}));
 }else{ids.message.textContent='Instalação inválida: ponte segura indisponível.'}
