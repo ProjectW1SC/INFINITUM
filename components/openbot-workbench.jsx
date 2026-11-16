@@ -1,5 +1,6 @@
 'use client';
 import {useEffect,useMemo,useState} from 'react';
+import ui from './killa-workbench.module.css';
 import {OPENBOT_COWORKERS,planAgentTask,ZAPFAST_SINGLE_SESSION_URL} from '../lib/openbot-workspace-policy.mjs';
 import {runBlackholeQwen,stopBlackholeQwen,checkBlackholeQwenSupport,getQwenCacheStatus} from '../lib/blackhole-local-llm.mjs';
 import {offlineBlackholeReply} from '../lib/blackhole-chat.mjs';
@@ -121,9 +122,30 @@ export default function OpenBotWorkbench({db,session}){
   finally{setBusy(false)}
  }
  return <section className="inf-panel" aria-label="Killa AI · laboratório de agentes sob revisão" style={{marginTop:18}}>
+  <div className={ui.shell}>
+   <div className={ui.top}><span className={ui.brand}><span className={ui.dot}/>KILLA <b>AI</b></span>
+    <span className={ui.status}>IA local · protegida</span></div>
+   <div className={ui.center}>
+    <div className={ui.orb} aria-hidden="true"/>
+    <h2>Como posso ajudar?</h2>
+    <p>Uma central de inteligência para atendimento e jurídico, sem perder o controle dos dados.</p>
+   </div>
+   <div className={ui.composer}>
+    <label htmlFor="killa-input" className={ui.srOnly}>Mensagem para Killa AI</label>
+    <textarea id="killa-input" rows={3} maxLength={6000} value={prompt} onChange={e=>setPrompt(e.target.value)}
+     placeholder="Peça uma análise, um resumo ou uma resposta baseada em fatos confirmados…"/>
+    <div className={ui.actions}><span>{mode==='peca'?'Peça jurídica':'Assistente local'}</span>
+     <button onClick={generate} type="button" disabled={busy||!prompt.trim()}>{busy?'Processando…':'Enviar para revisão →'}</button>
+    </div>
+   </div>
+   <nav className={ui.links}><a href="/mcp/setup">Conectar assistentes</a><a href="/whatsapp">Meu WhatsApp</a>
+    <a href="/report">Atendimentos confirmados</a></nav>
+   {draft&&<article className={ui.answer}><small>Resposta proposta · revisão obrigatória</small>
+    <p>{draft}</p><small>{source}</small></article>}
+  </div>
   <div className="blackhole-agents-header">
    <div><small>INFINITUM • KILLA AI · ADAPTAÇÃO</small><h2>Central dos agentes e IA local</h2>
-    <p>Seis papéis do escritório, modelos do LexisPredict e análise do SheetsPredict. Esta versão é uma adaptação: não executa o servidor completo do Killa AI.</p>
+    <p>Motores LexisPredict, PredictLM e modelos locais, com ferramentas MCP autenticadas e revisão humana para assuntos jurídicos.</p>
    </div>
   </div>
   <div className="office-agent-grid">{OPENBOT_COWORKERS.map(x=><article key={x.id} className="office-agent-card">
