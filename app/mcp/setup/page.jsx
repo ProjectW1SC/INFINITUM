@@ -4,7 +4,7 @@ import {useWorkspaceSession} from '../../../components/workspace-session-provide
 export default function KillaMcpSetup(){
  const {db,session,loading}=useWorkspaceSession();
  const [role,setRole]=useState(''),[policy,setPolicy]=useState({
-  mcp_enabled:false,permission_level:'basico',mcp_group_history_enabled:false,allowed_client_ids:[],require_mfa:true
+  mcp_enabled:false,permission_level:'basico',mcp_group_history_enabled:false,allowed_client_ids:[],require_mfa:true,mcp_pairing_enabled:false,mcp_send_enabled:false
  });
  const [saving,setSaving]=useState(false),[notice,setNotice]=useState('');
  useEffect(()=>{
@@ -13,7 +13,7 @@ export default function KillaMcpSetup(){
   (async()=>{
    const [membership,settings]=await Promise.all([
     db.from('crm_memberships').select('role,enabled').eq('user_id',session.user.id).maybeSingle(),
-    db.from('killa_mcp_settings').select('mcp_enabled,permission_level,mcp_group_history_enabled,allowed_client_ids,require_mfa')
+    db.from('killa_mcp_settings').select('mcp_enabled,permission_level,mcp_group_history_enabled,allowed_client_ids,require_mfa,mcp_pairing_enabled,mcp_send_enabled')
      .eq('owner_id',session.user.id).maybeSingle()
    ]);
    if(!active)return;
@@ -33,6 +33,7 @@ export default function KillaMcpSetup(){
     permission_level:policy.permission_level,
     mcp_group_history_enabled:policy.mcp_group_history_enabled===true,
     allowed_client_ids:Array.isArray(policy.allowed_client_ids)?policy.allowed_client_ids:[],require_mfa:true,
+    mcp_pairing_enabled:policy.mcp_pairing_enabled===true,mcp_send_enabled:policy.mcp_send_enabled===true,
     updated_at:new Date().toISOString()
    },{onConflict:'owner_id'});
    if(result.error)throw result.error;
@@ -65,6 +66,16 @@ export default function KillaMcpSetup(){
     <input type="checkbox" disabled={!canEdit||!policy.mcp_enabled} checked={policy.mcp_group_history_enabled}
       onChange={e=>setPolicy(v=>({...v,mcp_group_history_enabled:e.target.checked}))}/>
     Autorizar leitura de grupos já arquivados para esta conta
+   </label>
+   <label style={{display:'flex',gap:8,alignItems:'center',marginTop:16}}>
+    <input type="checkbox" disabled={!canEdit||!policy.mcp_enabled} checked={policy.mcp_pairing_enabled}
+     onChange={e=>setPolicy(v=>({...v,mcp_pairing_enabled:e.target.checked}))}/>
+    Permitir QR/código do meu WhatsApp em clientes MCP aprovados (dados muito sensíveis)
+   </label>
+   <label style={{display:'flex',gap:8,alignItems:'center',marginTop:16}}>
+    <input type="checkbox" disabled={!canEdit||!policy.mcp_enabled} checked={policy.mcp_send_enabled}
+     onChange={e=>setPolicy(v=>({...v,mcp_send_enabled:e.target.checked}))}/>
+    Permitir solicitações de envio pelo MCP, sempre com aprovação humana individual
    </label>
    <p>Segurança: exigimos OAuth por aplicativo com segundo fator (MFA/AAL2). Sem MFA configurado, o acesso MCP fica bloqueado.</p>
    <label style={{display:'block',marginTop:16}}>IDs dos aplicativos OAuth permitidos (um por linha)<br/>

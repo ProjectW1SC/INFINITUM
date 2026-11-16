@@ -30,7 +30,7 @@ REA, BLA, antirea, anti-rea-forge e DeRea ajudam a estudar ameaças, empacotamen
 
 ## Escopo da licença
 
-[LICENSE](./LICENSE) mantém MIT para o código INFINITUM. Marcas, bases privadas, credenciais e direitos de terceiros não são licenciados pelo MIT; veja [NOTICE](./NOTICE.md). A licença de LexisPredict é proprietária e independente.
+[LICENSE](./LICENSE) passa a reger material autoral novo sob termos proprietários, preservando concessões históricas MIT. Marcas, bases privadas, credenciais e direitos de terceiros não são licenciados pelo MIT; veja [NOTICE](./NOTICE.md). A licença de LexisPredict é proprietária e independente.
 
 ## Limitações operacionais
 

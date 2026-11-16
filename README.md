@@ -11,9 +11,9 @@ Organização de clientes, processos, atendimentos, captção de leads e rotinas
 
 [**Acessar a aplicação**](https://projectw1sc-crm.vercel.app)
 
-**Licença:** MIT License — Copyright (c) 2026 W1 Capital.
+**Licença atual:** Proprietária W1 Capital (16/11/2026). Distribuições anteriores sob MIT mantêm os direitos então concedidos. Copyright © 2026 W1 Capital.
 
-[![Licença: MIT](https://img.shields.io/badge/licença-MIT-0a0a0a)](./LICENSE)
+[![Licença: Proprietária](https://img.shields.io/badge/licença-Proprietária-741b40)](./LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-14+-black)](https://nextjs.org/)
 [![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E)](https://supabase.com/)
 
@@ -185,9 +185,9 @@ Não inclua dados pessoais, planilhas reais ou credenciais em commits ou exemplo
 
 ## Licença e direitos autorais
 
-**© 2026 W1 Capital.** O código-fonte é distribuído sob a [Licença MIT](./LICENSE).
+**© 2026 W1 Capital.** Material novo sob [Licença Proprietária W1 Capital](./LICENSE); material distribuído anteriormente sob MIT preserva a respectiva autorização.
 
-A marca **INFINITUM**, o símbolo infinito, o logotipo Lead Broker e demais elementos visuais de marca **não** são licenciados automaticamente pelo MIT do código. Respeite os direitos de titularidade antes de reutilizar.
+A marca **INFINITUM**, o símbolo infinito, o logotipo Lead Broker e demais elementos visuais de marca **não** são licenciados automaticamente pelos termos de código. Respeite os direitos de titularidade antes de reutilizar.
 
 ---
 
