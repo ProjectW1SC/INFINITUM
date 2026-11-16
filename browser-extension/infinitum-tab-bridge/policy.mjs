@@ -11,6 +11,8 @@ export function validateBridgeRequest(input,origin){
   const text=input.text;
   if(typeof text!=='string'||text.trim().length<1||text.length>3000)
    return {ok:false,reason:'draft_out_of_bounds'};
+  if(typeof input.expectedTitle!=='string'||!input.expectedTitle.trim()||input.expectedTitle.length>120)
+   return {ok:false,reason:'chat_title_required'};
  }
  return {ok:true,type:input.type};
 }
