@@ -73,3 +73,25 @@
 
 .quickConsent{max-width:740px;display:flex;align-items:flex-start;gap:9px;margin:0 auto 11px;color:#ffebf5!important;font-size:13px;line-height:1.5}
 .quickConsent input{accent-color:#e98bb9;margin-top:3px}
+
+
+/* One high-contrast Killa flow; no duplicate fields in the advanced panels. */
+.helper{max-width:740px;margin:6px auto 12px;font-size:12px;line-height:1.5;color:#f1d5e5!important}
+.disclosure{background:#201a25!important;border:1px solid #76536e!important;color:#f5eaf1!important;max-width:850px;margin:14px auto!important}
+.disclosure summary,.disclosure p,.disclosure label,.disclosure strong,.disclosure span{color:#f4e8f0!important}
+.disclosure p{font-size:13px;line-height:1.6;margin:12px 0}
+.disclosure select,.disclosure textarea{box-sizing:border-box;width:100%;background:#17131d!important;color:#fff!important;border:1px solid #906984!important;border-radius:8px;padding:10px;font:inherit;min-width:0}
+.disclosure .links{margin:14px 0}
+.disclosure .links a{color:#fff!important;background:#4a2940!important;border:1px solid #8e6280}
+.innerDisclosure{margin-top:18px;padding:12px;border-top:1px solid #74526b;color:#fff}
+.innerDisclosure summary{cursor:pointer;color:#fff!important;font-weight:650}
+.innerDisclosure p{color:#f6e9f0!important}
+.reviewLabel{display:flex;flex-direction:column;gap:8px;margin-top:12px;color:#f6e9f0!important}
+.reviewLabel textarea{width:100%;box-sizing:border-box;background:#1b1420!important;border:1px solid #956a83!important;border-radius:8px;color:#fff!important;padding:10px;font:inherit}
+.advancedGrid{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:14px}
+.advancedGrid label{display:flex;align-items:center;gap:8px;color:#fff!important;font-size:13px}
+.advancedGrid select{width:auto;min-width:160px}
+.quickField select{min-width:200px}
+.answer strong{color:#fff!important}
+.inlineActions span{color:#f2dbea!important}
+@media(max-width:640px){.quickField{display:flex;flex-direction:column;align-items:stretch}.quickField select{min-width:0}.disclosure{padding:13px!important}.advancedGrid{display:flex;flex-direction:column;align-items:stretch}.advancedGrid label{flex-wrap:wrap}}
