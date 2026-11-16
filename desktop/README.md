@@ -1,5 +1,29 @@
 # INFINITUM / Killa AI — Windows Desktop
 
+
+## Linguagens, versões e estrutura do código
+
+| Tecnologia | Uso neste aplicativo |
+| --- | --- |
+| JavaScript ESM (`.mjs`) | Processo principal Electron, políticas, scripts de build e atualização |
+| JavaScript CommonJS (`.cjs`) | Preload seguro do Electron |
+| HTML5 / CSS3 / JavaScript | Launcher local do aplicativo |
+| JSX / React | Interface INFINITUM servida pelo Next.js standalone |
+| SQL / PostgreSQL | Banco Supabase, migrações e políticas de acesso |
+| YAML / JSON | GitHub Actions e configurações do build |
+| PowerShell | Verificação da assinatura Windows |
+| TypeScript 5.9.3 | Verificador estático; a configuração atual checa arquivos JavaScript com `allowJs` e `checkJs` |
+
+**Versões verificadas:** Next.js 15.5.29, React 19.1.2, Node.js 24 no workflow Windows, Electron 45.3.2, electron-builder 26.18.0 e electron-updater 6.8.11. O pacote raiz declara Node.js >=22.
+
+Arquivos importantes: `main.mjs` (processo principal), `preload.cjs` (ponte restrita), `runtime-policy.mjs` (políticas de navegação/configuração), `launcher.html` / `launcher.css` / `launcher-ui.js` (launcher), `stage-standalone.mjs` (staging), `verify-packaged-server.mjs` (smoke test do payload empacotado) e `package.json` (Electron Builder/NSIS).
+
+Consulte também [documentação geral de arquitetura e linguagens](../docs/TECH-STACK.md).
+
+## Estado da integração WhatsApp
+
+O desktop ainda fornece `WA_AUTO_URL` apontando para o bridge WA.Auto em `runtime-policy.mjs`. O domínio ZapFast permitido na política de navegação abre o site externo no navegador padrão; **isso não conecta automaticamente o ZapFast à caixa de entrada `/whatsapp` do INFINITUM**. A integração multiempresa, com sessão isolada por empresa e histórico no Supabase, não deve ser anunciada como concluída até ser implementada e testada de ponta a ponta.
+
 ## O que este instalador faz
 
 - Executa a aplicação INFINITUM **integralmente de um servidor Next.js standalone local** dentro de um processo Node embutido no Electron, em \`127.0.0.1\` com porta persistente por perfil Windows. **Não abre o site Vercel** nem exige Node.js instalado no PC.
