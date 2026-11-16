@@ -13,9 +13,10 @@ export default function OpenBotWorkbench({db,session}){
  const [prompt,setPrompt]=useState('');
  const [draft,setDraft]=useState('');
  const [source,setSource]=useState('');
- const [engine,setEngine]=useState('colibri-local');
- const [consent,setConsent]=useState(true);
- const [preferCpu,setPreferCpu]=useState(true),[tokenBudget,setTokenBudget]=useState(384);
+ const [engine,setEngine]=useState('deterministico');
+ const [consent,setConsent]=useState(false);
+ const [onlineConsent,setOnlineConsent]=useState(false);
+ const [preferCpu,setPreferCpu]=useState(true),[tokenBudget,setTokenBudget]=useState(128);
  const [mode,setMode]=useState('texto'),[kind,setKind]=useState('manifestacao');
  const [timelineEvents,setTimelineEvents]=useState(''),[timelineSvg,setTimelineSvg]=useState('');
  const [busy,setBusy]=useState(false),[notice,setNotice]=useState('');
@@ -50,6 +51,23 @@ export default function OpenBotWorkbench({db,session}){
   setBusy(true);setDraft('');setApproved(false);setSource('');setNotice('');
   try{
    let answer,model;
+   if(engine==='online'){
+    if(!onlineConsent)throw Error('Autorize o envio do texto ao modelo online antes de gerar.');
+    if(!db||!session?.user?.id)throw Error('Entre no CRM para utilizar a IA online.');
+    const {data:{session:authSession},error:authError}=await db.auth.getSession();
+    if(authError||!authSession?.access_token)throw Error('Sessão expirada. Faça login novamente.');
+    const response=await fetch('/api/superagente',{method:'POST',
+     headers:{Authorization:'Bearer '+authSession.access_token,'Content-Type':'application/json'},
+     body:JSON.stringify({prompt:userText,externalAiConsent:true,allowEngineFallback:true,preferredMotor:'auto'}),
+     cache:'no-store',signal:AbortSignal.timeout(40000)});
+    let output;try{output=await response.json()}catch{throw Error('O servidor de IA não devolveu uma resposta válida.')}
+    if(!response.ok||output.ok!==true)throw Error(output.error||'Modelo de IA indisponível.');
+    if(typeof output.reply!=='string'||!output.reply.trim())throw Error('O modelo não retornou uma resposta.');
+    setDraft(output.reply.slice(0,18000));
+    setSource(output.isGenerativeModel?('IA online · '+String(output.model||'modelo configurado')):'Motor de regras (IA online indisponível)');
+    setNotice(output.notice||'Rascunho pronto. Revise os dados antes de usar.');
+    return;
+   }
    if(localSelected){
     const isPetition=mode==='peca';
     const authoritative=isPetition
@@ -58,7 +76,8 @@ export default function OpenBotWorkbench({db,session}){
     answer=authoritative;
     model=isPetition?'Minuta determinística PredictLM/LexisPredict · não protocolada':
       'Motor determinístico · sem consulta judicial';
-    let profile={ok:false,reason:'Qwen não autorizado',device:'none'};
+    setDraft(authoritative.slice(0,18000));setSource(model);
+     let profile={ok:false,reason:'Qwen não autorizado',device:'none'};
     if(consent)profile=await checkBlackholeQwenSupport({preferCpu,modelId});
     const route=planColibriLocal({prompt:userText,allowLocalModel:consent,
       device:{webgpu:profile.device==='webgpu',memoryGb:Number(navigator?.deviceMemory||0),preferCpu},modelId});
@@ -126,24 +145,48 @@ export default function OpenBotWorkbench({db,session}){
    <div className={ui.top}><span className={ui.brand}><span className={ui.dot}/>KILLA <b>AI</b></span>
     <span className={ui.status}>IA local · protegida</span></div>
    <div className={ui.center}>
-    <div className={ui.orb} aria-hidden="true"/>
-    <h2>Como posso ajudar?</h2>
-    <p>Uma central de inteligência para atendimento e jurídico, sem perder o controle dos dados.</p>
+    
+    <h2>Prepare sua resposta</h2>
+    <p>Escreva seu pedido. O rascunho aparece abaixo, pronto para revisão. Nenhuma mensagem é enviada.</p>
    </div>
-   <div className={ui.composer}>
+   <div className={ui.quickModes}><button type="button" disabled={busy} aria-pressed={mode==='texto'} onClick={()=>{setMode('texto');setDraft('')}}>Resposta ou resumo</button><button type="button" disabled={busy} aria-pressed={mode==='peca'} onClick={()=>{setMode('peca');setDraft('')}}>Minuta jurídica</button></div>
+    <label className={ui.quickField}>Motor da resposta
+     <select disabled={busy} aria-label="Motor da resposta" value={engine} onChange={e=>{
+      setEngine(e.target.value);setDraft('');setSource('');setApproved(false);setNotice('');
+      if(e.target.value==='qwen4')setPreferCpu(false);
+     }}>
+      <option value="deterministico">Rascunho rápido (sem modelo)</option>
+      <option value="online">IA online · redação livre</option>
+      <option value="qwen">Qwen local 0,5B</option>
+      <option value="qwen17">Qwen local 1,7B · mais memória</option>
+      <option value="qwen4">Qwen local 4B · GPU</option>
+     </select>
+    </label>
+    {engine==='online'&&<label className={ui.quickConsent}><input type="checkbox" disabled={busy}
+      checked={onlineConsent} onChange={e=>setOnlineConsent(e.target.checked)}/>
+      Autorizo enviar este pedido a um modelo de IA externo configurado.</label>}
+    {localSelected&&!consent&&<p className={ui.feedback}>Para ativar Qwen, abra “Modelo local opcional, revisão e ferramentas avançadas” e autorize o download.</p>}
+    {mode==='peca'&&<label className={ui.quickField}>Tipo de peça
+     <select disabled={busy} value={kind} onChange={e=>setKind(e.target.value)}>
+      <option value="manifestacao">Manifestação</option><option value="peticao_inicial">Petição inicial</option>
+      <option value="contestacao">Contestação</option><option value="recurso">Recurso · modalidade a confirmar</option>
+      <option value="relatorio">Relatório jurídico</option><option value="outro">Outra peça</option>
+     </select></label>}
+    <div className={ui.composer}>
     <label htmlFor="killa-input" className={ui.srOnly}>Mensagem para Killa AI</label>
-    <textarea id="killa-input" rows={3} maxLength={6000} value={prompt} onChange={e=>setPrompt(e.target.value)}
+    <textarea id="killa-input" rows={3} disabled={busy} maxLength={6000} value={prompt} onChange={e=>setPrompt(e.target.value)}
      placeholder="Peça uma análise, um resumo ou uma resposta baseada em fatos confirmados…"/>
-    <div className={ui.actions}><span>{mode==='peca'?'Peça jurídica':'Assistente local'}</span>
-     <button onClick={generate} type="button" disabled={busy||!prompt.trim()}>{busy?'Processando…':'Enviar para revisão →'}</button>
+    <div className={ui.actions}><span>{engine==='deterministico'?'Rascunho rápido · sem baixar modelo':engine==='online'?'IA online · autorização necessária':'Qwen opcional · processamento no navegador'}</span>
+     <button onClick={generate} type="button" disabled={busy||!prompt.trim()}>{busy?'Processando…':'Gerar rascunho'}</button>
     </div>
    </div>
-   <nav className={ui.links}><a href="/mcp/setup">Conectar assistentes</a><a href="/whatsapp">Meu WhatsApp</a>
-    <a href="/report">Atendimentos confirmados</a></nav>
-   {draft&&<article className={ui.answer}><small>Resposta proposta · revisão obrigatória</small>
-    <p>{draft}</p><small>{source}</small></article>}
+   
+   {notice&&<p role="status" className={ui.feedback}>{notice}</p>}
+    {draft&&<article className={ui.answer}><small>Resposta proposta · revisão obrigatória</small>
+    <p>{draft}</p><small>{source}</small><div className={ui.inlineActions}><button type="button" onClick={()=>{if(!navigator.clipboard?.writeText){setNotice('Selecione o texto para copiar.');return}navigator.clipboard.writeText(draft).then(()=>setNotice('Rascunho copiado. Nenhuma mensagem enviada.')).catch(()=>setNotice('Selecione o texto para copiar.'))}}>Copiar rascunho</button></div></article>}
   </div>
-  <div className="blackhole-agents-header">
+  <details className={ui.disclosure}><summary>Modelo local opcional, revisão e ferramentas avançadas</summary>
+   <div className="blackhole-agents-header">
    <div><small>INFINITUM • KILLA AI · ADAPTAÇÃO</small><h2>Central dos agentes e IA local</h2>
     <p>Motores LexisPredict, PredictLM e modelos locais, com ferramentas MCP autenticadas e revisão humana para assuntos jurídicos.</p>
    </div>
@@ -190,7 +233,8 @@ export default function OpenBotWorkbench({db,session}){
    <label>Motor de inteligência
     <select value={engine} onChange={e=>{setEngine(e.target.value);if(e.target.value==='qwen4')setPreferCpu(false);setDraft('');setApproved(false)}}>
      <option value="colibri-local">Qwen local · CPU padrão, grátis e ativo</option>
-     <option value="deterministico">Motor PredictLM/LexisPredict determinístico · sem modelo</option>
+     <option value="deterministico">Motor leve · sem baixar modelo (padrão)</option>
+     <option value="online">IA online configurada · geração livre com autorização</option>
      <option value="qwen">Qwen 0,5B · CPU/WebAssembly</option>
      <option value="qwen17">Qwen3 1,7B · CPU (8 GB RAM) ou GPU</option>
      <option value="qwen4">Qwen3 4B · GPU (8 GB RAM)</option>
@@ -252,7 +296,8 @@ export default function OpenBotWorkbench({db,session}){
     {timelineSvg&&<img alt="Linha do tempo ilustrativa, sem verificação judicial" style={{maxWidth:'100%',borderRadius:8}}
       src={'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(timelineSvg)}/>}
    </details>
-   {notice&&<p className="inf-note" role="status">{notice}</p>}
+
   </div>
+  </details>
  </section>;
 }
