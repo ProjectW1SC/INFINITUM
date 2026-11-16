@@ -1,0 +1,71 @@
+{
+  "name": "infinitum-killa-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "INFINITUM Killa AI local Windows with Supabase owner-scoped realtime and remote MCP",
+  "main": "main.mjs",
+  "scripts": {
+    "dist:win": "electron-builder --win nsis --x64 --publish never",
+    "pack:win": "electron-builder --win dir --x64 --publish never"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.11"
+  },
+  "devDependencies": {
+    "electron": "45.3.2",
+    "electron-builder": "26.18.0"
+  },
+  "build": {
+    "appId": "br.com.w1capital.infinitum.killa",
+    "productName": "INFINITUM Killa AI",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.mjs",
+      "preload.cjs",
+      "runtime-policy.mjs",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "app-server",
+        "to": "app-server",
+        "filter": [
+          "**/*",
+          "!**/.env",
+          "!**/.env.*",
+          "!**/*.pem",
+          "!**/service-role*"
+        ]
+      },
+      {
+        "from": "signed-updates.json",
+        "to": "signed-updates.json"
+      }
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "INFINITUM-KillaAI-Setup-${version}-${arch}.exe",
+      "publisherName": "W1 Capital Assessoria Financeira Ltda."
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "ProjectW1SC",
+        "repo": "INFINITUM"
+      }
+    ]
+  }
+}
