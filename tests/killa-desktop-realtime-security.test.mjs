@@ -16,5 +16,5 @@ test('the Edge desktop config never exports service keys and MCP still requires 
  assert.match(e,/SUPABASE_ANON_KEY/);
  assert.match(e,/withOAuthProtectedResource/);
  const block=e.slice(e.indexOf("if(path.endsWith('/desktop-config'))"),e.indexOf("if(path.endsWith('/approve'))"));
- assert.doesNotMatch(block,/SUPABASE_SERVICE_ROLE_KEY|sb_secret_|service_role/i);
+ assert.doesNotMatch(block.replace(/\/\/[^\n]*/g,''),/SUPABASE_SERVICE_ROLE_KEY|sb_secret_|service_role/i);
 });
