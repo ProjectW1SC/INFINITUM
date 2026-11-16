@@ -48,3 +48,9 @@ O KPI separa aceites `OpenBot` e `MCP` pelo recibo único do WA.Auto. Nenhum ate
 A versão desktop mantém uma **porta fixa por perfil Windows** e verifica um identificador temporário do servidor antes de abrir o login; isso conserva Supabase Auth e o cache Qwen entre reinicializações. O projeto já publica em Realtime as três tabelas restritas por `owner_id`; outros dados do CRM seguem seus fluxos autenticados existentes e não são enviados globalmente.
 
 O instalador piloto não recebe atualizações de código automaticamente sem assinatura Authenticode verificada. Um build Windows assinado poderá publicar novas versões com atualização segura quando certificados e canal de releases estiverem configurados. O modelo local Qwen funciona sem servidor de inferência, mas seus arquivos requerem download inicial e memória compatível.
+
+## Publicação de atualizações para todas as instalações
+
+O workflow [release Windows assinado](../.github/workflows/killa-desktop-signed-release.yml) foi preparado para distribuir novas versões pelo GitHub Releases, que o `electron-updater` verifica nas instalações existentes. Por segurança, ele **recusa publicar sem** os segredos `KILLA_WINDOWS_CERT_P12` e `KILLA_WINDOWS_CERT_PASSWORD`. O certificado nunca entra nos executáveis nem nos repositórios.
+
+Somente builds assinados receberão `signed-updates.json: enabled=true`; os pilotos não assinados continuam sem download automático de código. As alterações de dados de cada usuário no Supabase Realtime não exigem novo executável.
