@@ -145,7 +145,8 @@ export default function OpenBotWorkbench({db,session}){
    {draft&&<article className={ui.answer}><small>Resposta proposta · revisão obrigatória</small>
     <p>{draft}</p><small>{source}</small><div className={ui.inlineActions}><button type="button" onClick={()=>navigator.clipboard?.writeText(draft).then(()=>setNotice('Rascunho copiado. Nenhuma mensagem enviada.')).catch(()=>setNotice('Selecione o texto para copiar.'))}>Copiar rascunho</button></div></article>}
   </div>
-  <div className="blackhole-agents-header">
+  <details className={ui.disclosure}><summary>Modelo local opcional, revisão e ferramentas avançadas</summary>
+   <div className="blackhole-agents-header">
    <div><small>INFINITUM • KILLA AI · ADAPTAÇÃO</small><h2>Central dos agentes e IA local</h2>
     <p>Motores LexisPredict, PredictLM e modelos locais, com ferramentas MCP autenticadas e revisão humana para assuntos jurídicos.</p>
    </div>
