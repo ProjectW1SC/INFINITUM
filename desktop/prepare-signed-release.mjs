@@ -7,7 +7,6 @@ const pkg=JSON.parse(readFileSync(packageFile,'utf8'));
 pkg.version=version;
 pkg.build.publish=[{provider:'github',owner:'ProjectW1SC',repo:'INFINITUM'}];
 pkg.build.win.verifyUpdateCodeSignature=true;
-pkg.build.win.allowCatalogSignature=false;
 pkg.build.forceCodeSigning=true; // Fail release builds that cannot Authenticode-sign.
 // This script is only called by the signed release workflow after it verifies
 // that a Windows certificate is available from repository secrets.

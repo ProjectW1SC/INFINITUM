@@ -57,8 +57,7 @@
         "nsis"
       ],
       "artifactName": "INFINITUM-KillaAI-Setup-${version}-${arch}.exe",
-      "verifyUpdateCodeSignature": true,
-      "allowCatalogSignature": false
+      "verifyUpdateCodeSignature": true
     },
     "nsis": {
       "oneClick": false,
