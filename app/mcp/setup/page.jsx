@@ -95,8 +95,8 @@ export default function KillaMcpSetup(){
        placeholder="ID público do aplicativo externo"/></label>
      <p>Para usar em um cliente MCP que aceite OAuth, informe este endereço:</p>
      <div className={ui.mcpEndpoint}><code>{MCP_URL}</code>
-      <button type="button" onClick={()=>navigator.clipboard?.writeText(MCP_URL)
-       .then(()=>setNotice('Endereço MCP copiado.')).catch(()=>setError('Copie o endereço manualmente.'))}>Copiar URL</button></div>
+      <button type="button" onClick={()=>{if(!navigator.clipboard?.writeText){setError('Copie o endereço manualmente.');return}navigator.clipboard.writeText(MCP_URL)
+       .then(()=>setNotice('Endereço MCP copiado.')).catch(()=>setError('Copie o endereço manualmente.'))}}>Copiar URL</button></div>
      <p>O link acima é do serviço MCP instalado no Supabase, independente da hospedagem do site na Vercel.</p>
     </section>
     <details className={ui.mcpCard}><summary>Permissões adicionais (avançado)</summary>
