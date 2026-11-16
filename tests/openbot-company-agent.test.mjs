@@ -120,3 +120,12 @@ test('confirmed conciliation access request can be handled under human review wi
  assert.equal(isConciliationLinkRequest('Vai ter acordo e quanto vou receber na audiência?'),false);
  assert.equal(isConciliationLinkRequest('O prazo de recurso venceu?'),false);
 });
+
+test('due date uses São Paulo local day rather than UTC crossing midnight',()=>{
+ const r=planNextOpenBotReturn({
+  now:new Date('2026-11-17T01:00:00Z'),
+  movementAt:'2026-03-01',
+  policy:normalizeOpenBotPolicy({return_min_days:15,return_max_days:30,return_stalled_days:30})
+ });
+ assert.equal(r.dueDate,'2026-12-16');
+});
