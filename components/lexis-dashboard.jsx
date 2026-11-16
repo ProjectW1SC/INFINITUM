@@ -6,6 +6,8 @@ import {loadLexisCompanySources} from '../lib/lexis-company-data.mjs';
 import {summarizeLexisDashboard} from '../lib/lexis-dashboard-metrics.mjs';
 import {todayBrazil} from '../lib/tarefas.mjs';
 import {resolveCompanyAccess} from '../lib/lexis-shared-portfolio.mjs';
+import LexisAttendanceBoard from './lexis-attendance-board';
+import {useLexisAttendanceAudit} from './use-lexis-attendance-audit';
 const n=v=>Number(v||0).toLocaleString('pt-BR');
 const date=v=>v?String(v).slice(0,10).split('-').reverse().join('/'):'—';
 const labels={prazo:'Prazo',retorno:'Retorno',tarefa:'Tarefa',audiencia:'Audiência'};
@@ -17,6 +19,8 @@ function Head({eyebrow,title,to,children}){
 }
 export default function LexisDashboard({db,session}){
  const [version,setVersion]=useState(0);
+ const [companyId,setCompanyId]=useState('');
+ const audit=useLexisAttendanceAudit(db,companyId,session.user.id);
  const [state,setState]=useState({loading:true,error:'',company:'',warnings:[],valid:{},stats:null});
  const refresh=useCallback(()=>setVersion(v=>v+1),[]);
  useEffect(()=>{
@@ -28,6 +32,7 @@ export default function LexisDashboard({db,session}){
     if(error)throw error;
     const profile=resolveCompanyAccess(data||[],session.user.id);
     if(!profile)throw new Error('Sem vínculo único com uma empresa autorizada no LexisPredict.');
+    if(mounted)setCompanyId(profile.empresa_id);
     const [company,loaded]=await Promise.all([
      db.from('empresas').select('nome').eq('id',profile.empresa_id).maybeSingle(),
      loadLexisCompanySources(db,profile.empresa_id)
@@ -43,10 +48,11 @@ export default function LexisDashboard({db,session}){
  const maxTribunal=Math.max(1,...(s?.tribunals||[]).map(x=>x.count));
  const maxMonth=Math.max(1,...(s?.months||[]).map(x=>x.count));
  return <main className="lxd-shell" data-lexis-dashboard="executive">
-  <header className="lxd-top"><div><small>INFINITUM · LEXISPREDICT / PAINEL EXECUTIVO</small><h1>Visão jurídica completa</h1><p>{state.company||'Carteira da empresa'} · Processos, prazos, audiências e agenda em um só lugar.</p></div><div className="lxd-actions"><button className="inf-btn" disabled={state.loading} onClick={refresh}><RefreshCw size={15}/>{state.loading?' Consultando...':' Atualizar'}</button><Link className="inf-btn primary" href="/processos"><Scale size={15}/> Abrir carteira</Link></div></header>
+  <header className="lxd-top"><div><small>INFINITUM · LEXISPREDICT / PAINEL EXECUTIVO</small><h1>Visão jurídica completa</h1><p>{state.company||'Carteira da empresa'} · Processos, prazos, audiências e agenda em um só lugar.</p></div><div className="lxd-actions"><button className="inf-btn" disabled={state.loading} onClick={()=>{refresh();audit.refresh()}}><RefreshCw size={15}/>{state.loading?' Consultando...':' Atualizar'}</button><Link className="inf-btn primary" href="/processos"><Scale size={15}/> Abrir carteira</Link></div></header>
   {state.loading&&<p className="lxd-message" role="status">Conferindo todos os registros da empresa, incluindo páginas adicionais...</p>}
   {state.error&&<div className="lxd-message danger" role="alert"><AlertTriangle size={18}/><span>Falha na consulta do Lexis: {state.error}. Não exibimos totais presumidos.</span><button className="inf-btn" onClick={refresh}>Repetir consulta</button></div>}
   {state.warnings.length>0&&<p className="lxd-message" role="alert">Algumas fontes não responderam: {state.warnings.join(' · ')}. Indicadores dessas fontes aparecem indisponíveis.</p>}
+  {companyId&&<LexisAttendanceBoard audit={audit} userId={session.user.id} />}
   {s&&<><section className="lxd-stats" aria-label="Indicadores da carteira">
    <Stat name="Processos com CNJ" value={s.processes} description="Somente processos com número CNJ" to="/processos" Icon={Scale}/>
    <Stat name="Processos ativos com CNJ" value={s.active} description="Desconsidera encerrados" to="/processos" Icon={Activity}/>
@@ -61,10 +67,12 @@ export default function LexisDashboard({db,session}){
     <div className="lxd-lines">
      <Link href="/prazos">Para hoje <b>{n(s.returnsToday)}</b><ArrowRight size={14}/></Link>
      <Link href="/prazos">Nos próximos 7 dias <b>{n(s.returnsNext7)}</b><ArrowRight size={14}/></Link>
-     <Link href="/prazos">Agendamentos já atendidos <b>{n(s.returnsAttended)}</b><ArrowRight size={14}/></Link>
+     <Link href="/prazos?status=atendimentos_hoje">Já atendidos hoje · auditoria <b>{audit.data?n(audit.data.todayTotal):audit.loading?'…':'—'}</b><ArrowRight size={14}/></Link>
+     <Link href="/prazos?status=meus_atendimentos">Meus atendimentos hoje <b>{audit.data?n(audit.data.personalToday):audit.loading?'…':'—'}</b><ArrowRight size={14}/></Link>
+     <Link href="/prazos">Agendamentos concluídos por data <b>{n(s.returnsAttended)}</b><ArrowRight size={14}/></Link>
      <Link href="/prazos">Agendamentos em processos ativos <b>{n(s.returnsScheduled)}</b><ArrowRight size={14}/></Link>
     </div>
-    <p className="lxd-subtle">Datas históricas de proximo_prazo não são consideradas vencidas; nenhuma inferência de perda de prazo judicial.</p>
+    <p className="lxd-subtle">Atendimentos auditados por operador são contabilizados pela consulta Lexis de auditoria, separados dos retornos concluídos por comparação de datas. Datas legadas de proximo_prazo não são consideradas vencidas.</p>
    </article>
    <article className="lxd-panel"><Head eyebrow="PRÓXIMOS COMPROMISSOS" title="Agenda da organização" to="/agenda">{n(s.upcoming7)} compromissos datados nos próximos sete dias, incluindo hoje.</Head>
     {s.upcoming.length?s.upcoming.slice(0,6).map(x=><Link className="lxd-row" href={x.kind==='audiencia'?'/audiencias':x.kind==='prazo'?'/prazos':'/agenda'} key={x.id}><time>{date(x.due_on)}</time><span><strong>{x.title}</strong><small>{labels[x.kind]} · {x.responsible||'Sem responsável'}</small></span><ArrowRight size={14}/></Link>):<p className="lxd-subtle">Nenhum compromisso datado.</p>}
