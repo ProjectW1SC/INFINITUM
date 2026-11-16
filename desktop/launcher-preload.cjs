@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld('killaLauncher',Object.freeze({
  install:()=>invoke('launcher:install-update'),
  releases:()=>invoke('launcher:open-downloads'),
  openAdmin:()=>invoke('launcher:open-admin'),
+ openStore:()=>invoke('launcher:open-store'),
+ openZapFast:()=>invoke('launcher:open-zapfast'),
  setAutoUpdate:enabled=>ipcRenderer.invoke('launcher:set-auto-update',enabled===true),
  onState:listener=>{
   if(typeof listener!=='function')return ()=>{};
