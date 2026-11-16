@@ -219,6 +219,7 @@ function LegacyReportPage(){
     <Kpi icon={ShieldCheck} label="Quitações verificadas" value={report.portfolio.verified} help="Comprovantes confirmados"/>
     <Kpi icon={BriefcaseBusiness} label="Clientes atendidos" value={report.period.clientsContacted} help="Clientes distintos no período"/>
    </div>
+   <section aria-label="Killa AI / OpenBot · KPI por responsável"><KillaAtendimentoKpi db={db} session={session}/></section>
    <div className="report-grid">
     <section className="reference-panel report-trend-panel">
      <div className="report-section-head"><div><h2><BarChart3 size={19}/> Evolução da operação</h2><p>Atendimentos, atividades e finalizações registradas por dia</p></div><span className="report-subtitle">Fonte: registros no Supabase</span></div>
