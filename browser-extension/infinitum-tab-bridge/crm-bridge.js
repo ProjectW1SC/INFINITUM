@@ -3,6 +3,12 @@
  const CHANNEL='INFINITUM_BROWSER_TAB_BRIDGE';
  const ORIGIN='https://agentinfinitum.vercel.app';
  if(location.origin!==ORIGIN)return;
+ // The popup can inject this bridge into an already-open CRM tab; keep exactly one listener.
+ if(globalThis.__infinitumWhatsappBridgeReady===true){
+  window.postMessage({channel:CHANNEL,direction:'ready'},ORIGIN);
+  return;
+ }
+ globalThis.__infinitumWhatsappBridgeReady=true;
  window.addEventListener('message',event=>{
   if(event.source!==window||event.origin!==ORIGIN)return;
   const data=event.data;
