@@ -5,22 +5,24 @@
 import {getQwenModelResponse,getQwenPreinstallStatus} from './qwen-preinstall-store.mjs';
 const MODEL='onnx-community/Qwen2.5-0.5B-Instruct';
 const MODEL_Q8_URL='https://huggingface.co/'+MODEL+'/resolve/main/onnx/model_quantized.onnx';
-let generator=null,deviceUsed=null,loading=null,running=false;
+const AVAILABLE_MODELS=new Set([MODEL,'onnx-community/Qwen3-1.7B-ONNX','onnx-community/Qwen3-4B-ONNX']);
+let generator=null,deviceUsed=null,loadedModel=null,loading=null,running=false;
 const emit=(requestId,status,extra={})=>self.postMessage({requestId,status,...extra});
 async function loadLibrary(requestId){
  emit(requestId,'loading',{message:'Iniciando Transformers.js local...'});
  try{return await import('https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1')}
  catch(e){throw Error('Carregador Transformers.js inacessível. Verifique a rede ou CSP: '+String(e?.message||e).slice(0,120))}
 }
-async function initialize(requestId,device='wasm',allowCpuFallback=true){
- if(generator&&deviceUsed===device)return generator;
- if(generator&&deviceUsed!==device){
+async function initialize(requestId,device='wasm',allowCpuFallback=true,modelId=MODEL){
+ if(!AVAILABLE_MODELS.has(modelId))throw Error('Modelo local não permitido.');
+ if(generator&&deviceUsed===device&&loadedModel===modelId)return generator;
+ if(generator&&(deviceUsed!==device||loadedModel!==modelId)){
   try{await generator.dispose?.()}catch{}
-  generator=null;deviceUsed=null;
+  generator=null;deviceUsed=null;loadedModel=null;
  }
  if(loading)return loading;
  loading=(async()=>{
-  emit(requestId,'loading',{message:'Carregando Qwen 0,5B quantizado (q4) em '+(device==='wasm'?'CPU/WebAssembly':'WebGPU')+'...'});
+  emit(requestId,'loading',{message:'Carregando '+modelId.split('/').at(-1)+' quantizado em '+(device==='wasm'?'CPU/WebAssembly':'WebGPU')+'...'});
   const memory=Number(self.navigator?.deviceMemory||0);
   if(device==='wasm'&&memory>0&&memory<4)throw Error('Pouca RAM disponível para carregar o modelo em CPU. Use o modo determinístico.');
   const lib=await loadLibrary(requestId);
@@ -83,11 +85,13 @@ async function initialize(requestId,device='wasm',allowCpuFallback=true){
    return 'q8';
   };
   const create=async chosen=>{
-   const dtype=await chooseDtype(chosen);
+   if(modelId==='onnx-community/Qwen3-4B-ONNX'&&chosen!=='webgpu')throw Error('Qwen3 4B exige WebGPU.');
+   if(modelId!==MODEL&&chosen==='wasm'&&memory>0&&memory<8)throw Error('Qwen3 maior exige 8 GB RAM.');
+   const dtype=modelId===MODEL?await chooseDtype(chosen):(chosen==='wasm'?'q8':'q4');
    emit(requestId,'loading',{message:chosen==='wasm'?
     'Qwen CPU: abrindo pesos preparados no armazenamento local ('+dtype+').':
     'Qwen GPU: carregando pesos quantizados do cache.'});
-   if(chosen==='wasm'&&dtype==='q8'){
+   if(modelId===MODEL&&chosen==='wasm'&&dtype==='q8'){
     let previous=false;
     try{previous=!!(await (await caches.open('transformers-cache')).match(MODEL_Q8_URL))}catch{}
     const state=await getQwenPreinstallStatus();
@@ -97,8 +101,8 @@ async function initialize(requestId,device='wasm',allowCpuFallback=true){
       :'Qwen será preparado em segundo plano no domínio principal. A resposta leve continua disponível sem esperar o download.');
     }
    }
-   const model=await lib.pipeline('text-generation',MODEL,{dtype,device:chosen,progress_callback});
-   generator=model;deviceUsed=chosen;
+   const model=await lib.pipeline('text-generation',modelId,{dtype,device:chosen,progress_callback});
+   generator=model;deviceUsed=chosen;loadedModel=modelId;
    return model;
   };
   try{return await create(device)}
@@ -114,13 +118,13 @@ async function initialize(requestId,device='wasm',allowCpuFallback=true){
  try{return await loading}finally{loading=null}
 }
 self.onmessage=async event=>{
- const {requestId,prompt,history,maxTokens,device,allowCpuFallback}=event.data||{};
+ const {requestId,prompt,history,maxTokens,device,allowCpuFallback,modelId=MODEL}=event.data||{};
  if(!Number.isSafeInteger(requestId)||requestId<1||typeof prompt!=='string')return;
  if(running){emit(requestId,'error',{error:'Há outra geração de IA local em andamento.'});return;}
  running=true;
  try{
   const backend=device==='webgpu'?'webgpu':'wasm';
-  const model=await initialize(requestId,backend,allowCpuFallback===true);
+  const model=await initialize(requestId,backend,allowCpuFallback===true,modelId);
   emit(requestId,'generating',{message:'Gerando texto com Qwen no próprio navegador...',device:deviceUsed});
   const recent=Array.isArray(history)?history
    .filter(x=>x?.role==='user'||x?.role==='assistant').slice(-4)
@@ -138,7 +142,7 @@ self.onmessage=async event=>{
   const text=(typeof raw==='string'?raw:Array.isArray(raw)?String(raw.at(-1)?.content||''):'')
    .replace(/<\|im_end\|>|<\|eot_id\|>/g,'').trim();
   if(!text)throw Error('Modelo não produziu resposta.');
-  emit(requestId,'complete',{text,model:MODEL,device:deviceUsed});
+  emit(requestId,'complete',{text,model:loadedModel||MODEL,device:deviceUsed});
  }catch(error){emit(requestId,'error',{error:String(error?.message||error).slice(0,300)})}
  finally{running=false}
 };
