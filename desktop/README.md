@@ -2,7 +2,7 @@
 
 ## O que este instalador faz
 
-- Executa a aplicação INFINITUM **integralmente de um servidor Next.js standalone local** dentro de um processo Node embutido no Electron, em \`127.0.0.1\` com porta temporária. **Não abre o site Vercel** nem exige Node.js instalado no PC.
+- Executa a aplicação INFINITUM **integralmente de um servidor Next.js standalone local** dentro de um processo Node embutido no Electron, em \`127.0.0.1\` com porta persistente por perfil Windows. **Não abre o site Vercel** nem exige Node.js instalado no PC.
 - Cada funcionário entra na própria conta Supabase, com sessão no perfil do Windows; RLS e permissões da empresa continuam no servidor.
 - Supabase Realtime assina mudanças de mensagens e sessões por \`owner_id\`; dados privados nunca são transmitidos em eventos globais.
 - OpenBot, motores PredictLM, Qwen local e QR do WA.Auto usam a interface existente do INFINITUM.
