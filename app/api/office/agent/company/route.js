@@ -1,13 +1,13 @@
 import {officeAuth,officeJson,safeOfficeError} from '../../../../../lib/office-server.mjs';
 import {isDemoUserCompany} from '../../../../../lib/demo-tenant.mjs';
+import {isLexisCompanyAdmin} from '../../../../../lib/crm-access.mjs';
 import {normalizeOpenBotPolicy,DEFAULT_OPENBOT_COMPANY_POLICY,evaluateOpenBotInbound,deriveApprovedLearning} from '../../../../../lib/openbot-company-agent.mjs';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 const err=(reason,status=400)=>{throw Object.assign(Error(reason),{status})};
 const jidOk=x=>/^(?:[1-9][0-9]{9,14}@s\.whatsapp\.net|[0-9-]{6,30}@g\.us)$/.test(String(x||''));
-const isAdmin=r=>String(r||'').toLowerCase()==='administrador';
 async function companyFor(db,user){
- const r=await db.from('usuarios').select('empresa_id,role,nome').eq('auth_user_id',user.id).limit(2);
+ const r=await db.from('usuarios').select('empresa_id,role,cargo,nome').eq('auth_user_id',user.id).limit(2);
  if(r.error||r.data?.length!==1||!r.data?.[0]?.empresa_id)err('A empresa do usuário não pôde ser confirmada.',403);
  return r.data[0];
 }
@@ -32,7 +32,7 @@ export async function GET(request){
   if(contacts.error||votes.error)err('Regras de atendimento ou aprendizado temporariamente indisponíveis.',503);
   const learning=deriveApprovedLearning((votes.data||[]).flatMap(x=>
    Array.from({length:Math.max(0,Math.min(20,x.approved_count||0))},()=>({tag:x.tag,approved:true}))));
-  return officeJson({ok:true,...settings,canConfigure:isAdmin(member.role),
+  return officeJson({ok:true,...settings,canConfigure:isLexisCompanyAdmin(member),
    contacts:contacts.data||[],learning,
    note:'Configurações por empresa. Sem envio automático; somente rascunhos e confirmação individual.'});
  }catch(e){return safeOfficeError(e)}
@@ -47,7 +47,7 @@ export async function POST(request){
   if(!data||typeof data!=='object'||Array.isArray(data))err('Dados inválidos.',400);
   const action=String(data.action||'');
   if(action==='settings'){
-   if(!isAdmin(member.role))err('Somente um administrador da empresa pode alterar regras globais.',403);
+   if(!isLexisCompanyAdmin(member))err('Somente um administrador da empresa pode alterar regras globais.',403);
    const raw=data.policy;
    if(!raw||typeof raw!=='object'||Array.isArray(raw))err('Política inválida.',400);
    if(JSON.stringify(raw).length>18000)err('Configuração excessivamente grande.',400);

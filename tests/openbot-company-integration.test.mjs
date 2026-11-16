@@ -5,7 +5,8 @@ test('company rules endpoint enforces authenticated tenant and admin-only edits'
  const s=read('app/api/office/agent/company/route.js');
  assert.match(s,/officeAuth\(request\)/);
  assert.match(s,/companyFor/);
- assert.match(s,/role.*administrador|administrador.*role/i);
+ assert.match(s,/select\('empresa_id,role,cargo,nome'\)/);
+ assert.match(s,/isLexisCompanyAdmin\(member\)/);
  assert.match(s,/office_agent_company_policies/);
  assert.match(s,/normalizeOpenBotPolicy/);
  assert.doesNotMatch(s,/SERVICE_ROLE_KEY|sendBulk|Promise\.all\(.*send/);
