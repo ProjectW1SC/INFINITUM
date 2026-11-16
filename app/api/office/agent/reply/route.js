@@ -26,7 +26,7 @@ async function companyFor(db,user){
 async function processFor(db,company,caseId){
  const id=parseNumber(caseId);
  if(!id)invalid('Selecione um processo válido.',400);
- const r=await db.from('processos').select('id,empresa_id,cliente,protocolo_ref,datajud_last_ok,datajud_consultado_em,datajud_ultimo_movimento,datajud_ultimo_nome,observacoes,telefone,ultimo_retorno,proximo_retorno,ultima_movimentacao')
+ const r=await db.from('processos').select('id,empresa_id,cliente,protocolo_ref,datajud_last_ok,datajud_consultado_em,datajud_ultimo_movimento,datajud_ultimo_nome,observacoes,telefone,ultimo_retorno,proximo_retorno,ultima_movimentacao,status,status_interno')
   .eq('empresa_id',company).eq('id',id).limit(1).maybeSingle();
  if(r.error)invalid('Cadastro processual temporariamente indisponível.',503);
  if(!r.data||r.data.empresa_id!==company)invalid('Processo fora da carteira da empresa.',403);
@@ -88,6 +88,8 @@ async function verifyPrepared(db,user,company,jid,providerId){
  if(typeof providerId!=='string'||providerId.length<4||providerId.length>128)invalid('Mensagem recebida não identificada.',400);
  const grant=await granted(db,user,company,jid);
  const p=await processFor(db,company,grant.processo_id);
+ if(/encerrad|extint|arquivad|baixad|cancelad/i.test(String(p.status_interno||p.status||'')))
+  invalid('Processo com indicação de encerramento: atendimento exige revisão humana.',409);
  const chat=await conversation(db,user,company,jid,providerId);
  const rules=await companyAgentPolicy(db,company,jid);
  const manual=rules.rule?.mode||'';
