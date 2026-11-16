@@ -44,7 +44,9 @@ test('model stays warm for follow-up questions and releases RAM after idle',()=>
 test('CPU cannot saturate all cores and model weights do not reload while worker stays initialized',()=>{
  const worker=read('public/workers/blackhole-qwen-0.5b.worker.mjs');
  assert.match(worker,/numThreads\s*=\s*1/);
- assert.match(worker,/if\(generator&&deviceUsed===device\)return generator/);
+ assert.match(worker,/if\(generator&&deviceUsed===device&&loadedModel===modelId\)return generator/);
+ // Do not reuse a warm model after switching between Qwen variants.
+ assert.match(worker,/loadedModel!==modelId/);
  assert.match(worker,/useBrowserCache/);
  assert.doesNotMatch(worker,/\benv\.useBrowserCache\s*=\s*false/);
 });

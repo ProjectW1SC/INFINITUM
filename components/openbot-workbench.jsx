@@ -4,6 +4,7 @@ import {OPENBOT_COWORKERS,planAgentTask,ZAPFAST_SINGLE_SESSION_URL} from '../lib
 import {runBlackholeQwen,stopBlackholeQwen,checkBlackholeQwenSupport,getQwenCacheStatus} from '../lib/blackhole-local-llm.mjs';
 import {offlineBlackholeReply} from '../lib/blackhole-chat.mjs';
 import {planColibriLocal} from '../lib/colibri-local.mjs';
+import {resolveLocalQwenModel} from '../lib/local-qwen-runtime.mjs';
 import {buildQwenReviewPrompt,assessQwenReview} from '../lib/qwen-review-guard.mjs';
 import {buildPredictLmPetition,buildPredictLmLegalSectionPrompt,createLegalDocumentHtml,createLegalTimelineSvg} from '../lib/predictlm-legal-studio.mjs';
 
@@ -20,6 +21,8 @@ export default function OpenBotWorkbench({db,session}){
  const [approved,setApproved]=useState(false),[reviewNote,setReviewNote]=useState('');
  const [cacheInfo,setCacheInfo]=useState(null);
  const plan=useMemo(()=>planAgentTask(prompt),[prompt]);
+ const localSelected=['colibri-local','qwen','qwen17','qwen4'].includes(engine);
+ const modelId=resolveLocalQwenModel(engine);
  useEffect(()=>()=>stopBlackholeQwen(),[]);
  useEffect(()=>{
   let present=true;
@@ -46,7 +49,7 @@ export default function OpenBotWorkbench({db,session}){
   setBusy(true);setDraft('');setApproved(false);setSource('');setNotice('');
   try{
    let answer,model;
-   if(engine==='colibri-local'||engine==='qwen'){
+   if(localSelected){
     const isPetition=mode==='peca';
     const authoritative=isPetition
       ?buildPredictLmPetition({kind,instructions:userText}).body
@@ -55,25 +58,25 @@ export default function OpenBotWorkbench({db,session}){
     model=isPetition?'Minuta determinística PredictLM/LexisPredict · não protocolada':
       'Motor determinístico · sem consulta judicial';
     let profile={ok:false,reason:'Qwen não autorizado',device:'none'};
-    if(consent)profile=await checkBlackholeQwenSupport({preferCpu});
+    if(consent)profile=await checkBlackholeQwenSupport({preferCpu,modelId});
     const route=planColibriLocal({prompt:userText,allowLocalModel:consent,
-      device:{webgpu:profile.device==='webgpu',memoryGb:Number(navigator?.deviceMemory||0),preferCpu}});
+      device:{webgpu:profile.device==='webgpu',memoryGb:Number(navigator?.deviceMemory||0),preferCpu},modelId});
     if(route.engine==='qwen'){
       try{
         const generatorPrompt=isPetition
           ?buildPredictLmLegalSectionPrompt({kind,instructions:userText})
           :buildQwenReviewPrompt(authoritative);
         const out=await runBlackholeQwen(generatorPrompt,[],p=>setNotice(p.message||p.status),
-          {consent:true,maxTokens:tokenBudget,timeoutMs:600000,preferCpu});
+          {consent:true,maxTokens:tokenBudget,timeoutMs:600000,preferCpu,modelId});
         getQwenCacheStatus().then(setCacheInfo).catch(()=>{});
         if(isPetition){
           answer=authoritative+'\n\n--- SUGESTÃO DO QWEN (NÃO VERIFICADA — ADVOGADO DEVE CONFERIR) ---\n'+out.reply;
-          model='Minuta estruturada + Qwen '+out.device+' · revisão obrigatória';
+          model='Minuta estruturada + '+out.model+' ('+out.device+') · revisão obrigatória';
           setNotice('Trecho redigido no navegador. A IA não verificou decisões, leis ou documentos; confira tudo antes de usar.');
         }else{
           const checked=assessQwenReview(authoritative,out.reply);
           if(checked.ok){
-            answer=checked.text;model='Qwen 0,5B ('+out.device+') revisou a redação · fatos determinísticos';
+            answer=checked.text;model=out.model+' ('+out.device+') revisou a redação · fatos determinísticos';
             setNotice('Revisão feita no navegador, sem consulta judicial ou envio externo.');
           }else{
             model='Motor determinístico · revisão do Qwen rejeitada';
@@ -127,6 +130,8 @@ export default function OpenBotWorkbench({db,session}){
    <span className="inf-badge">Apenas revisão</span><strong>{x.label}</strong><p>{x.role}</p>
   </article>)}</div>
   <div className="inf-note" style={{marginTop:15}}>
+   <a href="/mcp/setup" className="inf-btn" style={{display:'inline-block',marginBottom:10}}>Configurar MCP do Killa AI</a>
+   <p>Conecte assistentes externos por OAuth para ler conversas autorizadas e preparar rascunhos. Nenhuma ferramenta MCP envia WhatsApp.</p>
    <strong>WhatsApp com um único QR Code.</strong> Acesse a sessão atual pelo
    {' '}<a href={ZAPFAST_SINGLE_SESSION_URL} target="_blank" rel="noopener noreferrer">ZapFast Web (Cloudflare)</a>
    {' '}ou utilize o WA.Auto já configurado no INFINITUM. Não vincule o mesmo número a dois motores ao mesmo tempo.
@@ -153,7 +158,7 @@ export default function OpenBotWorkbench({db,session}){
     A IA não consulta nem envia automaticamente dados confidenciais da carteira.
     A Vercel hospeda o aplicativo; Qwen roda na CPU/WebAssembly por padrão, sem WebGPU. O uso de GPU é opcional.
     Nenhum servidor PredictLM pago é necessário. Os pesos ficam salvos no cache deste domínio após o primeiro download;
-    quando o navegador autoriza armazenamento persistente, evita exclusão automática dos arquivos. A CPU usa uma thread.
+    quando o navegador autoriza armazenamento persistente, evita exclusão automática dos arquivos. A CPU usa uma thread. Qwen3 4B exige WebGPU; Qwen3 1,7B exige mais memória.
     Os templates de peças e diagramas são gerados por código; nenhum documento é protocolado automaticamente.
     {' '}Cache: {cacheInfo?.complete?'Qwen já preparado no disco':
     cacheInfo?.preinstallChunks>0?cacheInfo.preinstallChunks+' de '+cacheInfo.preinstallTotalChunks+' partes salvas; a preparação continuará após F5':
@@ -161,16 +166,18 @@ export default function OpenBotWorkbench({db,session}){
     {' '}{cacheInfo?.persisted?'Persistência autorizada.':'Persistência sujeita às regras do navegador.'}
     {' '}Acesse o <a href="https://agentinfinitum.vercel.app/agentes">domínio fixo do INFINITUM</a> para reutilizar os arquivos.</p>
    <label>Motor de inteligência
-    <select value={engine} onChange={e=>{setEngine(e.target.value);setDraft('');setApproved(false)}}>
+    <select value={engine} onChange={e=>{setEngine(e.target.value);if(e.target.value==='qwen4')setPreferCpu(false);setDraft('');setApproved(false)}}>
      <option value="colibri-local">Qwen local · CPU padrão, grátis e ativo</option>
      <option value="deterministico">Motor PredictLM/LexisPredict determinístico · sem modelo</option>
      <option value="qwen">Qwen 0,5B · CPU/WebAssembly</option>
+     <option value="qwen17">Qwen3 1,7B · CPU (8 GB RAM) ou GPU</option>
+     <option value="qwen4">Qwen3 4B · GPU (8 GB RAM)</option>
     </select>
    </label>
-   {(engine==='qwen'||engine==='colibri-local')&&<label><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/>
-    Qwen local ativo por padrão. O primeiro pedido baixa os pesos quantizados para o cache e processa pela CPU. Desmarque para usar apenas regras leves.
+   {localSelected&&<label><input type="checkbox" checked={consent} onChange={e=>setConsent(e.target.checked)}/>
+    Modelo local opcional, sem servidor Colibri/Needle. Os modelos grandes baixam pesos apenas quando escolhidos e exigem mais RAM. Desmarque para usar somente regras leves.
    </label>}
-   {(engine==='qwen'||engine==='colibri-local')&&<div className="office-action-row">
+   {localSelected&&<div className="office-action-row">
     <label><input type="checkbox" checked={!preferCpu} onChange={e=>setPreferCpu(!e.target.checked)}/>
      Usar GPU opcionalmente (CPU é o padrão)
     </label>
@@ -186,7 +193,7 @@ export default function OpenBotWorkbench({db,session}){
      disabled={busy||!prompt.trim()}>
      {busy?'Executando...':mode==='peca'?'Gerar minuta e sugestão da IA':'Gerar rascunho para revisão'}
    </button>
-   {busy&&(engine==='qwen'||engine==='colibri-local')&&<button type="button" className="inf-btn" onClick={()=>{stopBlackholeQwen();setBusy(false)}}>Parar IA local</button>}
+   {busy&&localSelected&&<button type="button" className="inf-btn" onClick={()=>{stopBlackholeQwen();setBusy(false)}}>Parar IA local</button>}
    </div>
    {draft&&<div className="inf-note"><strong>Rascunho para revisão humana · {source}</strong><p style={{whiteSpace:'pre-wrap'}}>{draft}</p>
     {mode==='peca'&&<button type="button" className="inf-btn" onClick={()=>{
