@@ -11,7 +11,8 @@ test('only permanent INFINITUM origin can ask extension to inspect existing What
  assert.equal(validateBridgeRequest({type:'send'},BRIDGE_ORIGIN).ok,false);
  assert.equal(validateBridgeRequest({type:'navigate'},BRIDGE_ORIGIN).ok,false);
  assert.equal(validateBridgeRequest({type:'getCookies'},BRIDGE_ORIGIN).ok,false);
- assert.equal(validateBridgeRequest({type:'draft',text:'  Olá, tudo bem?  '},BRIDGE_ORIGIN).ok,true);
+ assert.equal(validateBridgeRequest({type:'draft',text:'  Olá, tudo bem?  ',expectedTitle:'Cliente'} ,BRIDGE_ORIGIN).ok,true);
+ assert.equal(validateBridgeRequest({type:'draft',text:'  Olá, tudo bem?  '},BRIDGE_ORIGIN).ok,false);
  assert.equal(validateBridgeRequest({type:'draft',text:'x'.repeat(3500)},BRIDGE_ORIGIN).ok,false);
 });
 test('WhatsApp tab must be explicitly granted, on web.whatsapp.com and grant has not expired',()=>{
