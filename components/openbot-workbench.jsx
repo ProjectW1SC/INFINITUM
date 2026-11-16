@@ -165,8 +165,8 @@ export default function OpenBotWorkbench({db,session}){
      <option value="online">IA online · escrever uma resposta livre</option>
      <option value="qwen">Qwen local · 0,5B</option>
      <option value="colibri-local">Colibri local · Qwen 0,5B</option>
-     <option value="qwen17">Qwen local · 1,7B (mais memória)</option>
-     <option value="qwen4">Qwen local · 4B (exige GPU)</option>
+     <option value="qwen17">Qwen3 1,7B · exige mais memória</option>
+     <option value="qwen4">Qwen3 4B · exige GPU</option>
     </select>
    </label>
    {engine==='deterministico'&&<p className={ui.helper}>Respostas rápidas sem IA generativa. Para redigir mensagens livres, selecione IA online.</p>}
@@ -230,13 +230,13 @@ export default function OpenBotWorkbench({db,session}){
   </div>
   <details className={ui.disclosure}>
    <summary>Modelo local opcional · desempenho e memória</summary>
-   <p>O Qwen exige CPU ou GPU, memória livre e arquivos de modelo. Para evitar travamentos, ele só é carregado após você selecionar um modelo e autorizar o uso.</p>
+   <p>O Qwen exige CPU ou GPU, memória livre e arquivos de modelo. Para evitar travamentos, ele só é carregado após você selecionar um modelo e autorizar o uso. Sem cota diária de tokens ou perguntas no modo local; o limite por resposta depende do aparelho.</p>
    {localSelected?<div className={ui.advancedGrid}>
     <label>GPU disponível (opcional)<input type="checkbox" checked={!preferCpu} disabled={busy||engine==='qwen4'}
      onChange={e=>setPreferCpu(!e.target.checked)}/></label>
     <label>Limite de geração
      <select value={tokenBudget} disabled={busy} onChange={e=>setTokenBudget(Number(e.target.value))}>
-      {[128,256,384,512,768].map(n=><option key={n} value={n}>{n} tokens</option>)}
+      {[128,256,384,512,768,1024,1536,2048].map(n=><option key={n} value={n}>{n} tokens</option>)}
      </select></label>
     <p>Cache: {cacheInfo?.complete?'Arquivos preparados no navegador.':
       cacheInfo?.cachedFiles>0?'Arquivos parciais disponíveis; o download pode continuar.':'Ainda não foi possível confirmar os arquivos do modelo.'}</p>
