@@ -71,6 +71,56 @@ jobs:
           Review third-party notices before distributing a renamed binary.
           README
           du -sh w1-copy/* | tee w1-copy/SNAPSHOT_SIZES.txt
+      - name: REA static analysis (optional; no application secrets)
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          # REA v6.9.0 is pinned from the inspected MIT-licensed source.
+          # Static analysis only: no binaries are executed and no credentials are provided.
+          mkdir -p w1-copy/reports
+          timeout 480s npx --yes --package rea-agents@6.9.0 -- rea analyze-javascript-application "$GITHUB_WORKSPACE/w1-copy/OpenMausBot/src" --json > w1-copy/reports/rea-ui-analysis.json 2> w1-copy/reports/rea-ui-analysis.log
+          result=$?
+          if [ "$result" -eq 0 ]; then
+            echo "REA_STATIC_RESULT=completed" | tee w1-copy/reports/rea-status.txt
+          else
+            echo "REA_STATIC_RESULT=not-confirmed (exit $result); original source still copied" | tee w1-copy/reports/rea-status.txt
+          fi
+          exit 0
+      - name: Include W1 MausBot engineering template
+        shell: bash
+        run: |
+          mkdir -p w1-copy/W1-MausBot-Overlay
+          cat > w1-copy/W1-MausBot-Overlay/mcp-servers.example.json <<'JSON'
+          {
+            "mcpServers": {
+              "infinitum_crm": {
+                "type": "http",
+                "url": "https://agentinfinitum.vercel.app/api/openbot/mcp",
+                "enabled": false
+              }
+            }
+          }
+          JSON
+          cat > w1-copy/W1-MausBot-Overlay/README.md <<'README'
+          # W1 MausBot — independent derivative development
+          This overlay is a starting point, not a published Windows build.
+          Use OpenMausBot as the base Electron/React/agent harness so its UI
+          and genuine tools remain intact. Preserve LICENSE and NOTICE.
+          Add W1 identity, company-specific bots, and CRM integration in
+          separate commits; keep old desktop updater disabled until W1 has
+          its own signed release repository.
+
+          Import mcp-servers.example.json via OpenMausBot's MCP server
+          configuration UI after checking the server URL and enabling
+          Supabase OAuth Server. Sign in, verify MFA, then approve the
+          exact access level in OpenBot. Enable only after successful OAuth.
+          Read-only tools are exposed by default. Reviewed edits require
+          explicit edit_scope and separate approval for each change.
+          No WhatsApp sends, bulk deletes, shell commands or credential
+          extraction are granted through the CRM MCP service.
+          REA is a separate analysis tool, not a runtime dependency.
+          README
       - name: Export complete tracked source working trees
         shell: bash
         run: |
