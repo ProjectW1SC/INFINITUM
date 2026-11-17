@@ -1,6 +1,9 @@
 name: W1 MausBot - source snapshot (licensed upstream)
 on:
   workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/w1-mausbot-source-snapshot.yml
   push:
     branches:
       - feat/w1-mausbot-source-snapshot-20261117
