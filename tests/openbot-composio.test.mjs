@@ -6,7 +6,8 @@ const read=p=>readFileSync(new URL('../'+p,import.meta.url),'utf8');
 test('Composio credentials stay server-side and calls use the fixed Composio API origin',()=>{
  const s=read('lib/openbot-composio.mjs');
  assert.match(s,/env\.COMPOSIO_API_KEY/);
- assert.match(s,/https:\/\/backend\.composio\.dev/);\n assert.match(s,/\/api\/\+version/);
+ assert.match(s,/https:\/\/backend\.composio\.dev/);
+ assert.match(s,/\/api\/\+version/);
  assert.doesNotMatch(s,/NEXT_PUBLIC_COMPOSIO|console\.log\([^)]*apiKey/i);
 });
 
