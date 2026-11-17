@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 const load=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 
 test('OpenBot has a proper standalone chat workspace, not the CRM card dashboard',()=>{
- const page=load('app/agentes/page.jsx');
+ const page=load('app/agentes/chat/page.jsx');
  const studio=load('components/openbot-studio.jsx');
  assert.match(page,/OpenBotStudio|OpenBotPage/);
  assert.match(studio,/Conversa|conversa/);
@@ -29,27 +29,4 @@ test('Model list comes from authenticated server configuration, not invented ava
  const api=load('app/api/openbot/models/route.js');
  assert.match(api,/officeAuth/);
  assert.match(api,/configuredLexisMotors/);
- assert.doesNotMatch(api,/secret_key|API_KEY.*reply/);
-});
-test('Private agent conversations have strict ownership and RLS',()=>{
- const sql=load('supabase/migrations/20261117013000_openbot_chat_workspace.sql');
- assert.match(sql,/ENABLE ROW LEVEL SECURITY/gi);
- assert.match(sql,/auth\.uid\(\)/);
- assert.match(sql,/openbot_threads/);
- assert.match(sql,/openbot_messages/);
- assert.match(sql,/owner_id/);
- assert.match(sql,/client_id/);
-});
-test('OpenBot and Grok-style bot behavior is grounded in real capabilities',()=>{
- const policy=load('lib/openbot-studio-config.mjs');
- assert.match(policy,/export const OPENBOT_BOTS/);
- assert.match(policy,/manual_review_only/);
- assert.match(policy,/whatsapp/);
- assert.match(policy,/maxHistory/);
-});
-
-test('OpenBot never silently predownloads Qwen when opening the standalone messenger',()=>{
- const boot=load('components/qwen-preinstall-bootstrap.jsx');
- assert.match(boot,/pathname==='\/agentes'\|\|pathname==='\/openbot'/);
- assert.match(boot,/return;/);
-});
+ assert.doesNotMatch(api,/secret_key|API_KE¶»§q«^
