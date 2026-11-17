@@ -1,4 +1,5 @@
 import {officeAuth,safeOfficeError} from '../../../../lib/office-server.mjs';
+import {readConnectedData} from '../integrations/data/route.js';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 
@@ -20,7 +21,14 @@ const toolsList=[
  {name:'crm_search_processes',description:'Localiza processos autorizados do CRM pelo número ou título, sem consultar tribunais em tempo real.',
   inputSchema:{type:'object',properties:{query:{type:'string',minLength:3,maxLength:80}},required:['query'],additionalProperties:false}},
  {name:'openbot_connections_status',description:'Lista provedores já autorizados no OpenBot, apenas metadados, nunca tokens.',
-  inputSchema:{type:'object',properties:{},additionalProperties:false}}
+  inputSchema:{type:'object',properties:{},additionalProperties:false}},
+ ...[['drive','Drive: lista arquivos'],['sheets','Sheets: lista planilhas'],
+ ['gmail','Gmail: lista marcadores'],['instagram','Instagram: lista contas profissionais']]
+ .map(([service,label])=>({
+  name:'openbot_'+service+'_list',description:'Consulta somente leitura. '+label+' de uma conta OAuth previamente autorizada.',
+  inputSchema:{type:'object',properties:{connection_id:{type:'string',description:'ID da conexão devolvido por openbot_connections_status'}},
+   required:['connection_id'],additionalProperties:false}
+ }))
 ];
 async function authorize(request){
  const {db,user,claims}=await officeAuth(request,{allowOAuth:true});
@@ -63,6 +71,14 @@ async function findProcesses({db,user},query){
   judicialLookupPerformed:false,asOf:new Date().toISOString()};
 }
 async function callTool(ctx,name,args){
+ const serviceMap={openbot_drive_list:'drive',openbot_sheets_list:'sheets',
+  openbot_gmail_list:'gmail',openbot_instagram_list:'instagram'};
+ if(Object.hasOwn(serviceMap,name)){
+  const id=String(args?.connection_id||'');
+  if(!/^[0-9a-f-]{36}$/i.test(id))throw bad('Identificador de conta OAuth inválido.',400);
+  const result=await readConnectedData(ctx.user.id,serviceMap[name],id);
+  return toContent(result);
+ }
  if(name==='crm_search_clients')return toContent(await findClients(ctx,args.query));
  if(name==='crm_search_processes')return toContent(await findProcesses(ctx,args.query));
  if(name==='openbot_connections_status'){
