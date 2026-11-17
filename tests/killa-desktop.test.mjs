@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {validateDesktopConfig,safeStandaloneEnvironment,isLocalAppNavigation,isSafeExternalNavigation,shouldRunSignedUpdater} from '../desktop/runtime-policy.mjs';
 import {readFileSync} from 'node:fs';
 const read=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
-const config={supabaseUrl:'https://ulkuhiibeoibbzhqrfya.supabase.co',
+const config={supabaseUrl:'https://segjskjlbeydlljnefai.supabase.co',
   publishableKey:'sb_publishable_sample-not-a-real-token',bridgeOrigin:'https://lexispredict-wa-auto.onrender.com'};
 test('desktop accepts only a pinned Supabase project and public key',()=>{
  assert.equal(validateDesktopConfig(config).supabaseUrl,config.supabaseUrl);
@@ -21,6 +21,8 @@ test('local Next process never inherits a service role or other private env keys
  assert.equal(env.HOSTNAME,'127.0.0.1');
  assert.equal(env.PORT,'54193');
  assert.equal(env.WA_AUTO_URL,config.bridgeOrigin);
+ assert.equal(env.NEXT_PUBLIC_LEXIS_SHARED_DB,'1');
+ assert.equal(env.OPENBOT_DESKTOP_REMOTE,'https://agentinfinitum.vercel.app');
  assert.equal(env.SUPABASE_SERVICE_ROLE_KEY,undefined);
  assert.equal(env.OPENAI_API_KEY,undefined);
  assert.equal(env.WA_AUTO_SECRET,undefined);
