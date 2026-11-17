@@ -26,7 +26,7 @@ test('automatic updates are exclusively published by signed Windows workflow',()
  assert.match(automatic,/release-notes\.md/);
  assert.doesNotMatch(automatic,/vercel\s+(deploy|build)/i);
  const main=read('desktop/main.mjs');
- assert.match(main,/Every packaged Windows build carries the same pinned W1 Ed25519 public key/);
+ assert.match(main,/Every package built from this revision carries the same pinned W1 Ed25519 key/);
  assert.match(main,/setInterval/);
  assert.doesNotMatch(main,/CONFIG_ENDPOINT|agentinfinitum\.vercel\.app\/api\/openbot\/desktop-config/);
 });
