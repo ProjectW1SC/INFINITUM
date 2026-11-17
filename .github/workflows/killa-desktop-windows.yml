@@ -49,8 +49,12 @@ jobs:
         env:
           KILLA_DESKTOP_STANDALONE: '1'
           NODE_ENV: production
-          # Public config is fetched at runtime from the Supabase Edge Function.
-          # Never copy Vercel service_role, sb_secret or signing keys into the EXE.
+          # Next.js inlines NEXT_PUBLIC_* values into browser bundles at build time.
+          # Keep the desktop's shared Lexis wallet mode and public project identity aligned.
+          NEXT_PUBLIC_LEXIS_SHARED_DB: '1'
+          NEXT_PUBLIC_SUPABASE_URL: 'https://segjskjlbeydlljnefai.supabase.co'
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_yEX6mVid3dpC7o7eOzuB1g_Vh'
+          # Publishable key is public; never copy service_role, sb_secret or signing keys into the EXE.
       - name: Copiar Next standalone e assets
         run: node desktop/stage-standalone.mjs
       - name: Smoke test do Next local em 127.0.0.1
