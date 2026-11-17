@@ -10,7 +10,7 @@ test('OAuth tokens use authenticated encryption; plaintext and tampering never w
  const sealed=encryptToken({access_token:'private-access',refresh_token:'private-refresh'},env);
  assert.doesNotMatch(sealed,/private-(?:access|refresh)/);
  assert.deepEqual(decryptToken(sealed,env),{access_token:'private-access',refresh_token:'private-refresh'});
- const bits=sealed.split('.');bits[2]=bits[2].slice(0,-1)+(bits[2].endsWith('A')?'B':'A');
+ const bits=sealed.split('.');bits[3]=(bits[3].startsWith('A')?'B':'A')+bits[3].slice(1);
  assert.throws(()=>decryptToken(bits.join('.'),env),/expirou|alterada/);
 });
 test('OAuth state expires after ten minutes, not reusable beyond expiry',()=>{
