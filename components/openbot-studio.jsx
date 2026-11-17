@@ -21,7 +21,7 @@ const safeError=e=>String(e?.message||e||'Operação não concluída').slice(0,2
 const validTitle=t=>chatTitle(t).slice(0,120);
 const openbotLabel=id=>OPENBOT_BOTS.find(b=>b.key===id)?.name||'Killa';
 
-export default function OpenBotStudio({db,session,initialBot,initialThreadId,startNew=false,embedded=false,onBack}){
+export default function OpenBotStudio({db,session,initialBot,initialThreadId,startNew=false,embedded=false,onBack,activityRuns=[]}){
  const owner=session?.user?.id;
  const [models,setModels]=useState(starterModels);
  const [threads,setThreads]=useState([]),[profiles,setProfiles]=useState({});
@@ -373,9 +373,9 @@ export default function OpenBotStudio({db,session,initialBot,initialThreadId,sta
      <button type="button" className={styles.outlineAction} onClick={()=>setSettingsOpen(x=>!x)}>
       <SlidersHorizontal size={16}/> {settingsOpen?'Fechar preferências':'Editar instruções do bot'}</button>
      {settingsOpen&&<div className={styles.settings}>
-      <label>Instruções adicionais<textarea rows={6} maxLength={1400} value={customInstruction}
+      <label>Memória de perfil e instruções adicionais<textarea rows={6} maxLength={1400} value={customInstruction}
        onChange={e=>setCustomInstruction(e.target.value)} placeholder="Como este agente deve responder?"/></label>
-      <p>As regras de segurança e de revisão não podem ser desativadas.</p>
+      <p>Preferências privadas deste perfil. O agente não transforma automaticamente mensagens lidas em fatos permanentes. As regras de segurança e revisão não podem ser desativadas.</p>
       <button type="button" onClick={saveProfile} disabled={savingSettings}>{savingSettings?'Salvando…':'Salvar instruções e motor'}</button>
      </div>}
      <h3>Configuração da conversa</h3>
@@ -385,9 +385,11 @@ export default function OpenBotStudio({db,session,initialBot,initialThreadId,sta
      {pendingDelete&&<p className={styles.warning}>Exclusão definitiva do histórico desta conversa no Supabase. Nenhuma conversa do WhatsApp será alterada.</p>}
     </>}
     {panel==='atividade'&&<>
-     <h3>Atividade nesta conversa</h3>
-     <p className={styles.muted}>Histórico real, registrado no Supabase; não são ações de ferramentas ou automações.</p>
+     <h3>Execuções do agente</h3>
+     <p className={styles.muted}>Registros confirmados da fila operacional do INFINITUM. Conversas não são contadas como tarefas concluídas.</p>
      <div className={styles.statGrid}><div><strong>{currentThreadMessages}</strong><span>Mensagens</span></div><div><strong>{messages.filter(m=>m.role==='assistant').length}</strong><span>Respostas</span></div></div>
+     {!activityRuns.length?<p className={styles.muted}>Nenhuma execução registrada para este perfil.</p>:activityRuns.slice(0,8).map(r=><div className={styles.activityRow} key={r.id}><Activity size={14}/><span><strong>{String(r.task||'Execução registrada').slice(0,110)}</strong><small>{String(r.status||'Registrado')} · {timeLabel(r.created_at)}</small></span></div>)}
+     <h3>Mensagens desta conversa</h3>
      {!messages.length?<p className={styles.muted}>Nenhuma mensagem registrada.</p>:messages.slice(-10).reverse().map(m=>
       <div className={styles.activityRow} key={m.id}><Clock3 size={14}/>
        <span><strong>{m.role==='user'?'Pedido do operador':'Rascunho gerado'}</strong><small>{timeLabel(m.created_at)} · {m.source||bot.name}</small></span></div>)}
@@ -401,6 +403,8 @@ export default function OpenBotStudio({db,session,initialBot,initialThreadId,sta
      <div className={styles.toolRow}><MessageSquare size={18}/><div><strong>ZapFast · WhatsApp</strong><small>Abre separadamente; não transfere a sessão nem envia mensagens</small></div>
       <a href={ZAPFAST_SINGLE_SESSION_URL} target="_blank" rel="noopener noreferrer"><ExternalLink size={15}/></a></div>
      <div className={styles.toolRow}><FileText size={18}/><div><strong>Operação jurídica</strong><small>Processos e atendimentos no CRM autorizado</small></div><Link href="/agentes/operacao"><ExternalLink size={15}/></Link></div>
+     <div className={styles.toolRow}><Activity size={18}/><div><strong>Fila de tarefas</strong><small>Prioridades, retornos e pendências registradas no CRM</small></div><Link href="/tarefas"><ExternalLink size={15}/></Link></div>
+     <div className={styles.toolRow}><ShieldCheck size={18}/><div><strong>Central de aprovações</strong><small>Revisão humana de propostas de alteração e permissões</small></div><Link href="/mcp/approve"><ExternalLink size={15}/></Link></div>
      <h3>Aprovações</h3>
      <div className={styles.inspectorStatus}><ShieldCheck size={15}/> {OPENBOT_APPROVAL==='manual_review_only'?'Revisão humana obrigatória':'Verificar configuração'}</div>
      <p className={styles.muted}>Execução em segundo plano e controle de computadores não estão habilitados nesta versão. Não são simulados.</p>
