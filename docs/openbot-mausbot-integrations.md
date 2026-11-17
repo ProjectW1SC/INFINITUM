@@ -45,6 +45,13 @@ Variáveis privadas na Vercel, Production e Preview:
 Nunca colocar segredos em \`NEXT_PUBLIC_*\`, no executável Windows, no repositório ou no navegador. O token Google é armazenado criptografado em \`openbot_connections\`.
 
 ### APIs Google que o projeto usa
+
+Links diretos para habilitação no projeto `infinitum-ccb26`:
+- [Biblioteca de APIs](https://console.cloud.google.com/apis/library?project=infinitum-ccb26)
+- [Google Auth Platform · Data Access / escopos](https://console.cloud.google.com/auth/scopes?project=infinitum-ccb26)
+- [Google Auth Platform · Clientes OAuth](https://console.cloud.google.com/auth/clients?project=infinitum-ccb26)
+- [Firebase · INFINITUM CRM Web](https://console.firebase.google.com/project/infinitum-ccb26/settings/general)
+
 Habilite no Google Cloud Console, projeto \`infinitum-ccb26\`:
 - Google Drive API
 - Google Sheets API
