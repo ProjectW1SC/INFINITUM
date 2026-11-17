@@ -50,8 +50,9 @@ const child=spawn(exe,[server],{
  cwd:dir,windowsHide:true,stdio:['ignore','ignore','pipe'],shell:false,
  env:{...safeEnv,ELECTRON_RUN_AS_NODE:'1',NODE_ENV:'production',
   HOSTNAME:'127.0.0.1',PORT:String(port),KILLA_LOCAL_NONCE:nonce,
-  NEXT_PUBLIC_SUPABASE_URL:'https://ulkuhiibeoibbzhqrfya.supabase.co',
-  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:'sb_publishable_ci-placeholder-not-secret'}
+  NEXT_PUBLIC_SUPABASE_URL:'https://segjskjlbeydlljnefai.supabase.co',
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:'sb_publishable_yEX6mVid3dpC7o7eOzuB1g_Vh',
+  NEXT_PUBLIC_LEXIS_SHARED_DB:'1'}
 });
 let crashed=false,signalError=null;
 child.once('error',error=>{crashed=true;signalError=error?.code||'spawn_error'});
