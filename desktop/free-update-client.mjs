@@ -128,15 +128,17 @@ export async function launchVerifiedInstaller({path,manifest,spawnImpl=spawn}){
 }
 export function createFreeUpdater({app,publicKey,onState=()=>{},fetchImpl=fetch}){
  if(!app||!publicKey||!pinnedKeyMatches(publicKey))throw Error('Chave pública W1 Capital inválida; atualizações bloqueadas.');
- let lastManifest=null,lastPath=null;
+ let lastManifest=null,lastPath=null,downloading=false;
  const tell=state=>onState(state);
  return Object.freeze({
   async check(){
+   if(downloading)return {status:'downloading'};
    tell({phase:'checking',signed:true,downloaded:false,
-    message:'Verificando versões aprovadas pela W1 Capital, sem Vercel.'});
+    message:'Consultando as versões oficiais publicadas na main do GitHub.'});
    const response=await fetchTrustedResponse(LATEST_SIGNED_MANIFEST,fetchImpl);
    if(!response){
-    tell({phase:'ready',signed:true,downloaded:false,
+    lastManifest=null;lastPath=null;
+    tell({phase:'ready',signed:true,downloaded:false,releaseNotes:'',
      message:'Nenhuma atualização oficial publicada. Continue com a versão instalada.'});
     return {status:'ready'};
    }
@@ -147,21 +149,48 @@ export function createFreeUpdater({app,publicKey,onState=()=>{},fetchImpl=fetch}
    try{manifest=verifyUpdateManifest(doc,publicKey,app.getVersion())}
    catch(error){
     if(String(error?.message||'').includes('Não há nova versão')){
-     tell({phase:'ready',signed:true,downloaded:false,message:'Você está na versão oficial mais recente.'});
+     lastManifest=null;lastPath=null;
+     tell({phase:'ready',signed:true,downloaded:false,releaseNotes:'',
+      message:'Você já possui a versão oficial mais recente.'});
      return {status:'ready'};
     }
     throw error;
    }
+   if(lastManifest?.version===manifest.version&&lastPath){
+    try{
+     await verifyLocalInstaller(lastPath,manifest);
+     lastManifest=manifest;
+     tell({phase:'downloaded',signed:true,downloaded:true,percent:100,
+      updateVersion:manifest.version,releaseNotes:manifest.releaseNotes,
+      message:'Atualização já baixada e verificada. Instale quando for conveniente.'});
+     return {status:'downloaded',version:manifest.version,releaseNotes:manifest.releaseNotes};
+    }catch{lastPath=null}
+   }
    lastManifest=manifest;
-   tell({phase:'downloading',signed:true,downloaded:false,updateVersion:manifest.version,
-    percent:0,message:'Baixando versão aprovada. SHA-512 e assinatura Ed25519 serão verificados.'});
-   lastPath=await downloadVerifiedInstaller({app,manifest,fetchImpl,
-    onProgress:percent=>tell({phase:'downloading',signed:true,downloaded:false,
-     percent,updateVersion:manifest.version,message:'Baixando pacote oficial da W1 Capital.'})});
-   tell({phase:'downloaded',signed:true,downloaded:true,percent:100,
-    updateVersion:manifest.version,
-    message:'Atualização W1 Capital autenticada. Instalação local disponível.'});
-   return {status:'downloaded',version:manifest.version};
+   lastPath=null;
+   tell({phase:'available',signed:true,downloaded:false,percent:0,
+    updateVersion:manifest.version,releaseNotes:manifest.releaseNotes,
+    message:'Nova versão disponível. Confira as alterações e escolha quando baixar.'});
+   return {status:'available',version:manifest.version,releaseNotes:manifest.releaseNotes};
+  },
+  async download(){
+   if(!lastManifest)throw Error('Nenhuma versão nova foi autenticada para download.');
+   if(downloading)throw Error('O download da atualização já está em andamento.');
+   downloading=true;
+   const manifest=lastManifest;
+   try{
+    tell({phase:'downloading',signed:true,downloaded:false,updateVersion:manifest.version,
+     releaseNotes:manifest.releaseNotes,percent:0,
+     message:'Baixando em segundo plano. O INFINITUM continuará disponível.'});
+    lastPath=await downloadVerifiedInstaller({app,manifest,fetchImpl,
+     onProgress:percent=>tell({phase:'downloading',signed:true,downloaded:false,
+      percent,updateVersion:manifest.version,releaseNotes:manifest.releaseNotes,
+      message:'Baixando e verificando SHA-512 do pacote oficial.'})});
+    tell({phase:'downloaded',signed:true,downloaded:true,percent:100,
+     updateVersion:manifest.version,releaseNotes:manifest.releaseNotes,
+     message:'Atualização baixada e verificada. A instalação aguarda sua confirmação.'});
+    return {status:'downloaded',version:manifest.version,releaseNotes:manifest.releaseNotes};
+   }finally{downloading=false}
   },
   async install(){
    if(!lastManifest||!lastPath)throw Error('Nenhuma atualização oficial autenticada.');
