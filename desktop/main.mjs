@@ -11,7 +11,7 @@ import {validateDesktopConfig,safeStandaloneEnvironment,isLocalAppNavigation,
  isSafeExternalNavigation,isSafeZapFastNavigation,DESKTOP_ZAPFAST_URL,shouldRunSignedUpdater,DESKTOP_ENTRY_PATH} from './runtime-policy.mjs';
 import {safeLauncherSnapshot,normalizeUpdateProgress,canInstallSignedUpdate,isSignedUpdateConfiguration} from './launcher-policy.mjs';
 
-const CONFIG_ENDPOINT='https://ulkuhiibeoibbzhqrfya.supabase.co/functions/v1/killa-mcp/desktop-config';
+const CONFIG_ENDPOINT='https://agentinfinitum.vercel.app/api/openbot/desktop-config';
 let nextProcess=null,port=0,desktopConfig=null,window=null,launcherWindow=null,zapFastWindow=null,shuttingDown=false,localNonce='';
 let updater=null,freeUpdater=null,updateCheck=null,appOpen=null;
 let autoUpdateEnabled=true;
@@ -25,7 +25,7 @@ async function loadPublicConfiguration(){
   headers:{Accept:'application/json'},signal:AbortSignal.timeout(12000),redirect:'error',
   cache:'no-store'
  });
- if(!response.ok)throw Error('Supabase Edge não retornou configuração pública ('+response.status+').');
+ if(!response.ok)throw Error('A API do CRM não retornou configuração pública ('+response.status+').');
  const raw=await response.text();
  if(raw.length>2500)throw Error('Configuração pública excede tamanho permitido.');
  return validateDesktopConfig(JSON.parse(raw));
@@ -354,7 +354,7 @@ async function launchLocalCRM(target=DESKTOP_ENTRY_PATH){
    const message=error?.code==='DESKTOP_BUNDLE_INCOMPLETE'
     ?'Instalação incompleta: dependências Next.js ausentes. Baixe e instale uma versão corrigida.'
     :desktopConfig===null
-     ?'Não foi possível carregar a configuração pública do Supabase. Verifique a internet e a Edge Function desktop-config.'
+     ?'Não foi possível carregar a configuração pública do OpenBot. Verifique a internet e o domínio agentinfinitum.vercel.app.'
      :'Servidor Next.js local não iniciou. Verifique o pacote e a porta local; nenhum dado de cliente foi exposto.';
    return pushLauncher({phase:'error',message});
   }finally{appOpen=null}
