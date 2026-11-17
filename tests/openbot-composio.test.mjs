@@ -59,3 +59,12 @@ test('Connected apps UI starts Composio Connect Links and shows remote account s
  assert.match(s,/redirectUrl/);
  assert.match(s,/composioAccounts/);
 });
+
+test('Composio write approvals can resume only with the original request state and human input responses',()=>{
+ const s=read('app/api/openbot/mcp/route.js');
+ assert.match(s,/request_state/);
+ assert.match(s,/input_responses/);
+ assert.match(s,/args\.request_state/);
+ assert.match(s,/args\.input_responses/);
+ assert.match(s,/same tool and arguments|same action and arguments/i);
+});
