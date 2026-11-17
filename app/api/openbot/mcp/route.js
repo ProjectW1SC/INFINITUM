@@ -26,8 +26,11 @@ const toolsList=[
  {name:'composio_search_tools',description:'Pesquisa ações disponíveis nos plugins Instagram e WhatsApp Business conectados pelo Composio. Retorna nomes e esquemas das ferramentas; não executa nenhuma ação.',
   inputSchema:{type:'object',properties:{query:{type:'string',minLength:3,maxLength:240}},required:['query'],additionalProperties:false}},
  {name:'composio_execute_tool',description:'Executa uma ferramenta Instagram ou WhatsApp Business pelo Composio. Ações de escrita só são aceitas quando o cliente tem edição supervisionada e o Composio exige confirmação; se o cliente MCP não suportar aprovação, a ação é negada.',
-  inputSchema:{type:'object',properties:{tool_slug:{type:'string',pattern:'^(INSTAGRAM|WHATSAPP)_[A-Z0-9_]{3,150}
-  inputSchema:{type:'object',properties:{},additionalProperties:false}},
+  inputSchema:{type:'object',properties:{
+   tool_slug:{type:'string',pattern:'^(INSTAGRAM|WHATSAPP)_[A-Z0-9_]{3,150}$'},
+   arguments:{type:'object',additionalProperties:true},
+   account:{type:'string',maxLength:200,description:'ID ca_... da conta conectada; obrigatório quando houver várias contas.'}
+  },required:['tool_slug','arguments'],additionalProperties:false}},
  {name:'crm_propose_edit',description:'PROPOR uma edição supervisionada no CRM. Não altera dados até o operador revisar e aprovar com MFA no OpenBot. Apenas notas, retornos, responsáveis e prioridades.',
   inputSchema:{type:'object',properties:{
    target_table:{type:'string',enum:['office_clients','office_cases','office_deadlines','crm_clients']},
