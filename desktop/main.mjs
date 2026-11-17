@@ -430,7 +430,7 @@ async function launchLocalCRM(target=DESKTOP_ENTRY_PATH){
    const message=error?.code==='DESKTOP_BUNDLE_INCOMPLETE'
     ?'Instalação incompleta: dependências Next.js ausentes. Baixe e instale uma versão corrigida.'
     :desktopConfig===null
-     ?'Não foi possível carregar a configuração pública do OpenBot. Verifique a internet e o domínio agentinfinitum.vercel.app.'
+     ?'Não foi possível ler a configuração pública empacotada. Reinstale o INFINITUM usando o pacote oficial.'
      :'Servidor Next.js local não iniciou. Verifique o pacote e a porta local; nenhum dado de cliente foi exposto.';
    return pushLauncher({phase:'error',message});
   }finally{appOpen=null}
