@@ -20,8 +20,12 @@ if(!stats.isFile()||stats.size<1000000||stats.size>500000000)
  throw Error('Tamanho de pacote inesperado; publicação cancelada.');
 const hash=createHash('sha512');
 for await(const chunk of createReadStream(dest))hash.update(chunk);
+const notesPath=join(import.meta.dirname,'dist','release-notes.md');
+let releaseNotes='Atualização de manutenção do INFINITUM Killa AI.';
+try{releaseNotes=readFileSync(notesPath,'utf8')}catch{}
+releaseNotes=releaseNotes.replace(/\r/g,'').replace(/<[^>]*>/g,'').replace(/[<>]/g,'').slice(0,6000);
 const body={schema:1,channel:'stable',appId:'br.com.w1capital.infinitum.killa',
- version,tag:'v'+version,
+ version,tag:'v'+version,releaseNotes,
  asset:{name,url:releaseArtifactUrl(version),size:stats.size,sha512:hash.digest('base64')}};
 const bytes=Buffer.from(JSON.stringify(body),'utf8');
 const manifest={format:'w1-signed-release-v1',

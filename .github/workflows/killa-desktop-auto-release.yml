@@ -1,0 +1,128 @@
+name: W1 Capital — publicar atualização automática do INFINITUM
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: killa-desktop-auto-release-main
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: github.repository == 'ProjectW1SC/INFINITUM' && github.ref == 'refs/heads/main'
+    environment: desktop-production
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Gerar versão monotônica para esta atualização da main
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = '0.2.' + $env:GITHUB_RUN_NUMBER
+          if ($version -notmatch '^\\d+\\.\\d+\\.\\d+$') { throw 'Versão automática inválida.' }
+          gh release view ('v'+$version) --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) { throw ('A release '+$version+' já existe; nenhuma release será sobrescrita.') }
+          $global:LASTEXITCODE = 0
+          "VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Preparar assinatura Ed25519 e exigir canal Authenticode
+        run: node desktop/prepare-free-release.mjs $env:VERSION
+        env:
+          KILLA_ED25519_PRIVATE_KEY_B64: ${{ secrets.KILLA_ED25519_PRIVATE_KEY_B64 }}
+          VERSION: ${{ env.VERSION }}
+      - name: Instalar dependências do CRM
+        run: npm install --no-audit --no-fund
+      - name: Testes, autorização, DOM e tipos
+        run: |
+          npm test
+          npm run typecheck
+          npm run test:dom
+      - name: Compilar Next standalone sem Vercel
+        run: npm run build
+        env:
+          KILLA_DESKTOP_STANDALONE: '1'
+          NODE_ENV: production
+          NEXT_PUBLIC_LEXIS_SHARED_DB: '1'
+          NEXT_PUBLIC_SUPABASE_URL: 'https://segjskjlbeydlljnefai.supabase.co'
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_yEX6mVid3dpC7o7eOzuB1g_Vh'
+      - name: Preparar servidor standalone e validar HTTP local
+        run: |
+          node desktop/stage-standalone.mjs
+          node desktop/verify-local-server.mjs
+      - name: Instalar Electron e validar código do launcher
+        run: |
+          npm install --prefix desktop --no-audit --no-fund
+          node --check desktop/main.mjs
+          node --check desktop/free-update-client.mjs
+          node --check desktop/launcher-ui.js
+          node --check desktop/launcher-preload.cjs
+          node --check desktop/preload.cjs
+      - name: Empacotar EXE e testar servidor local embutido
+        run: |
+          npm --prefix desktop run pack:win
+          node desktop/verify-packaged-server.mjs
+        env:
+          WIN_CSC_LINK: ${{ secrets.KILLA_WINDOWS_CERT_P12 }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.KILLA_WINDOWS_CERT_PASSWORD }}
+      - name: Gerar instalador Windows x64 assinado
+        run: npm --prefix desktop run dist:win
+        env:
+          WIN_CSC_LINK: ${{ secrets.KILLA_WINDOWS_CERT_P12 }}
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.KILLA_WINDOWS_CERT_PASSWORD }}
+      - name: Validar payload final e assinatura Authenticode
+        shell: pwsh
+        env:
+          VERSION: ${{ env.VERSION }}
+        run: |
+          node desktop/verify-packaged-server.mjs
+          ./desktop/verify-windows-signature.ps1 -AppExe 'desktop/dist/win-unpacked/INFINITUM Killa AI.exe' -Installer ('desktop/dist/INFINITUM-KillaAI-Setup-'+$env:VERSION+'-x64.exe')
+      - name: Resumir commits desde a última release publicada
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ env.VERSION }}
+        run: |
+          New-Item -ItemType Directory -Force -Path 'desktop/dist' | Out-Null
+          $lastTag = gh release list --repo $env:GITHUB_REPOSITORY --limit 1 --json tagName --jq '.[0].tagName'
+          $changes = @()
+          if (-not [string]::IsNullOrWhiteSpace($lastTag) -and $lastTag -ne 'null') {
+            $changes = @(git log --format='- %s' ($lastTag + '..' + $env:GITHUB_SHA) | Select-Object -First 28)
+          } else {
+            $changes = @(git log -n 28 --format='- %s' $env:GITHUB_SHA)
+          }
+          if ($changes.Count -eq 0) { $changes = @('- Correções de estabilidade, segurança e melhorias operacionais.') }
+          $notes = @('# INFINITUM Killa AI v' + $env:VERSION, '', 'Atualização gerada após testes e validações da branch main.', '', '## O que mudou') + $changes
+          $notes | Set-Content -Path 'desktop/dist/release-notes.md' -Encoding utf8
+      - name: Assinar manifesto de atualização com Ed25519
+        run: node desktop/sign-free-release.mjs $env:VERSION ('desktop/dist/INFINITUM-KillaAI-Setup-'+$env:VERSION+'-x64.exe')
+        env:
+          KILLA_ED25519_PRIVATE_KEY_B64: ${{ secrets.KILLA_ED25519_PRIVATE_KEY_B64 }}
+          VERSION: ${{ env.VERSION }}
+      - name: Publicar release oficial do GitHub para os EXEs
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ env.VERSION }}
+        run: |
+          gh release create ('v'+$env:VERSION) --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --latest --title ('INFINITUM Killa AI v'+$env:VERSION) --notes-file 'desktop/dist/release-notes.md' ('desktop/dist/INFINITUM-KillaAI-Setup-'+$env:VERSION+'-x64.exe') 'desktop/dist/killa-update.json'
+      - name: Arquivar instalador e manifesto
+        uses: actions/upload-artifact@v4
+        with:
+          name: infinitum-killa-auto-release-${{ env.VERSION }}
+          path: |
+            desktop/dist/INFINITUM-KillaAI-Setup-${{ env.VERSION }}-x64.exe
+            desktop/dist/killa-update.json
+            desktop/dist/release-notes.md
+          if-no-files-found: error
+          retention-days: 30

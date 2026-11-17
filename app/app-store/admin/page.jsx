@@ -37,7 +37,19 @@ export default function StoreSuperadmin(){
     const existing=(res.data?.totp||[]).find(x=>x.status==='verified');
     if(live&&existing)setFactor(existing.id);
     if(!r.needsMfa&&live)await refresh();
-   }catch{if(live)setAccess({ok:false})}
+   }catch(error){
+    if(live){
+     const code=String(error?.message||'').slice(0,80);
+     const reason=code==='mfa_required'
+      ?'Sua conta foi reconhecida, mas precisa confirmar o segundo fator TOTP.'
+      :code==='session_revoked'
+       ?'A sessão expirou ou foi encerrada. Entre novamente no INFINITUM.'
+       :code==='superadmin_required'
+        ?'Esta identidade não está autorizada na lista privada de superadministradores da loja.'
+        :'Não foi possível validar a sessão desta conta na central da loja ('+code+').';
+     setAccess({ok:false,reason});
+    }
+   }
   })();
   return()=>{live=false};
  },[loading,db,session?.user?.id,request,refresh]);
@@ -86,7 +98,7 @@ export default function StoreSuperadmin(){
  }
  if(loading)return <main className="store"><h1>Loja W1 Capital</h1><p>Validando sessão...</p></main>;
  if(!session?.user)return <main className="store"><h1>Loja W1 Capital</h1><p>Faça login.</p><Link href="/">Entrar</Link></main>;
- if(access?.ok===false)return <main className="store"><h1>Acesso negado</h1><p>Somente superadmin exclusivo da loja.</p><Link href="/agentes">Voltar ao INFINITUM</Link></main>;
+ if(access?.ok===false)return <main className="store"><h1>Acesso negado</h1><p>{access.reason||'Somente superadmin exclusivo da loja.'}</p><Link href="/agentes">Voltar ao INFINITUM</Link></main>;
  if(!access)return <main className="store"><h1>Loja W1 Capital</h1><p>Verificando superadmin...</p></main>;
  if(access.needsMfa)return <main className="store"><h1>Segurança extra da loja</h1><p>É obrigatório ativar o segundo fator TOTP para consultar logs e Env.</p>
   {!factor&&<button disabled={busy} onClick={enroll}>Ativar Google Authenticator / TOTP</button>}

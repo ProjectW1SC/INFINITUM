@@ -8,6 +8,11 @@ export const ALLOWED_RELEASE_HOSTS=new Set([
  'github.com','release-assets.githubusercontent.com','objects.githubusercontent.com','github-releases.githubusercontent.com'
 ]);
 function rejected(reason){throw Error(reason)}
+export function cleanReleaseNotes(value){
+ if(typeof value!=='string')return '';
+ return value.replace(/\r/g,'').replace(/<[^>]*>/g,'').replace(/[<>]/g,'')
+  .split('\n').slice(0,32).map(line=>line.trim().slice(0,220)).join('\n').slice(0,6000);
+}
 export function validVersion(value){
  return typeof value==='string'&&VERSION.test(value);
 }
@@ -50,12 +55,13 @@ export function validateReleaseMetadata(release,installedVersion){
  const hash=parseBase64(asset.sha512,64);
  if(hash.length!==64)rejected('Hash SHA-512 de atualização inválido.');
  return Object.freeze({version:release.version,tag:release.tag,
+  releaseNotes:cleanReleaseNotes(release.releaseNotes),
   asset:Object.freeze({name,url:asset.url,size:asset.size,sha512:asset.sha512})});
 }
 export function verifyUpdateManifest(document,publicKey,installedVersion){
  if(!document||document.format!=='w1-signed-release-v1')rejected('Formato de atualização não autorizado.');
  if(!pinnedKeyMatches(publicKey))rejected('Chave pública não pertence à W1 Capital.');
- const data=parseBase64(document.payload,4096);
+ const data=parseBase64(document.payload,10000);
  const sig=parseBase64(document.signature,64);
  if(sig.length!==64||verify(null,data,createPublicKey(publicKey),sig)!==true)
   rejected('Assinatura da W1 Capital inválida ou alterada.');

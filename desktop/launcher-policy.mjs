@@ -1,4 +1,4 @@
-const ACTIONS=new Set(['launch','check-update','install-update','open-downloads']);
+const ACTIONS=new Set(['launch','check-update','download-update','install-update','open-downloads']);
 const PHASES=new Set(['loading','checking','ready','available','downloading','downloaded','installing','opening','error','unsigned','offline']);
 const VERSION=/^\d{1,4}\.\d{1,4}\.\d{1,4}(?:-[0-9A-Za-z.-]{1,40})?$/;
 export function validateLauncherAction(action){return typeof action==='string'&&ACTIONS.has(action)}
@@ -12,7 +12,10 @@ export function safeLauncherSnapshot(input={}){
   phase,version:VERSION.test(String(input?.version||''))?String(input.version):'0.0.0',
   updateVersion:VERSION.test(String(input?.updateVersion||''))?String(input.updateVersion):'',
   percent:normalizeUpdateProgress({percent:input?.percent}),
-  signed:input?.signed===true,downloaded:input?.downloaded===true,autoInstall:input?.autoInstall!==false,
+  signed:input?.signed===true,downloaded:input?.downloaded===true,
+  autoCheck:input?.autoCheck!==false,
+  releaseNotes:typeof input?.releaseNotes==='string'
+   ?input.releaseNotes.replace(/<[^>]*>/g,'').replace(/[<>]/g,'').slice(0,6000):'',
   message:typeof input?.message==='string'?input.message.replace(/[<>]/g,'').slice(0,240):''
  });
 }

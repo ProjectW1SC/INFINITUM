@@ -8,8 +8,15 @@ import {z} from 'npm:zod@^4.3.6';
 // Separate service from WhatsApp and the desktop: a failed store admin request
 // must NEVER gain access to WA.Auto sessions or tenant message archives.
 const PROJECT='ProjectW1SC/INFINITUM';
+const AUTH_SOURCE_PROJECT_REF='segjskjlbeydlljnefai';
+const AUTH_SOURCE_URL='https://segjskjlbeydlljnefai.supabase.co';
+// Supabase publishable key: public identifier only, never a service-role credential.
+const AUTH_SOURCE_PUBLISHABLE_KEY='sb_publishable_yEX6mVid3dpC7o7eOzuB1g_Vh';
+const AUTH_SOURCE_ISSUER=AUTH_SOURCE_URL+'/auth/v1';
+const W1_COMPANY_ID='d37fd4bb-1c71-4dca-b97e-292355918d39';
+const STORE_USER_ID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const GH_API='https://api.github.com/repos/'+PROJECT;
-const ALLOWED_WORKFLOWS=['ci.yml','killa-desktop-windows.yml','killa-desktop-free-release.yml'];
+const ALLOWED_WORKFLOWS=['ci.yml','killa-desktop-windows.yml','killa-desktop-free-release.yml','killa-desktop-auto-release.yml'];
 const VALID_VERSION=/^(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})$/;
 const LIMIT=400000;const error=(code,status=403)=>Response.json({ok:false,error:code},{status});
 const secret=(name)=>Deno.env.get(name)||'';
@@ -49,13 +56,61 @@ function json(req,data,status=200){
   'Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'none'; frame-ancestors 'none'"}});
 }
 function adminRpc(db,name,args){return db.rpc(name,args)}
+function sourceUserDb(token){
+ return createClient(AUTH_SOURCE_URL,AUTH_SOURCE_PUBLISHABLE_KEY,{
+  global:{headers:{Authorization:'Bearer '+token}},
+  auth:{persistSession:false,autoRefreshToken:false}
+ });
+}
+function normalizeRoleLabel(value){
+ return String(value??'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'')
+  .toLowerCase().replace(/[\\s_-]+/g,' ').trim();
+}
+async function authorizedExternal(token,jwt,{requireMfa=true,client='firstparty'}={}){
+ if(client!=='firstparty'||jwt?.client_id)throw Error('third_party_not_allowed');
+ const sourceDb=sourceUserDb(token);
+ const result=await sourceDb.auth.getUser(token);
+ const user=result.data?.user;
+ if(result.error||!user||jwt?.sub!==user.id)throw Error('unauthorized');
+ // This first-party desktop identity is explicitly mapped in the private store
+ // allowlist. CRM-wide administrators do not gain store access by role alone.
+ const profileResult=await sourceDb.from('usuarios')
+  .select('auth_user_id,empresa_id,cargo,role')
+  .eq('auth_user_id',user.id).maybeSingle();
+ const profile=profileResult.data;
+ const adminLabels=new Set(['admin','administrador','superadmin','super admin']);
+ const companyAdmin=[profile?.cargo,profile?.role].some(value=>adminLabels.has(normalizeRoleLabel(value)));
+ if(profileResult.error||!profile||profile.auth_user_id!==user.id||
+  profile.empresa_id!==W1_COMPANY_ID||!companyAdmin)throw Error('superadmin_required');
+ if(typeof jwt?.session_id!=='string'||!STORE_USER_ID_PATTERN.test(jwt.session_id))
+  throw Error('session_revoked');
+ const alive=await sourceDb.rpc('killa_validate_current_session',{p_session_id:jwt.session_id});
+ if(alive.error||alive.data!==true)throw Error('session_revoked');
+ const server=serviceDb();
+ const mapping=await adminRpc(server,'killa_store_external_admin_access',{
+  p_source_project_ref:AUTH_SOURCE_PROJECT_REF,p_source_user_id:user.id
+ });
+ const storeUserId=mapping.data?.storeUserId;
+ if(mapping.error||mapping.data?.allowed!==true||
+  typeof storeUserId!=='string'||!STORE_USER_ID_PATTERN.test(storeUserId))
+  throw Error('superadmin_required');
+ if(requireMfa&&jwt?.aal!=='aal2')throw Error('mfa_required');
+ // Existing store RPCs keep using the canonical local store-superadmin ID.
+ // The source identity is verified separately and cannot choose this mapping.
+ return {user:{...user,id:storeUserId},sourceUser:user,sourceUserId:user.id,
+  sourceProjectRef:AUTH_SOURCE_PROJECT_REF,jwt,server,role:mapping.data};
+}
 async function authorized(req,{requireMfa=true,client='firstparty'}={}){
- const token=(req.headers.get('Authorization')||'').replace(/^Bearer\s+/i,'').trim();
- if(!token||token.length>12000||!secret('SUPABASE_URL')||!secret('SUPABASE_ANON_KEY')||!secret('SUPABASE_SERVICE_ROLE_KEY'))
+ const token=(req.headers.get('Authorization')||'').replace(/^Bearer\\s+/i,'').trim();
+ if(!token||token.length>12000)throw Error('unauthorized');
+ const jwt=claims(token);
+ if(client==='firstparty'&&jwt?.iss===AUTH_SOURCE_ISSUER)
+  return authorizedExternal(token,jwt,{requireMfa,client});
+ if(!secret('SUPABASE_URL')||!secret('SUPABASE_ANON_KEY')||!secret('SUPABASE_SERVICE_ROLE_KEY'))
   throw Error('unauthorized');
  const db=userDb(token);
  const result=await db.auth.getUser(token);
- const jwt=claims(token),user=result.data?.user;
+ const user=result.data?.user;
  if(result.error||!user||jwt?.sub!==user.id)throw Error('unauthorized');
  if(client==='firstparty'&&jwt?.client_id)throw Error('third_party_not_allowed');
  if(client==='oauth'&&(!jwt?.client_id||typeof jwt.client_id!=='string'))throw Error('oauth_required');
@@ -65,7 +120,7 @@ async function authorized(req,{requireMfa=true,client='firstparty'}={}){
  const role=await adminRpc(server,'killa_store_admin_access',{p_user_id:user.id});
  if(role.error||role.data?.allowed!==true)throw Error('superadmin_required');
  // Revoked/logged-out sessions must be denied even while their JWT has not expired.
- if(typeof jwt?.session_id!=='string'||!/^[-0-9a-f]{36}$/i.test(jwt.session_id))
+ if(typeof jwt?.session_id!=='string'||!STORE_USER_ID_PATTERN.test(jwt.session_id))
   throw Error('session_revoked');
  const alive=await adminRpc(server,'killa_store_validate_session',{
   p_user_id:user.id,p_session_id:jwt.session_id
@@ -80,7 +135,7 @@ async function authorized(req,{requireMfa=true,client='firstparty'}={}){
    ||!permission.data.allowed_client_ids.includes(jwt.client_id))
    throw Error('oauth_client_not_allowed');
  }
- return {user,jwt,server,role:role.data};
+ return {user,sourceUser:user,sourceUserId:user.id,jwt,server,role:role.data};
 }
 function ghHeaders(write=false){
  const token=secret(write?'KILLA_GITHUB_DISPATCH_TOKEN':'KILLA_GITHUB_READ_TOKEN');
