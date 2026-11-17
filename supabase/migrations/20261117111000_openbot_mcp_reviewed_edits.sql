@@ -80,6 +80,7 @@ BEGIN
  FROM public.usuarios WHERE auth_user_id=actor;
  IF membership_count<>1 OR member_company IS DISTINCT FROM p.empresa_id
  THEN RAISE EXCEPTION 'Vínculo empresarial não autorizado.' USING ERRCODE='42501'; END IF;
+ IF p_approve IS NULL THEN RAISE EXCEPTION 'Decisão de revisão inválida.' USING ERRCODE='22023'; END IF;
  IF NOT p_approve THEN
   UPDATE public.openbot_mcp_edit_requests SET status='rejected',reviewed_at=now(),reviewed_by=actor WHERE id=p.id;
   RETURN jsonb_build_object('ok',true,'status','rejected','id',p.id);
@@ -104,7 +105,7 @@ BEGIN
   IF length(p.new_value)>100 OR p.new_value ~ '[[:cntrl:]]'
   THEN RAISE EXCEPTION 'Valor inválido para campo curto.' USING ERRCODE='22023'; END IF;
  ELSE
-  IF length(p.new_value)>2400 OR strpos(p.new_value,chr(0))>0
+  IF length(p.new_value)>2400
   THEN RAISE EXCEPTION 'Observação muito longa.' USING ERRCODE='22023'; END IF;
  END IF;
  -- Rows are locked before the compare-and-update to prevent lost updates.
