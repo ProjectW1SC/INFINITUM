@@ -68,13 +68,13 @@ function normalizeRoleLabel(value){
 }
 async function authorizedExternal(token,jwt,{requireMfa=true,client='firstparty'}={}){
  if(client!=='firstparty'||jwt?.client_id)throw Error('third_party_not_allowed');
- const db=sourceUserDb(token);
- const result=await db.auth.getUser(token);
+ const sourceDb=sourceUserDb(token);
+ const result=await sourceDb.auth.getUser(token);
  const user=result.data?.user;
  if(result.error||!user||jwt?.sub!==user.id)throw Error('unauthorized');
  // This first-party desktop identity is explicitly mapped in the private store
  // allowlist. CRM-wide administrators do not gain store access by role alone.
- const profileResult=await db.from('usuarios')
+ const profileResult=await sourceDb.from('usuarios')
   .select('auth_user_id,empresa_id,cargo,role')
   .eq('auth_user_id',user.id).maybeSingle();
  const profile=profileResult.data;
@@ -84,7 +84,7 @@ async function authorizedExternal(token,jwt,{requireMfa=true,client='firstparty'
   profile.empresa_id!==W1_COMPANY_ID||!companyAdmin)throw Error('superadmin_required');
  if(typeof jwt?.session_id!=='string'||!STORE_USER_ID_PATTERN.test(jwt.session_id))
   throw Error('session_revoked');
- const alive=await db.rpc('killa_validate_current_session',{p_session_id:jwt.session_id});
+ const alive=await sourceDb.rpc('killa_validate_current_session',{p_session_id:jwt.session_id});
  if(alive.error||alive.data!==true)throw Error('session_revoked');
  const server=serviceDb();
  const mapping=await adminRpc(server,'killa_store_external_admin_access',{
