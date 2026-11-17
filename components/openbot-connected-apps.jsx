@@ -13,7 +13,7 @@ const safe=(error)=>String(error?.message||error||'Conexão indisponível').slic
 const age=v=>v?new Date(v).toLocaleDateString('pt-BR'):'não verificado';
 const SERVICE_LABELS={drive:'Google Drive',sheets:'Google Sheets',gmail:'Gmail',instagram:'Instagram'};
 
-export default function OpenBotConnectedApps({request,onClose}){
+export default function OpenBotConnectedApps({request,onClose,onUseData}){
  const [tab,setTab]=useState('apps'),[catalog,setCatalog]=useState([]),[accounts,setAccounts]=useState([]);
  const [mcp,setMcp]=useState(null),[loading,setLoading]=useState(true),[working,setWorking]=useState('');
  const [error,setError]=useState(''),[notice,setNotice]=useState(''),[selected,setSelected]=useState('');
@@ -184,7 +184,12 @@ export default function OpenBotConnectedApps({request,onClose}){
          {working===connector.provider?<Loader2 className={css.spin} size={16}/>:<Plug size={16}/>}
          {connectorAccounts.length?'Conectar outra conta':'Conectar conta'} </button>:
         <p className={css.warning}>O aplicativo OAuth deste provedor ainda não tem credenciais configuradas no servidor. O administrador precisa registrar o aplicativo no Google Cloud ou Meta for Developers e configurar as chaves privadas. Não cole senhas aqui.</p>}
-       {preview&&<section className={css.preview}><h3>{SERVICE_LABELS[preview.service]||preview.service} · teste confirmado</h3>
+       {preview&&<section className={css.preview}><button type="button" className={css.primary}
+        onClick={()=>{
+         const rows=(preview.items||[]).slice(0,10).map(x=>({id:x.id,name:x.name||x.username||x.page||'',url:x.url||''}));
+         onUseData?.('Fonte autorizada: '+(SERVICE_LABELS[preview.service]||preview.service)+
+          '\nConferido em: '+preview.checkedAt+'\nItens: '+JSON.stringify(rows)+'\n\nExplique ou organize estes dados; não invente informações ausentes.');
+        }}><Copy size={15}/> Usar resultados no chat</button><h3>{SERVICE_LABELS[preview.service]||preview.service} · teste confirmado</h3>
         <p>Itens autorizados encontrados: {preview.items?.length||0}. Nenhuma mensagem ou postagem foi enviada.</p>
         {(preview.items||[]).slice(0,12).map(x=><div key={x.id} className={css.previewRow}>
          <span>{x.name||x.username||x.page||x.id}</span>
@@ -207,7 +212,13 @@ export default function OpenBotConnectedApps({request,onClose}){
       <input aria-label="Pesquisar no CRM" placeholder="Digite nome ou número do processo" minLength={3} maxLength={80}
        value={crmQuery} onChange={e=>setCrmQuery(e.target.value)}/>
       <button disabled={crmQuery.trim().length<3||!!working}>{working==='crm'?'Pesquisando…':'Pesquisar'}</button></form>
-     {crmResult&&<><p className={css.muted}>{crmResult.partial?'Fontes incompletas — confira os avisos.':'Pesquisa concluída.'} Consulta em {age(crmResult.asOf)}.</p>
+     {crmResult&&<><button type="button" className={css.primary}
+       onClick={()=>onUseData?.('Resultados confirmados no CRM em '+crmResult.asOf+
+        '\nClientes: '+JSON.stringify((crmResult.clients||[]).slice(0,8))+
+        '\nProcessos: '+JSON.stringify((crmResult.cases||[]).slice(0,8))+
+        '\nFontes incompletas: '+(crmResult.partial?'sim':'não')+
+        '\n\nPrepare um resumo sem inventar movimentações ou dados externos.')}>
+       <Copy size={15}/> Usar resultados no chat</button><p className={css.muted}>{crmResult.partial?'Fontes incompletas — confira os avisos.':'Pesquisa concluída.'} Consulta em {age(crmResult.asOf)}.</p>
       {(crmResult.errors||[]).map((e,i)=><p className={css.warning} key={i}>{e}</p>)}
       <h3>Clientes ({crmResult.clients?.length||0})</h3>
       {crmResult.clients?.length?crmResult.clients.map(x=><div className={css.result} key={x.source+x.id}><strong>{x.name}</strong><small>{x.source} · {x.stage||x.status||'Sem status informado'}</small></div>):<p className={css.muted}>Nenhum cliente encontrado nas fontes consultadas.</p>}
