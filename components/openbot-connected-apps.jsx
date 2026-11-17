@@ -13,23 +13,27 @@ const safe=(error)=>String(error?.message||error||'Conexão indisponível').slic
 const age=v=>v?new Date(v).toLocaleDateString('pt-BR'):'não verificado';
 const SERVICE_LABELS={drive:'Google Drive',sheets:'Google Sheets',gmail:'Gmail',instagram:'Instagram'};
 
-export default function OpenBotConnectedApps({request,onClose,onUseData}){
- const [tab,setTab]=useState('apps'),[catalog,setCatalog]=useState([]),[accounts,setAccounts]=useState([]);
+export default function OpenBotConnectedApps({request,onClose,onUseData,initialTab='apps'}){
+ const [tab,setTab]=useState(initialTab),[catalog,setCatalog]=useState([]),[accounts,setAccounts]=useState([]);
  const [mcp,setMcp]=useState(null),[loading,setLoading]=useState(true),[working,setWorking]=useState('');
  const [error,setError]=useState(''),[notice,setNotice]=useState(''),[selected,setSelected]=useState('');
  const [preview,setPreview]=useState(null),[crmQuery,setCrmQuery]=useState(''),[crmResult,setCrmResult]=useState(null);
  const [mcpClient,setMcpClient]=useState(''),[confirmRemove,setConfirmRemove]=useState('');
+ const [editScope,setEditScope]=useState('read'),[editRequests,setEditRequests]=useState([]);
+ const [confirmEditId,setConfirmEditId]=useState('');
  const connector=useMemo(()=>catalog.find(c=>c.id===selected),[catalog,selected]);
  const connectorAccounts=useMemo(()=>accounts.filter(a=>a.provider===connector?.provider),[accounts,connector?.provider]);
  const groupItems=group=>catalog.filter(c=>c.category===group);
  const refresh=useCallback(async()=>{
   try{
    setError('');
-   const [apps,mcpInfo]=await Promise.allSettled([
-    request('/api/openbot/integrations'),request('/api/openbot/mcp/settings')
+   const [apps,mcpInfo,pending]=await Promise.allSettled([
+    request('/api/openbot/integrations'),request('/api/openbot/mcp/settings'),
+    request('/api/openbot/mcp/edits')
    ]);
    if(apps.status==='fulfilled'){setCatalog(apps.value.connectors||[]);setAccounts(apps.value.accounts||[])}
    else setError('Não foi possível ler as conexões: '+safe(apps.reason));
+   if(pending.status==='fulfilled')setEditRequests(pending.value.proposals||[]);
    if(mcpInfo.status==='fulfilled')setMcp(mcpInfo.value);
    else setNotice('MCP indisponível nesta sessão: '+safe(mcpInfo.reason));
   }finally{setLoading(false)}
@@ -99,10 +103,26 @@ export default function OpenBotConnectedApps({request,onClose,onUseData}){
   setWorking('mcp');setError('');setNotice('');
   try{
    const result=await request('/api/openbot/mcp/settings',{method:'POST',
-    body:JSON.stringify({clientId})});
+    body:JSON.stringify({clientId,editScope})});
    setMcp(old=>({...old,grants:[result.grant,...(old?.grants||[]).filter(g=>g.client_id!==clientId)]}));
    setMcpClient('');setNotice(result.notice);
   }catch(e){setError('MCP não habilitado: '+safe(e))}
+  finally{setWorking('')}
+ }
+ async function reviewEdit(id,approve){
+  if(working)return;
+  if(approve&&confirmEditId!==id){setConfirmEditId(id);return}
+  setWorking(id);setError('');setNotice('');
+  try{
+   const result=await request('/api/openbot/mcp/edits',{method:'POST',
+    body:JSON.stringify({proposalId:id,approve})});
+   const status=result.review?.status||'unknown';
+   setNotice(status==='applied'?'Alteração aplicada e registrada com auditoria.':
+     status==='rejected'?'Proposta rejeitada.':
+     status==='conflict'?'Registro alterado por outra pessoa. Solicite nova proposta.':'Revisão registrada: '+status);
+   setEditRequests(old=>old.map(p=>p.id===id?{...p,status,reviewed_at:new Date().toISOString()}:p));
+   setConfirmEditId('');
+  }catch(e){setError('Não foi possível revisar a alteração: '+safe(e))}
   finally{setWorking('')}
  }
  async function revokeMcp(id){
@@ -237,9 +257,33 @@ export default function OpenBotConnectedApps({request,onClose,onUseData}){
        <input aria-label="ID público OAuth" value={mcpClient} onChange={e=>setMcpClient(e.target.value)}
         maxLength={200} placeholder="ID público OAuth do MausBot" />
        <button disabled={!!working||!mcp?.mfaVerified||mcpClient.trim().length<5}>Autorizar</button></form>
-      {(mcp?.grants||[]).map(g=><div key={g.id} className={css.account}><div><strong>{g.client_id}</strong><small>Expira: {age(g.expires_at)} · {g.enabled?'Permitido':'Inativo'}</small></div>
+      <label className={css.info} style={{marginBottom:10,gap:10,alignItems:'center'}}>
+       <input type="checkbox" checked={editScope==='reviewed_edit'}
+        onChange={e=>setEditScope(e.target.checked?'reviewed_edit':'read')}/>
+       <span>Conceder edição supervisionada: o MausBot pode propor mudanças em notas, responsáveis, retornos e prioridades. Cada alteração exige aprovação humana com MFA; nunca há execução automática.</span>
+      </label>
+      {(mcp?.grants||[]).map(g=><div key={g.id} className={css.account}><div><strong>{g.client_id}</strong><small>Expira: {age(g.expires_at)} · {g.enabled?'Permitido':'Inativo'} · {g.edit_scope==='reviewed_edit'?'Edição supervisionada':'Somente leitura'}</small></div>
        <button className={css.danger} disabled={!!working} onClick={()=>revokeMcp(g.id)}>Revogar</button></div>)}
       {!(mcp?.grants||[]).length&&<p className={css.muted}>Nenhum cliente externo autorizado nesta conta.</p>}
+      <h3>Edições propostas pelo MausBot</h3>
+      <p className={css.muted}>O agente pode solicitar alterações, mas nenhuma é feita até você aprovar. Propostas expiram em 30 minutos, mudanças simultâneas são bloqueadas e tudo fica registrado.</p>
+      {editRequests.filter(p=>p.status==='pending').length===0&&<p className={css.info}>Nenhuma alteração pendente de aprovação.</p>}
+      {editRequests.filter(p=>p.status==='pending').map(p=><div key={p.id} className={css.account} style={{alignItems:'flex-start'}}>
+       <div style={{flex:1,minWidth:0}}>
+        <strong>{p.field_label||p.field_name} · {p.target_table}</strong>
+        <small>ID: {p.target_id}</small>
+        <small>Novo valor: {p.new_value}</small>
+        <small>Justificativa do agente: {p.reason}</small>
+        <small>Solicitado por: {p.client_id} · Expira: {new Date(p.expires_at).toLocaleString('pt-BR')}</small>
+       </div>
+       <div className={css.accountActions}>
+        <button disabled={!!working||!mcp?.mfaVerified||Date.parse(p.expires_at)<Date.now()}
+         onClick={()=>reviewEdit(p.id,true)}>
+         {confirmEditId===p.id?'Confirmar aplicação':'Aprovar alteração'}</button>
+        <button className={css.danger} disabled={!!working} onClick={()=>reviewEdit(p.id,false)}>Rejeitar</button>
+       </div>
+      </div>)}
+      {editRequests.some(p=>p.status==='applied')&&<p className={css.muted}>Alterações já aplicadas e auditadas: {editRequests.filter(p=>p.status==='applied').length}</p>}
       <p className={css.warning}>O OAuth precisa ser habilitado em Supabase → Authentication → OAuth Server. Se o cliente não conectar, verifique o consentimento em /oauth/consent e confirme o segundo fator.</p>
      </section>}
    </div>
