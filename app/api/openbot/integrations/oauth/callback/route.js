@@ -1,6 +1,6 @@
 import {adminClient,decryptOAuthState,encryptToken,decryptToken,providerCredentials,oauthRedirectUri}
  from '../../../../../../lib/openbot-connection-server.mjs';
-import {GOOGLE_OAUTH_SCOPES,META_OAUTH_SCOPES} from '../../../../../../lib/openbot-connectors.mjs';
+import {getGoogleScopes,META_OAUTH_SCOPES} from '../../../../../../lib/openbot-connectors.mjs';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 const ROOT='https://agentinfinitum.vercel.app';
@@ -16,7 +16,7 @@ const safeResult=async r=>{
  if(raw.length>24000)throw Error('Resposta OAuth excessiva');
  try{return JSON.parse(raw)}catch{throw Error('Resposta OAuth inválida')}
 };
-async function exchange(provider,code,credentials,verifier){
+async function exchange(provider,code,credentials,verifier,connectorId){
  const callback=oauthRedirectUri(provider);
  if(provider==='google'){
   const body=new URLSearchParams({client_id:credentials.clientId,client_secret:credentials.secret,redirect_uri:callback,
@@ -30,7 +30,7 @@ async function exchange(provider,code,credentials,verifier){
   const user=await safeResult(userResponse);
   if(!userResponse.ok||!user.sub)throw Error('Não foi possível identificar a conta Google.');
   return {externalAccountId:String(user.sub).slice(0,200),displayName:String(user.name||user.email||'Conta Google').slice(0,240),
-   email:String(user.email||'').slice(0,240),token:json,scopes:String(json.scope||GOOGLE_OAUTH_SCOPES.join(' ')).split(/\s+/),
+   email:String(user.email||'').slice(0,240),token:json,scopes:String(json.scope||getGoogleScopes(connectorId||'drive').join(' ')).split(/\s+/),
    expiresAt:Number(json.expires_in)>0?new Date(Date.now()+Number(json.expires_in)*1000).toISOString():null};
  }
  if(provider==='meta'){
@@ -57,7 +57,7 @@ export async function GET(request){
  if(code.length<8||code.length>4096||state.length<40||state.length>6500)return safeRedirect('invalid_callback');
  try{
   const payload=decryptOAuthState(state);
-  const {provider,ownerId,nonce,verifier}=payload;
+  const {provider,connectorId,ownerId,nonce,verifier}=payload;
   if(!['google','meta'].includes(provider)||!/^[A-Za-z0-9_-]{36,100}$/.test(nonce))return safeRedirect('invalid_state');
   const credentials=providerCredentials(provider);
   const admin=adminClient();
@@ -66,7 +66,7 @@ export async function GET(request){
    .eq('nonce',nonce).eq('owner_id',ownerId).eq('provider',provider)
    .is('used_at',null).gt('expires_at',new Date().toISOString()).select('nonce').maybeSingle();
   if(used.error||!used.data)return safeRedirect('state_expired');
-  const account=await exchange(provider,code,credentials,verifier);
+  const account=await exchange(provider,code,credentials,verifier,connectorId);
   const old=await admin.from('openbot_connections').select('tokens_ciphertext')
    .eq('owner_id',ownerId).eq('provider',provider).eq('external_account_id',account.externalAccountId).maybeSingle();
   if(old.error)throw Error('Falha ao consultar autorização anterior');
