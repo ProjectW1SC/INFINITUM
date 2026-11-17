@@ -50,6 +50,6 @@ test('OpenBot and Grok-style bot behavior is grounded in real capabilities',()=>
 
 test('OpenBot never silently predownloads Qwen when opening the standalone messenger',()=>{
  const boot=load('components/qwen-preinstall-bootstrap.jsx');
- assert.match(boot,/pathname==='\/agentes'\|\|pathname==='\/openbot'/);
+ assert.match(boot,/pathname==='\/agentes\/chat'\|\|pathname==='\/openbot'/);
  assert.match(boot,/return;/);
 });

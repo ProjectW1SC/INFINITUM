@@ -11,7 +11,7 @@ export default function QwenPreinstallBootstrap(){
  const pathname=usePathname();
  useEffect(()=>{
   // The standalone OpenBot Studio loads local models only after explicit consent.
-  if(pathname==='/agentes'||pathname==='/openbot')return;
+  if(pathname==='/agentes/chat'||pathname==='/openbot')return;
   if(typeof window==='undefined'||window.location.hostname!==QWEN_PREINSTALL_ORIGIN)return;
   if(typeof Worker==='undefined'||!navigator.storage?.estimate)return;
   let stopped=false,installer=null,renew=null;
