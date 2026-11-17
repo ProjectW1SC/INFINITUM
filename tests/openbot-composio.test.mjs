@@ -7,7 +7,7 @@ test('Composio credentials stay server-side and calls use the fixed Composio API
  const s=read('lib/openbot-composio.mjs');
  assert.match(s,/env\.COMPOSIO_API_KEY/);
  assert.match(s,/https:\/\/backend\.composio\.dev/);
- assert.match(s,/\/api\/\+version/);
+ assert.ok(s.includes("'/api/'+version"));
  assert.doesNotMatch(s,/NEXT_PUBLIC_COMPOSIO|console\.log\([^)]*apiKey/i);
 });
 
