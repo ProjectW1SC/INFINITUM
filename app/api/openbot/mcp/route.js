@@ -1,6 +1,8 @@
 import {officeAuth,safeOfficeError} from '../../../../lib/office-server.mjs';
 import {readConnectedData} from '../integrations/data/route.js';
 import {validateEditProposal} from '../../../../lib/openbot-mcp-edit-policy.mjs';
+import {adminClient} from '../../../../lib/openbot-connection-server.mjs';
+import {listComposioToolkits,searchComposioTools,executeComposioTool,isComposioWriteTool} from '../../../../lib/openbot-composio.mjs';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 
@@ -21,6 +23,14 @@ const toolsList=[
   inputSchema:{type:'object',properties:{query:{type:'string',minLength:3,maxLength:80}},required:['query'],additionalProperties:false}},
  {name:'crm_search_processes',description:'Localiza processos autorizados do CRM pelo número ou título, sem consultar tribunais em tempo real.',
   inputSchema:{type:'object',properties:{query:{type:'string',minLength:3,maxLength:80}},required:['query'],additionalProperties:false}},
+ {name:'composio_search_tools',description:'Pesquisa ações disponíveis nos plugins Instagram e WhatsApp Business conectados pelo Composio. Retorna nomes e esquemas das ferramentas; não executa nenhuma ação.',
+  inputSchema:{type:'object',properties:{query:{type:'string',minLength:3,maxLength:240}},required:['query'],additionalProperties:false}},
+ {name:'composio_execute_tool',description:'Executa uma ferramenta Instagram ou WhatsApp Business pelo Composio. Ações de escrita só são aceitas quando o cliente tem edição supervisionada e o Composio exige confirmação; se o cliente MCP não suportar aprovação, a ação é negada.',
+  inputSchema:{type:'object',properties:{
+   tool_slug:{type:'string',pattern:'^(INSTAGRAM|WHATSAPP)_[A-Z0-9_]{3,150}$'},
+   arguments:{type:'object',additionalProperties:true},
+   account:{type:'string',maxLength:200,description:'ID ca_... da conta conectada; obrigatório quando houver várias contas.'}
+  },required:['tool_slug','arguments'],additionalProperties:false}},
  {name:'openbot_connections_status',description:'Lista provedores já autorizados no OpenBot, apenas metadados, nunca tokens.',
   inputSchema:{type:'object',properties:{},additionalProperties:false}},
  {name:'crm_propose_edit',description:'PROPOR uma edição supervisionada no CRM. Não altera dados até o operador revisar e aprovar com MFA no OpenBot. Apenas notas, retornos, responsáveis e prioridades.',
@@ -110,6 +120,17 @@ async function pendingEdits(ctx){
  return {proposals:r.data||[],editScope:ctx.edit_scope};
 }
 async function callTool(ctx,name,args){
+ if(name==='composio_search_tools'){
+  return toContent(await searchComposioTools(ctx.user.id,args.query,adminClient()));
+ }
+ if(name==='composio_execute_tool'){
+  const slug=String(args.tool_slug||'').toUpperCase();
+  if(!/^(INSTAGRAM|WHATSAPP)_[A-Z0-9_]{3,150}$/.test(slug))throw bad('Ação fora dos plugins Instagram e WhatsApp Business.',403);
+  if(isComposioWriteTool(slug)&&ctx.edit_scope!=='reviewed_edit')
+   throw bad('Ação de escrita bloqueada. Habilite edição supervisionada para este cliente MCP; o Composio ainda exigirá aprovação.',403);
+  const result=await executeComposioTool(ctx.user.id,slug,args.arguments||{},{account:args.account||''},adminClient());
+  return toContent({result,writeApproval:'As ações de escrita exigem aprovação do Composio. Se o cliente MCP não oferecer confirmação interativa, a execução será negada.',noCredentialsReturned:true});
+ }
  if(name==='crm_propose_edit')return toContent(await proposeEdit(ctx,args));
  if(name==='crm_pending_edits')return toContent(await pendingEdits(ctx));
 
@@ -127,7 +148,8 @@ async function callTool(ctx,name,args){
   const r=await ctx.db.from('openbot_connections').select('provider,display_name,email,status,last_checked_at')
    .eq('owner_id',ctx.user.id).limit(30);
   if(r.error)throw bad('Conexões indisponíveis.',503);
-  return toContent({accounts:r.data||[],noSecrets:true,noAutomaticActions:true});
+  const composio=await listComposioToolkits(ctx.user.id,adminClient()).catch(()=>[]);
+  return toContent({accounts:r.data||[],composioAccounts:composio,noSecrets:true,noAutomaticActions:true});
  }
  throw bad('Ferramenta não encontrada.',404);
 }

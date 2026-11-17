@@ -36,7 +36,9 @@ test('never label unconfigured providers as connected',()=>{
  assert.equal(c.find(x=>x.id==='drive').configured,false);
  assert.equal(c.find(x=>x.id==='gmail').state,'requires_app_configuration');
  assert.equal(c.find(x=>x.id==='instagram').configured,false);
- assert.equal(c.find(x=>x.id==='whatsapp').state,'separate');
+ assert.equal(c.find(x=>x.id==='whatsapp').state,'requires_app_configuration');
+  assert.equal(c.find(x=>x.id==='whatsapp').mode,'composio');
+  assert.equal(c.find(x=>x.id==='zapfast').state,'separate');
  assert.equal(c.find(x=>x.id==='crm').state,'native');
 });
 test('MausBot remote HTTP MCP implements standard read-only JSON RPC',()=>{

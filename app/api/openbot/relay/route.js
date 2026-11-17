@@ -4,9 +4,9 @@ export const dynamic='force-dynamic';
 // This relay exists ONLY inside the 127.0.0.1 Windows build, whose local
 // Node process does not have the private online AI/OAuth service credentials.
 const REMOTE='https://agentinfinitum.vercel.app';
-const READABLE=new Set(['/api/openbot/models','/api/openbot/integrations',
+const READABLE=new Set(['/api/openbot/models','/api/openbot/integrations','/api/openbot/composio',
  '/api/openbot/integrations/data','/api/openbot/crm/search','/api/openbot/mcp/settings','/api/openbot/mcp/edits']);
-const WRITABLE=new Set(['/api/openbot/integrations','/api/openbot/integrations/oauth/start',
+const WRITABLE=new Set(['/api/openbot/integrations','/api/openbot/composio','/api/openbot/integrations/oauth/start',
  '/api/openbot/mcp/settings','/api/openbot/mcp/edits','/api/superagente']);
 function assertDesktopRequest(request){
  if(process.env.OPENBOT_DESKTOP_REMOTE!==REMOTE)
