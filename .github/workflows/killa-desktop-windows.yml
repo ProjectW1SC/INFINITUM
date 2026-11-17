@@ -9,6 +9,7 @@ on:
       - 'desktop/**'
       - '.github/workflows/killa-desktop-windows.yml'
       - 'next.config.mjs'
+      - 'tests/killa-desktop-shared-wallet-build.test.mjs'
   push:
     branches:
       - feat/infinitum-windows-desktop-20261116
@@ -23,6 +24,7 @@ on:
       - 'lib/supabase-client.js'
       - 'lib/killa-realtime.mjs'
       - 'components/workspace-session-provider.jsx'
+      - 'tests/killa-desktop-shared-wallet-build.test.mjs'
 
 permissions:
   contents: read
