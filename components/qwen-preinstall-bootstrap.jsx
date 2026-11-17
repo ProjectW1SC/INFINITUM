@@ -1,5 +1,6 @@
 'use client';
 import {useEffect} from 'react';
+import {usePathname} from 'next/navigation';
 import {canPrefetchQwen,QWEN_PREINSTALL_ORIGIN,chooseQwenDownloadConcurrency} from '../lib/qwen-preinstall-policy.mjs';
 import {getQwenCacheStatus} from '../lib/blackhole-local-llm.mjs';
 
@@ -7,7 +8,10 @@ import {getQwenCacheStatus} from '../lib/blackhole-local-llm.mjs';
 // Download only on the stable domain; private CRM and WhatsApp data are NEVER
 // transferred to the model host. On reload the worker resumes saved chunks.
 export default function QwenPreinstallBootstrap(){
+ const pathname=usePathname();
  useEffect(()=>{
+  // The standalone OpenBot Studio loads local models only after explicit consent.
+  if(pathname==='/agentes'||pathname==='/openbot')return;
   if(typeof window==='undefined'||window.location.hostname!==QWEN_PREINSTALL_ORIGIN)return;
   if(typeof Worker==='undefined'||!navigator.storage?.estimate)return;
   let stopped=false,installer=null,renew=null;
@@ -73,6 +77,6 @@ export default function QwenPreinstallBootstrap(){
    window.removeEventListener('online',onOnline);
    release();
   };
- },[]);
+ },[pathname]);
  return null;
 }
