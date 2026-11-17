@@ -27,7 +27,7 @@ test('the source CRM session is checked server-side and cannot self-assign store
  assert.match(migration,/auth\.uid\(\)/);
  assert.match(migration,/auth\.sessions/);
  assert.match(migration,/REVOKE ALL/i);
- assert.match(migration,/GRANT EXECUTE[\\s\\S]*authenticated/i);
+ assert.match(migration,/GRANT EXECUTE[\s\S]*authenticated/i);
  const edge=read('supabase/functions/killa-store-admin/index.ts');
  assert.match(edge,/sourceDb\.rpc\('killa_validate_current_session'/);
  assert.doesNotMatch(edge,/user_metadata.*superadmin/i);
