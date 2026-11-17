@@ -1,0 +1,90 @@
+name: W1 MausBot - source snapshot (licensed upstream)
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feat/w1-mausbot-source-snapshot-20261117
+    paths:
+      - .github/workflows/w1-mausbot-source-snapshot.yml
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout original OpenMausBot source
+        uses: actions/checkout@v4
+        with:
+          repository: milind-soni/OpenMausBot
+          ref: main
+          fetch-depth: 1
+          submodules: recursive
+          lfs: false
+          path: w1-copy/OpenMausBot
+          persist-credentials: false
+      - name: Checkout upstream team playbooks
+        uses: actions/checkout@v4
+        with:
+          repository: milind-soni/openmausbot-teams
+          ref: main
+          fetch-depth: 1
+          path: w1-copy/openmausbot-teams
+          persist-credentials: false
+      - name: Checkout REA source (analysis tool, separate from app)
+        uses: actions/checkout@v4
+        with:
+          repository: morluto/rea
+          ref: main
+          fetch-depth: 1
+          path: w1-copy/rea
+          persist-credentials: false
+      - name: Verify licenses and source snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f w1-copy/OpenMausBot/LICENSE
+          test -f w1-copy/openmausbot-teams/LICENSE
+          test -f w1-copy/rea/LICENSE
+          grep -qi 'Apache License' w1-copy/OpenMausBot/LICENSE
+          grep -qi 'MIT License' w1-copy/openmausbot-teams/LICENSE
+          grep -qi 'MIT License' w1-copy/rea/LICENSE
+          test -f w1-copy/OpenMausBot/package.json
+          test -f w1-copy/rea/README.md
+          for folder in OpenMausBot openmausbot-teams rea; do
+            (cd "w1-copy/$folder" && printf '%s: %s\n' "$folder" "$(git rev-parse HEAD)") | tee -a w1-copy/UPSTREAM_SHAS.txt
+          done
+          cat > w1-copy/README-W1-COPY.txt <<'README'
+          W1 Capital independent development snapshot
+          Includes the original tracked source trees of:
+          - OpenMausBot (Apache 2.0)
+          - openmausbot-teams (MIT)
+          - REA (MIT), an optional analysis tool, NOT part of the OpenMausBot runtime
+          Licenses and NOTICE files remain under each original source tree.
+          UPSTREAM_SHAS.txt records exactly which source revisions were copied.
+          This snapshot is the original source; W1 customizations and integrations are separate.
+          No passwords, OAuth sessions, installed dependencies or private accounts are copied.
+          Git histories, GitHub releases and LFS binary contents are NOT bundled.
+          Review third-party notices before distributing a renamed binary.
+          README
+          du -sh w1-copy/* | tee w1-copy/SNAPSHOT_SIZES.txt
+      - name: Export complete tracked source working trees
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          # Preserve all checked-out source and licenses while removing only Git metadata.
+          for folder in OpenMausBot openmausbot-teams rea; do
+            rm -rf "w1-copy/$folder/.git"
+          done
+          tar -czf artifacts/W1-MausBot-Original-Source-Teams-REA.tar.gz -C w1-copy .
+          sha256sum artifacts/*.tar.gz | tee artifacts/SHA256SUMS.txt
+          tar -tzf artifacts/W1-MausBot-Original-Source-Teams-REA.tar.gz | head -n 20 || true
+      - name: Publish downloadable source snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: W1-MausBot-complete-source-copy
+          path: artifacts/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
