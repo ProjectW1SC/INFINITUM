@@ -16,4 +16,17 @@ test('automatic updates are exclusively published by signed Windows workflow',()
  assert.match(prep,/signed-updates\.json/);
  assert.match(prep,/verifyUpdateCodeSignature=true/);
  assert.match(read('desktop/signed-updates.json'),/"enabled": false/);
+ const automatic=read('.github/workflows/killa-desktop-auto-release.yml');
+ assert.match(automatic,/push:/);
+ assert.match(automatic,/branches:\s*\[main\]/);
+ assert.match(automatic,/desktop-production/);
+ assert.match(automatic,/KILLA_ED25519_PRIVATE_KEY_B64/);
+ assert.match(automatic,/KILLA_WINDOWS_CERT_P12/);
+ assert.match(automatic,/gh release create/);
+ assert.match(automatic,/release-notes\.md/);
+ assert.doesNotMatch(automatic,/vercel\s+(deploy|build)/i);
+ const main=read('desktop/main.mjs');
+ assert.match(main,/Every packaged Windows build carries the same pinned W1 Ed25519 public key/);
+ assert.match(main,/setInterval/);
+ assert.doesNotMatch(main,/CONFIG_ENDPOINT|agentinfinitum\.vercel\.app\/api\/openbot\/desktop-config/);
 });
