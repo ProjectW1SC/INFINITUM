@@ -25,3 +25,4 @@ CREATE TABLE IF NOT EXISTS public.openbot_composio_sessions (
 );
 ALTER TABLE public.openbot_composio_sessions ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.openbot_composio_sessions FROM PUBLIC,anon,authenticated;
+GRANT ALL ON public.openbot_composio_states,public.openbot_composio_sessions TO service_role;
