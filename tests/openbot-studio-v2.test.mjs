@@ -19,7 +19,8 @@ test('OpenBot reads bots and message histories from per-user Supabase tables',()
  const studio=load('components/openbot-studio.jsx');
  assert.match(studio,/from\('openbot_threads'\)/);
  assert.match(studio,/from\('openbot_messages'\)/);
- assert.match(studio,/eq\('owner_id',session\.user\.id\)/);
+ assert.match(studio,/const owner=session\?\.user\?\.id/);
+ assert.match(studio,/eq\('owner_id',owner\)/);
  assert.match(studio,/\/api\/superagente/);
  assert.match(studio,/externalAiConsent:true/);
  assert.match(studio,/isGenerativeModel/);
