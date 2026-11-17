@@ -6,7 +6,7 @@ import ProfessionalAuth from './professional-auth';
 import {useWorkspaceSession} from './workspace-session-provider';
 import {getRememberOfficeSession,setRememberOfficeSession} from '../lib/supabase-office-storage.mjs';
 import {firebaseGoogleConfigured,firebaseGoogleLogin,completeFirebaseGoogleRedirect} from '../lib/firebase-google-bridge.mjs';
-export default function SecuredWorkspace({active,children}){
+export default function SecuredWorkspace({active,children,fullscreen=false}){
  const {db,session,loading,authFault,access}=useWorkspaceSession();
  const [email,setEmail]=useState(''),[password,setPassword]=useState('');
  const [error,setError]=useState(''),[busy,setBusy]=useState(false);
@@ -146,6 +146,7 @@ export default function SecuredWorkspace({active,children}){
   </ProfessionalAuth>
  }
  if(!access.allowed)return <main className="reference-auth">Conta autenticada, mas ainda sem acesso à carteira jurídica. O administrador deve habilitar sua participação no escritório. <button onClick={()=>db.auth.signOut()}>Sair</button></main>;
+ if(fullscreen)return children({db,session});
  return <CrmShell active={active} email={session.user.email} onSignOut={()=>db.auth.signOut()}>
   {children({db,session})}
  </CrmShell>;

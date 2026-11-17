@@ -33,6 +33,13 @@ function StoreContent(){
    </article>
    <article className={styles.card}>
     <div className={styles.icon}><MessageCircle size={29}/></div>
+    <div className={styles.tag}>WORKSPACE DE AGENTES · INCLUÍDO</div>
+    <h2>OpenBot · Agentes de IA</h2>
+    <p>Converse com bots separados, escolha modelos online realmente configurados ou Qwen local opcional, salve seu histórico no Supabase e revise cada resposta.</p>
+    <Link className={styles.action} href="/openbot">Abrir OpenBot <ArrowUpRight size={17}/></Link>
+   </article>
+   <article className={styles.card}>
+    <div className={styles.icon}><MessageCircle size={29}/></div>
     <div className={styles.tag}>SERVIÇO CONECTADO SEPARADAMENTE</div>
     <h2>ZapFast · WhatsApp</h2>
     <p>Use a sessão do ZapFast em uma janela própria do desktop. A autenticação é exclusiva do ZapFast: o WhatsApp não é sincronizado automaticamente com o CRM.</p>
