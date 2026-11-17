@@ -12,11 +12,10 @@ import {validateDesktopConfig,safeStandaloneEnvironment,isLocalAppNavigation,
 import {safeLauncherSnapshot,normalizeUpdateProgress,canInstallSignedUpdate,isSignedUpdateConfiguration} from './launcher-policy.mjs';
 import {secondInstanceAction,canReuseLocalServer} from './lifecycle-policy.mjs';
 
-const CONFIG_ENDPOINT='https://agentinfinitum.vercel.app/api/openbot/desktop-config';
 let nextProcess=null,port=0,desktopConfig=null,window=null,launcherWindow=null,zapFastWindow=null,shuttingDown=false,localNonce='';
 let updater=null,freeUpdater=null,updateCheck=null,appOpen=null;
-let autoUpdateEnabled=true;
-let launcherState=safeLauncherSnapshot({phase:'loading',version:app.getVersion(),message:'Inicializando canal de atualizações seguro.',signed:false,autoInstall:true});
+let autoCheckEnabled=true,updateDownload=null;
+let launcherState=safeLauncherSnapshot({phase:'loading',version:app.getVersion(),message:'Inicializando canal de atualizações seguro.',signed:false,autoCheck:true});
 if(!app.requestSingleInstanceLock())app.quit();
 else app.on('second-instance',()=>{
  const action=secondInstanceAction({
@@ -30,13 +29,9 @@ else app.on('second-instance',()=>{
 app.setAppUserModelId('br.com.w1capital.infinitum.killa');
 
 async function loadPublicConfiguration(){
- const response=await fetch(CONFIG_ENDPOINT,{
-  headers:{Accept:'application/json'},signal:AbortSignal.timeout(12000),redirect:'error',
-  cache:'no-store'
- });
- if(!response.ok)throw Error('A API do CRM não retornou configuração pública ('+response.status+').');
- const raw=await response.text();
- if(raw.length>2500)throw Error('Configuração pública excede tamanho permitido.');
+ const path=join(app.getAppPath(),'public-config.json');
+ const raw=readFileSync(path,'utf8');
+ if(raw.length>2500)throw Error('Configuração pública empacotada excede o limite permitido.');
  return validateDesktopConfig(JSON.parse(raw));
 }
 // A stable loopback origin keeps Supabase sessions and Qwen caches across restarts.
@@ -117,6 +112,8 @@ function pushLauncher(changes){
  launcherState=safeLauncherSnapshot({...launcherState,...changes});
  if(launcherWindow&&!launcherWindow.isDestroyed())
   launcherWindow.webContents.send('launcher:state',launcherState);
+ if(window&&!window.isDestroyed())
+  window.webContents.send('killa:update-state',launcherState);
  return launcherState;
 }
 function isTrustedLauncherEvent(event){
@@ -128,18 +125,27 @@ async function applyVerifiedUpdate(){
  if(!canInstallSignedUpdate(launcherState))return pushLauncher({
   message:'Nenhuma atualização autenticada disponível para instalação.'
  });
+ if(window&&!window.isDestroyed()){
+  const choice=await dialog.showMessageBox(window,{
+   type:'question',title:'Atualização do INFINITUM pronta',
+   message:'A versão '+launcherState.updateVersion+' foi baixada e verificada.',
+   detail:'Para instalar, o INFINITUM será fechado e aberto novamente. Salve o que estiver fazendo antes de continuar.',
+   buttons:['Instalar e reiniciar','Continuar trabalhando'],defaultId:0,cancelId:1,noLink:true
+  });
+  if(choice.response!==0)return launcherState;
+ }
  if(freeUpdater){
-  pushLauncher({phase:'installing',message:'Executando instalador verificado por assinatura Ed25519 da W1 Capital.'});
+  pushLauncher({phase:'installing',message:'Instalando pacote verificado pela assinatura Ed25519 e pelo hash SHA-512.'});
   try{
    await freeUpdater.install();
    app.quit();
   }catch{
    pushLauncher({phase:'error',downloaded:false,
-    message:'A integridade do pacote falhou ou o Windows bloqueou a instalação. Nenhum arquivo novo foi autorizado.'});
+    message:'A integridade do pacote falhou ou o Windows bloqueou a instalação. A versão atual foi preservada.'});
   }
   return launcherState;
  }
- if(!updater)return pushLauncher({phase:'unsigned',message:'Atualizador não configurado.'});
+ if(!updater)return pushLauncher({phase:'unsigned',message:'Atualizador seguro não configurado.'});
  pushLauncher({phase:'installing',message:'Instalando atualização Windows assinada e validada.'});
  try{updater.quitAndInstall(false,true)}
  catch{pushLauncher({phase:'error',message:'Instalador bloqueado; versão anterior preservada.'})}
@@ -148,51 +154,63 @@ async function applyVerifiedUpdate(){
 async function checkForSignedUpdates(){
  if(freeUpdater){
   if(updateCheck)return updateCheck;
-  updateCheck=freeUpdater.check().then(async result=>{
-   if(result.status==='downloaded'&&autoUpdateEnabled&&!window)
-    await applyVerifiedUpdate();
-  }).catch(()=>{
+  updateCheck=freeUpdater.check().catch(()=>{
    pushLauncher({phase:'offline',downloaded:false,
-    message:'Não foi possível autenticar uma release W1 Capital. Nenhum programa foi executado. Você pode abrir a versão instalada.'});
+    message:'Não foi possível consultar o GitHub Releases. O INFINITUM instalado continua funcionando.'});
   }).finally(()=>{updateCheck=null});
   await updateCheck;
   return launcherState;
  }
  if(!updater||!launcherState.signed)return pushLauncher({
-  phase:'unsigned',message:'Esta instalação piloto não recebe executáveis automaticamente. Abra apenas releases assinados.'
+  phase:'unsigned',message:'Canal de atualização assinado ainda não está disponível nesta instalação.'
  });
  if(updateCheck)return updateCheck;
- pushLauncher({phase:'checking',message:'Consultando versões oficiais do GitHub Releases por HTTPS.'});
+ pushLauncher({phase:'checking',message:'Consultando o canal oficial de atualizações do GitHub.'});
  updateCheck=updater.checkForUpdates().catch(()=>{
-  pushLauncher({phase:'offline',message:'Não foi possível acessar o canal assinado. Você pode abrir a versão instalada.'});
+  pushLauncher({phase:'offline',message:'Não foi possível acessar o canal de atualização assinado.'});
  }).finally(()=>{updateCheck=null});
  await updateCheck;
  return launcherState;
 }
+async function downloadAvailableUpdate({installAfterDownload=false}={}){
+ if(!freeUpdater)return pushLauncher({phase:'unsigned',message:'Esta instalação não possui o atualizador W1 autenticado.'});
+ if(launcherState.phase==='downloaded'&&launcherState.downloaded)
+  return installAfterDownload?applyVerifiedUpdate():launcherState;
+ if(updateDownload)return updateDownload;
+ if(launcherState.phase!=='available')
+  return pushLauncher({message:'Nenhuma nova versão verificada está aguardando download.'});
+ updateDownload=freeUpdater.download().then(async result=>{
+  if(result.status==='downloaded'&&installAfterDownload)await applyVerifiedUpdate();
+  return launcherState;
+ }).catch(()=>{
+  pushLauncher({phase:'error',downloaded:false,
+   message:'O download não foi concluído ou o hash SHA-512 não corresponde ao manifesto. Nenhum arquivo foi instalado.'});
+  return launcherState;
+ }).finally(()=>{updateDownload=null});
+ return updateDownload;
+}
+
 async function setupSignedUpdater(){
- // Two independent trust paths:
- // 1) Free W1 Ed25519 signatures pinned in the executable plus SHA-512;
- // 2) Optional Windows Authenticode, only if a trusted publisher is configured.
- // Never check arbitrary main.zip or run a downloaded script.
- const markerFile=join(process.resourcesPath,'signed-updates.json');
- let freeConfig=null;
- try{freeConfig=JSON.parse(readFileSync(markerFile,'utf8'))}catch{}
- if(app.isPackaged&&process.platform==='win32'&&
-    freeConfig?.enabled===true&&freeConfig.source==='w1-ed25519-github-release'){
+ // Every packaged Windows build carries the same pinned W1 Ed25519 public key.
+ // This lets the existing pilot installer receive its first authenticated update;
+ // a writable marker or a main-branch ZIP is never trusted as executable code.
+ if(app.isPackaged&&process.platform==='win32'){
   try{
    const pub=readFileSync(join(app.getAppPath(),'branding','update-public-key.pem'),'utf8');
    freeUpdater=createFreeUpdater({app,publicKey:pub,onState:pushLauncher});
-   pushLauncher({phase:'ready',signed:true,autoInstall:autoUpdateEnabled,
-    message:'Canal gratuito W1 Capital: verificações Ed25519 e SHA-512 ativadas.'});
-   const interval=setInterval(()=>{void checkForSignedUpdates()},6*60*60*1000);
+   pushLauncher({phase:'ready',signed:true,autoCheck:autoCheckEnabled,
+    message:'Canal GitHub Releases ativo. Manifesto Ed25519 e pacote SHA-512 serão conferidos antes de qualquer instalação.'});
+   const interval=setInterval(()=>{
+    if(autoCheckEnabled)void checkForSignedUpdates();
+   },30*60*1000);
    interval.unref?.();
-   await checkForSignedUpdates();
+   if(autoCheckEnabled)await checkForSignedUpdates();
+   return;
   }catch{
    freeUpdater=null;
-   pushLauncher({phase:'unsigned',signed:false,
-    message:'A identidade criptográfica de atualização não foi validada. Atualizações de EXE bloqueadas.'});
+   pushLauncher({phase:'offline',signed:false,
+    message:'A chave pública W1 não pôde ser validada. O atualizador foi bloqueado por segurança.'});
   }
-  return;
  }
  // A writable marker by itself cannot grant updater access. The installed
  // app-update.yml must also contain the publisher's Authenticode identity.
@@ -279,6 +297,10 @@ ipcMain.handle('launcher:check-update',event=>{
  expectTrustedLauncher(event);
  return checkForSignedUpdates();
 });
+ipcMain.handle('launcher:download-update',(event,options)=>{
+ expectTrustedLauncher(event);
+ return downloadAvailableUpdate({installAfterDownload:options?.installAfterDownload===true});
+});
 ipcMain.handle('launcher:open-downloads',async event=>{
  expectTrustedLauncher(event);
  await shell.openExternal('https://github.com/ProjectW1SC/INFINITUM/releases');
@@ -291,12 +313,12 @@ ipcMain.handle('launcher:install-update',event=>{
 ipcMain.handle('launcher:set-auto-update',(event,value)=>{
  expectTrustedLauncher(event);
  if(typeof value!=='boolean')throw Error('Configuração de atualização inválida.');
- autoUpdateEnabled=value;
+ autoCheckEnabled=value;
  const prefs=join(app.getPath('userData'),'killa-launcher-preferences.json');
- writeFileSync(prefs,JSON.stringify({autoInstall:value})+'\n',{mode:0o600});
- pushLauncher({autoInstall:value,message:value
-  ?'Instalação automática ativada apenas para releases W1 Capital autenticadas.'
-  :'Instalação automática desligada; você pode atualizar manualmente no launcher.'});
+ writeFileSync(prefs,JSON.stringify({autoCheck:value})+'\n',{mode:0o600});
+ pushLauncher({autoCheck:value,message:value
+  ?'Verificação automática do GitHub ativada. O download e a instalação sempre aguardam sua escolha.'
+  :'Verificação automática desligada; você ainda pode consultar manualmente as releases oficiais.'});
  return launcherState;
 });
 // ZapFast is a separate, first-party HTTPS application. Its browser profile is
@@ -341,6 +363,18 @@ function isTrustedDesktopEvent(event){
  return !!(window&&!window.isDestroyed()&&event?.sender===window.webContents&&
   isLocalAppNavigation(event?.senderFrame?.url,port));
 }
+ipcMain.handle('killa:get-update-state',event=>{
+ if(!isTrustedDesktopEvent(event))throw Error('Origem do CRM não autorizada.');
+ return launcherState;
+});
+ipcMain.handle('killa:download-update',(event,options)=>{
+ if(!isTrustedDesktopEvent(event))throw Error('Origem do CRM não autorizada.');
+ return downloadAvailableUpdate({installAfterDownload:options?.installAfterDownload===true});
+});
+ipcMain.handle('killa:install-update',event=>{
+ if(!isTrustedDesktopEvent(event))throw Error('Origem do CRM não autorizada.');
+ return applyVerifiedUpdate();
+});
 ipcMain.handle('killa:open-zapfast',event=>{
  if(!isTrustedDesktopEvent(event))throw Error('Origem do CRM não autorizada.');
  return openZapFastWindow();
@@ -453,20 +487,17 @@ ipcMain.on('killa:public-config',event=>{
 app.on('before-quit',cleanup);
 app.on('window-all-closed',()=>{
  if(process.platform==='darwin')return;
- if(autoUpdateEnabled&&freeUpdater&&launcherState.phase==='downloaded'){
-  // Keep main process alive until the authenticated installer is launched.
-  void applyVerifiedUpdate().finally(()=>app.quit());
-  return;
- }
+ // Never install or restart automatically when the operator closes the CRM.
+ // A downloaded release remains staged until an explicit installation action.
  app.quit();
 });
 app.whenReady().then(async()=>{
  Menu.setApplicationMenu(null);
  try{
   const prefs=JSON.parse(readFileSync(join(app.getPath('userData'),'killa-launcher-preferences.json'),'utf8'));
-  autoUpdateEnabled=prefs?.autoInstall!==false;
- }catch{autoUpdateEnabled=true}
- pushLauncher({autoInstall:autoUpdateEnabled});
+  autoCheckEnabled=prefs?.autoCheck!==false;
+ }catch{autoCheckEnabled=true}
+ pushLauncher({autoCheck:autoCheckEnabled});
  try{
   await openLauncherWindow();
   void setupSignedUpdater();
