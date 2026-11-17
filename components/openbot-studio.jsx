@@ -8,6 +8,7 @@ import {OPENBOT_BOTS,OPENBOT_CAPABILITIES,OPENBOT_APPROVAL,findOpenBot,chatTitle
  historyForRequest,prepareBotRequest} from '../lib/openbot-studio-config.mjs';
 import {ZAPFAST_SINGLE_SESSION_URL} from '../lib/openbot-workspace-policy.mjs';
 import styles from './openbot-studio.module.css';
+import OpenBotConnectedApps from './openbot-connected-apps.jsx';
 
 const starterModels=[{id:'rules',label:'Rascunho rápido (sem IA generativa)',mode:'rules'}];
 const timeLabel=value=>{
@@ -34,6 +35,7 @@ export default function OpenBotStudio({db,session}){
  const [mobileBots,setMobileBots]=useState(false),[settingsOpen,setSettingsOpen]=useState(false);
  const [customInstruction,setCustomInstruction]=useState(''),[savingSettings,setSavingSettings]=useState(false);
  const [pendingDelete,setPendingDelete]=useState(false);
+ const [appsOpen,setAppsOpen]=useState(false);
  const bottomRef=useRef(null),editorRef=useRef(null),sendLock=useRef(false),chatRequest=useRef(0);
  const bot=findOpenBot(activeBot);
  const profile=profiles[activeBot]||null;
@@ -52,7 +54,11 @@ export default function OpenBotStudio({db,session}){
 
  const api=useCallback(async(path,options={})=>{
   const token=await getToken();
-  const r=await fetch(path,{...options,cache:'no-store',headers:{
+  // The signed Windows client has a local server without the private OAuth/AI keys.
+  // The authenticated relay forwards only selected endpoints to the canonical HTTPS backend.
+  const desktop=typeof window!=='undefined'&&window.killaDesktop&&window.location.hostname==='127.0.0.1';
+  const endpoint=desktop?'/api/openbot/relay?path='+encodeURIComponent(path):path;
+  const r=await fetch(endpoint,{...options,cache:'no-store',headers:{
    Authorization:'Bearer '+token,...(options.body?{'Content-Type':'application/json'}:{}),...(options.headers||{})
   }});
   const j=await r.json().catch(()=>({ok:false,error:'Resposta do servidor inválida.'}));
@@ -220,7 +226,9 @@ export default function OpenBotStudio({db,session}){
 
  const canSend=!!draft.trim()&&consentReady&&!busy&&!loadingChat;
  const currentThreadMessages=messages.length;
+ useEffect(()=>{if(new URLSearchParams(window.location.search).get('integrations')==='1')setAppsOpen(true)},[]);
  return <div className={styles.studio}>
+  {appsOpen&&<OpenBotConnectedApps request={api} onClose={()=>setAppsOpen(false)}/> }
   {mobileBots&&<button aria-label="Fechar menu lateral" className={styles.scrim} onClick={()=>setMobileBots(false)}/>}
   <aside className={styles.sidebar+' '+(mobileBots?styles.sidebarOpen:'')} aria-label="Bots e conversas">
    <div className={styles.brand}><div className={styles.brandIcon}><Bot size={22}/></div>
@@ -249,6 +257,7 @@ export default function OpenBotStudio({db,session}){
      </button>)}
    </div>
    <div className={styles.sidebarBottom}>
+    <button className={styles.appsEntry} type="button" onClick={()=>setAppsOpen(true)}><Plug size={16}/> Aplicativos conectados</button>
     <Link href="/dashboard"><ArrowLeft size={16}/> Voltar ao INFINITUM</Link>
     <Link href="/agentes/operacao"><SlidersHorizontal size={16}/> Agentes operacionais</Link>
    </div>
@@ -372,7 +381,7 @@ export default function OpenBotStudio({db,session}){
      <p className={styles.muted}>Execução em segundo plano e controle de computadores não estão habilitados nesta versão. Não são simulados.</p>
     </>}
    </div>
-   <div className={styles.inspectorFoot}><Link href="/app-store"><Plug size={15}/> Aplicativos</Link>
+   <div className={styles.inspectorFoot}><button type="button" className={styles.appsEntry} onClick={()=>setAppsOpen(true)}><Plug size={15}/> Conectar aplicativos</button>
     <Link href="/dashboard"><ArrowLeft size={15}/> CRM</Link></div>
   </aside>}
  </div>;
