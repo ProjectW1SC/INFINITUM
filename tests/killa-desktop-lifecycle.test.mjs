@@ -29,3 +29,8 @@ test('Electron wires second-instance recovery and authenticated local-server reu
  assert.match(main,/localNextIsReady/);
  assert.match(main,/openLauncherWindow\(\)/);
 });
+
+test('Electron installer includes the lifecycle module imported by its main process',()=>{
+ const pkg=JSON.parse(readFileSync(new URL('../desktop/package.json',import.meta.url),'utf8'));
+ assert.ok(pkg.build.files.includes('lifecycle-policy.mjs'));
+});
