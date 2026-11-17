@@ -40,16 +40,22 @@
      <div class="progress-track"><div id="progress-fill"></div></div>
      <span id="progress-text">0%</span>
     </div>
+    <section id="release-notes" class="release-notes" hidden aria-live="polite">
+      <div class="release-notes-heading"><strong id="release-notes-title">O que mudou</strong><span id="release-version"></span></div>
+      <pre id="release-notes-text"></pre>
+    </section>
   </div>
   <div class="buttons">
-    <button id="install-update" class="primary" hidden>Instalar atualização verificada</button>
+    <button id="download-now" class="primary" hidden>Atualizar agora</button>
+    <button id="download-background" class="secondary" hidden>Baixar em segundo plano</button>
+    <button id="install-update" class="primary" hidden>Instalar e reiniciar</button>
     <button id="launch" class="primary">Abrir INFINITUM</button>
     <button id="store" class="secondary">Abrir Killa AI Store</button>
     <button id="zapfast" class="secondary">Abrir ZapFast · WhatsApp no desktop</button>
     <button id="check" class="secondary">Verificar atualizações</button>
     <button id="releases" class="link">Ver versões publicadas</button>
     <button id="admin-diagnostics" class="link">Killa AI Store · Administração (MFA)</button>
-    <label class="automatic"><input type="checkbox" id="auto-updates" checked/> Atualizar automaticamente somente versões aprovadas pela W1 Capital</label>
+    <label class="automatic"><input type="checkbox" id="auto-updates" checked/> Verificar novas versões automaticamente (a cada 30 minutos)</label>
   </div>
   <div class="security"><span class="shield">◆</span>
     <p><strong>Distribuição protegida.</strong> Atualizações gratuitas: manifesto Ed25519 da W1 Capital e hash SHA-512 verificados antes de executar. Uma assinatura reconhecida pelo Windows é opcional e evita alguns avisos do SmartScreen. O launcher não executa códigos recebidos por chat, WhatsApp ou Supabase.</p>
