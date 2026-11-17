@@ -33,6 +33,8 @@ test('launcher starts locally before Supabase, uses sandboxed IPC and no remote 
  assert.match(main,/openLauncherWindow/);
  assert.match(main,/loadFile/);
  assert.match(main,/launcher:check-update/);
+ assert.match(main,/launcher:download-update/);
+ assert.match(main,/killa:download-update/);
  assert.match(main,/launcher:launch/);
  assert.match(main,/launcher:install-update/);
  assert.match(main,/isTrustedLauncherEvent/);
