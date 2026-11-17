@@ -35,7 +35,7 @@ test('Google OAuth requests only the read-only scopes for the selected service',
   const requested=url.searchParams.get('scope');
   for(const scope of scopes)assert.ok(requested.includes(scope),'missing '+connectorId+' scope '+scope);
   assert.match(requested,/openid/);
-  assert.doesNotMatch(requested,/gmail\\.send|drive\\.file|spreadsheets\\.write|calendar\\.events(?:\\s|$)|chat\\.messages(?:\\s|$)|youtube\\.upload/);
+  assert.doesNotMatch(requested,/gmail\.send|drive\.file|spreadsheets\.write|calendar\.events(?:\s|$)|chat\.messages(?:\s|$)|youtube\.upload/);
   const unrelated=Object.entries(services).filter(([id])=>id!==connectorId).flatMap(([,list])=>list)
    .filter(scope=>!scopes.includes(scope));
   for(const scope of unrelated)assert.ok(!requested.includes(scope),'overbroad scope '+scope+' for '+connectorId);
