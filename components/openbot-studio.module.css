@@ -153,3 +153,15 @@
  color:#f3d9ea!important;font-size:12px!important;text-decoration:none!important}
 .appsEntry:hover{background:#50314c!important;border-color:#a57592!important}
 .inspectorFoot .appsEntry{flex:1;min-width:0;justify-content:center;font-size:11px!important}
+
+/* Embedded OpenBot chat adopts the INFINITUM wine theme and fills the agent workspace. */
+.embedded{height:100%;min-height:0;max-height:none;width:100%;border-radius:0;--accent:#a51f4c;--accent2:#e8799d}
+.embedded .chatHeader{background:linear-gradient(90deg,#1a0b12,#100b10);border-bottom-color:#452331}
+.embedded .main{background:radial-gradient(ellipse at 45% 0,#2a111d66,transparent 42%),#0c090d}
+.embedded .inspector{background:linear-gradient(180deg,#100d12,#0c090d);border-left-color:#432635}
+.embedded .composer{background:#1a1720;border-color:#594050}
+.embedded .sendButton{background:linear-gradient(110deg,#8a1b3c,#55152b);border-color:#b03a60}
+.embedded .tabActive{background:#2b1824!important;border-color:#704056!important;color:#f3c4d5!important}
+.backToTeam{display:flex;align-items:center;gap:7px;flex:none;border:1px solid #623448;border-radius:8px;background:#24121b;color:#f1dce6;padding:8px 10px;font-size:11px;font-weight:650}
+.backToTeam:hover{background:#3a1727;border-color:#a54a6c}
+@media(max-width:690px){.embedded{height:100%;min-height:0;max-height:none}.embedded .chatHeader{gap:8px;padding:0 10px}.backToTeam{padding:7px 8px;font-size:10px}}
