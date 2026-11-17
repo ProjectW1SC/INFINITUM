@@ -286,7 +286,7 @@ export default function OpenBotStudio({db,session}){
        <div className={styles.messageContent}>{m.content}</div>
        <footer><span>{m.role==='user'?'Você':(m.source||bot.name)}</span><time>{timeLabel(m.created_at)}</time>
         {m.role==='assistant'&&<button type="button" aria-label="Copiar resposta" onClick={()=>
-         navigator.clipboard?.writeText(m.content).then(()=>setNotice('Resposta copiada.')).catch(()=>setError('Não foi possível copiar.'))}><Copy size={14}/></button>}
+         navigator.clipboard?.writeText ? navigator.clipboard.writeText(m.content).then(()=>setNotice('Resposta copiada.')).catch(()=>setError('Não foi possível copiar.')) : setError('A cópia não está disponível neste navegador.')}><Copy size={14}/></button>}
        </footer>
       </div>
      </article>)}{busy&&<div className={styles.processing}><LoaderCircle size={17} className={styles.spin}/>
