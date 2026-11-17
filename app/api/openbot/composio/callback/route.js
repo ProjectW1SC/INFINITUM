@@ -23,7 +23,7 @@ export async function GET(request){
    ||accountId!==state.expected_account_id)return redirect('authorization_failed');
   // A callback query parameter is not proof of ownership. Verify the returned
   // account through a fresh Composio session bound to the original CRM user.
-  const apps=await listComposioToolkits(state.owner_id);
+  const apps=await listComposioToolkits(state.owner_id,admin);
   const account=apps.find(x=>x.toolkit===state.toolkit&&x.connectedAccountId===accountId&&x.connected);
   if(!account)return redirect('account_not_verified');
   return redirect('connected');
