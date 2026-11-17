@@ -191,9 +191,9 @@ async function downloadAvailableUpdate({installAfterDownload=false}={}){
 }
 
 async function setupSignedUpdater(){
- // Every packaged Windows build carries the same pinned W1 Ed25519 public key.
- // This lets the existing pilot installer receive its first authenticated update;
- // a writable marker or a main-branch ZIP is never trusted as executable code.
+ // Every package built from this revision carries the same pinned W1 Ed25519 key.
+ // The earlier 0.1.2 pilot predates this updater and needs one manual replacement.
+ // A writable marker or a main-branch ZIP is never trusted as executable code.
  if(app.isPackaged&&process.platform==='win32'){
   try{
    const pub=readFileSync(join(app.getAppPath(),'branding','update-public-key.pem'),'utf8');
