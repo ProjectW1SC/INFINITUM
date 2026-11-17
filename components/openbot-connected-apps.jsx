@@ -214,7 +214,7 @@ export default function OpenBotConnectedApps({request,onClose,onUseData,initialT
        {!connectorAccounts.length&&<p className={css.info}>Nenhuma conta OAuth autorizada deste provedor.</p>}
        {connector.configured?
         <button className={css.primary} disabled={!!working} onClick={()=>begin(connector)}>
-         {working===connector.provider?<Loader2 className={css.spin} size={16}/>:<Plug size={16}/>}
+         {working===connector.id?<Loader2 className={css.spin} size={16}/>:<Plug size={16}/>}
          {connectorAccounts.length?'Conectar outra conta':'Conectar conta'} </button>:
         <p className={css.warning}>O aplicativo OAuth deste provedor ainda não tem credenciais configuradas no servidor. O administrador precisa registrar o aplicativo no Google Cloud ou Meta for Developers e configurar as chaves privadas. Não cole senhas aqui.</p>}
        {preview&&<section className={css.preview}><button type="button" className={css.primary}
