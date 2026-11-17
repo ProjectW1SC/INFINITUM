@@ -1,5 +1,5 @@
-import {adminClient} from '../../../../lib/openbot-connection-server.mjs';
-import {listComposioToolkits} from '../../../../lib/openbot-composio.mjs';
+import {adminClient} from '../../../../../lib/openbot-connection-server.mjs';
+import {listComposioToolkits} from '../../../../../lib/openbot-composio.mjs';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 const ROOT='https://agentinfinitum.vercel.app';
