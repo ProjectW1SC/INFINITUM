@@ -1,17 +1,17 @@
 'use client';
 import {useCallback,useEffect,useMemo,useState} from 'react';
 import {Puzzle,Plug,HardDrive,Table2,Mail,Instagram,MessageCircle,Building2,Github,
- CalendarDays,AtSign,RefreshCw,ShieldCheck,ChevronRight,Link2,Check,AlertCircle,
+ CalendarDays,AtSign,Video,MessageSquare,Youtube,RefreshCw,ShieldCheck,ChevronRight,Link2,Check,AlertCircle,
  Loader2,Copy,X,Search,ExternalLink,LockKeyhole,ArrowLeft,KeyRound} from 'lucide-react';
 import {ZAPFAST_SINGLE_SESSION_URL} from '../lib/openbot-workspace-policy.mjs';
 import css from './openbot-connected-apps.module.css';
 
 const ICONS={drive:HardDrive,sheets:Table2,gmail:Mail,instagram:Instagram,whatsapp:MessageCircle,
- crm:Building2,github:Github,outlook:AtSign,calendar:CalendarDays,slack:Plug};
+ crm:Building2,github:Github,outlook:AtSign,calendar:CalendarDays,meet:Video,chat:MessageSquare,youtube:Youtube,slack:Plug};
 const GROUPS=['Google Workspace','Mensagens','Redes sociais','Trabalho','Desenvolvimento','Equipe'];
 const safe=(error)=>String(error?.message||error||'Conexão indisponível').slice(0,240);
 const age=v=>v?new Date(v).toLocaleDateString('pt-BR'):'não verificado';
-const SERVICE_LABELS={drive:'Google Drive',sheets:'Google Sheets',gmail:'Gmail',instagram:'Instagram'};
+const SERVICE_LABELS={drive:'Google Drive',sheets:'Google Sheets',gmail:'Gmail',calendar:'Google Calendar',meet:'Google Meet',chat:'Google Chat',chat_messages:'Mensagens do Google Chat',youtube:'YouTube',instagram:'Instagram'};
 
 export default function OpenBotConnectedApps({request,onClose,onUseData,initialTab='apps'}){
  const [tab,setTab]=useState(initialTab),[catalog,setCatalog]=useState([]),[accounts,setAccounts]=useState([]);
@@ -52,12 +52,13 @@ export default function OpenBotConnectedApps({request,onClose,onUseData,initialT
   const win=window.open(url,'_blank','noopener,noreferrer');
   if(!win&&typeof window.killaDesktop==='undefined')setNotice('Permita abrir uma nova aba para concluir a conexão.');
  }
- async function begin(provider){
+ async function begin(connector){
+  const provider=connector?.provider,connectorId=connector?.id;
   if(!['google','meta'].includes(provider)||working)return;
-  setWorking(provider);setError('');setNotice('');
+  setWorking(connectorId||provider);setError('');setNotice('');
   try{
    const result=await request('/api/openbot/integrations/oauth/start',{method:'POST',
-    body:JSON.stringify({provider})});
+    body:JSON.stringify({provider,connectorId})});
    if(!result.authorizationUrl)throw Error('O provedor não devolveu a página de autorização.');
    openExternal(result.authorizationUrl);
    setNotice('Autorize a conta na janela aberta e clique em Atualizar após voltar ao OpenBot.');
@@ -73,6 +74,16 @@ export default function OpenBotConnectedApps({request,onClose,onUseData,initialT
    setNotice(result.notice||'Conta removida do OpenBot.');
    setAccounts(old=>old.filter(x=>x.id!==account.id));setPreview(null);setConfirmRemove('');
   }catch(e){setError(safe(e))}
+  finally{setWorking('')}
+ }
+ async function previewChatMessages(spaceName){
+  const connectionId=preview?.connection?.id;
+  if(!connectionId||working)return;
+  setWorking(connectionId);setError('');
+  try{
+   const result=await request('/api/openbot/integrations/data?service=chat_messages&space_id='+encodeURIComponent(spaceName)+'&connection_id='+encodeURIComponent(connectionId));
+   setPreview(result);
+  }catch(e){setError('Não foi possível ler as mensagens deste espaço: '+safe(e))}
   finally{setWorking('')}
  }
  async function previewData(account){
@@ -144,13 +155,15 @@ export default function OpenBotConnectedApps({request,onClose,onUseData,initialT
    .catch(()=>setError('Não foi possível copiar.'));
  }
  const activeAccounts=c=>accounts.filter(a=>a.provider===c.provider&&a.status==='connected');
+ const hasConnectorScopes=(c,a)=>!c.scopes?.length||c.scopes.every(scope=>(a.scopes||[]).includes(scope));
  const statusOf=c=>{
   if(c.mode==='native')return ['Ativo','good'];
   if(c.mode==='separate')return ['Separado','neutral'];
   if(c.mode==='planned')return ['Ainda indisponível','off'];
-  if(activeAccounts(c).length)return ['Conectado','good'];
-  if(c.configured)return ['Pronto para autorizar','ready'];
-  return ['Configuração necessária','off'];
+  if(!c.configured)return ['Configuração necessária','off'];
+  if(activeAccounts(c).some(a=>hasConnectorScopes(c,a)))return ['Conectado','good'];
+  if(activeAccounts(c).length)return ['Permissão pendente','ready'];
+  return ['Pronto para autorizar','ready'];
  };
 
  return <div className={css.root} role="dialog" aria-modal="true" aria-label="Aplicativos conectados">
@@ -191,33 +204,34 @@ export default function OpenBotConnectedApps({request,onClose,onUseData,initialT
        <div className={css.subheading}><h3>Suas contas {connector.provider==='google'?'Google':'Meta'}</h3>
         <span>{connectorAccounts.length} registro(s)</span></div>
        {connectorAccounts.map(a=><div key={a.id} className={css.account}>
-        <div><strong>{a.display_name||a.email||'Conta conectada'}</strong><small>{a.email||a.external_account_id} · {a.status==='connected'?'Autorizada':'Requer reconexão'}</small>
+        <div><strong>{a.display_name||a.email||'Conta conectada'}</strong><small>{a.email||a.external_account_id} · {hasConnectorScopes(connector,a)?'Permissão concedida':'Permissão adicional necessária'}</small>
          <small>Verificada: {age(a.last_checked_at)}</small></div>
         <div className={css.accountActions}>
-         <button disabled={!!working} onClick={()=>previewData(a)}>{working===a.id?<Loader2 className={css.spin} size={14}/>:<RefreshCw size={14}/>} Testar acesso</button>
+         {hasConnectorScopes(connector,a)?<button disabled={!!working} onClick={()=>previewData(a)}>{working===a.id?<Loader2 className={css.spin} size={14}/>:<RefreshCw size={14}/>} Testar acesso</button>:<button disabled={!!working||!connector.configured} onClick={()=>begin(connector)}><Plug size={14}/> Conceder permissão</button>}
          <button disabled={!!working} onClick={()=>disconnect(a)} className={css.danger}>{confirmRemove===a.id?'Confirmar remoção':'Desconectar'}</button>
         </div>
        </div>)}
        {!connectorAccounts.length&&<p className={css.info}>Nenhuma conta OAuth autorizada deste provedor.</p>}
        {connector.configured?
-        <button className={css.primary} disabled={!!working} onClick={()=>begin(connector.provider)}>
+        <button className={css.primary} disabled={!!working} onClick={()=>begin(connector)}>
          {working===connector.provider?<Loader2 className={css.spin} size={16}/>:<Plug size={16}/>}
          {connectorAccounts.length?'Conectar outra conta':'Conectar conta'} </button>:
         <p className={css.warning}>O aplicativo OAuth deste provedor ainda não tem credenciais configuradas no servidor. O administrador precisa registrar o aplicativo no Google Cloud ou Meta for Developers e configurar as chaves privadas. Não cole senhas aqui.</p>}
        {preview&&<section className={css.preview}><button type="button" className={css.primary}
         onClick={()=>{
-         const rows=(preview.items||[]).slice(0,10).map(x=>({id:x.id,name:x.name||x.username||x.page||'',url:x.url||''}));
+         const rows=(preview.items||[]).slice(0,10).map(x=>({id:x.id,name:x.name||x.username||x.page||'',url:x.url||'',text:x.text||x.snippet||'',from:x.from||x.sender||'',start:x.start||'',end:x.end||'',date:x.date||x.publishedAt||''}));
          onUseData?.('Fonte autorizada: '+(SERVICE_LABELS[preview.service]||preview.service)+
           '\nConferido em: '+preview.checkedAt+'\nItens: '+JSON.stringify(rows)+'\n\nExplique ou organize estes dados; não invente informações ausentes.');
         }}><Copy size={15}/> Usar resultados no chat</button><h3>{SERVICE_LABELS[preview.service]||preview.service} · teste confirmado</h3>
         <p>Itens autorizados encontrados: {preview.items?.length||0}. Nenhuma mensagem ou postagem foi enviada.</p>
         {(preview.items||[]).slice(0,12).map(x=><div key={x.id} className={css.previewRow}>
-         <span>{x.name||x.username||x.page||x.id}</span>
+         <span>{x.name||x.username||x.page||x.id}{x.text&&<small>{x.text}</small>}</span>
+         {preview.service==='chat'&&x.resourceName&&<button type="button" disabled={!!working} onClick={()=>previewChatMessages(x.resourceName)}>Ler mensagens</button>}
          {x.url&&/^https:\/\//.test(x.url)&&<a href={x.url} target="_blank" rel="noopener noreferrer"><ExternalLink size={14}/></a>}
         </div>)}</section>}
       </>}
      </section>:<>
-      <div className={css.intro}><span><LockKeyhole size={18}/></span><p>Conexões separadas por conta. Drive, Sheets e Gmail compartilham a autorização Google; cada conta conectada aparece individualmente. Nenhum token fica no navegador.</p></div>
+      <div className={css.intro}><span><LockKeyhole size={18}/></span><p>Conexões separadas por conta. Os serviços Google usam autorização por conta e permissões específicas; conecte somente o que pretende consultar. Nenhum token fica no navegador.</p></div>
       {GROUPS.map(group=>groupItems(group).length>0&&<section key={group} className={css.group}><h2>{group}</h2><div className={css.grid}>
        {groupItems(group).map(c=>{const Icon=ICONS[c.id]||Plug;const [label,kind]=statusOf(c);return <button type="button" className={css.card} key={c.id} onClick={()=>moveTo(c.id)}>
         <span className={css.cardTop}><span className={css.appIcon}><Icon size={23}/></span><ChevronRight size={16}/></span>
