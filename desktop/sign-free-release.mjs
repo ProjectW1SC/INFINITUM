@@ -23,7 +23,7 @@ for await(const chunk of createReadStream(dest))hash.update(chunk);
 const notesPath=join(import.meta.dirname,'dist','release-notes.md');
 let releaseNotes='Atualização de manutenção do INFINITUM Killa AI.';
 try{releaseNotes=readFileSync(notesPath,'utf8')}catch{}
-releaseNotes=releaseNotes.replace(/\\r/g,'').replace(/<[^>]*>/g,'').replace(/[<>]/g,'').slice(0,6000);
+releaseNotes=releaseNotes.replace(/\r/g,'').replace(/<[^>]*>/g,'').replace(/[<>]/g,'').slice(0,6000);
 const body={schema:1,channel:'stable',appId:'br.com.w1capital.infinitum.killa',
  version,tag:'v'+version,releaseNotes,
  asset:{name,url:releaseArtifactUrl(version),size:stats.size,sha512:hash.digest('base64')}};
