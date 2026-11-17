@@ -228,7 +228,10 @@ export default function OpenBotStudio({db,session}){
  const canSend=!!draft.trim()&&consentReady&&!busy&&!loadingChat;
  const currentThreadMessages=messages.length;
  useEffect(()=>{
-  const tab=new URLSearchParams(window.location.search).get('integrations');
+  const params=new URLSearchParams(window.location.search);
+  const tab=params.get('integrations');
+  const requestedBot=params.get('bot');
+  if(requestedBot&&OPENBOT_BOTS.some(bot=>bot.key===requestedBot)){setActiveBot(requestedBot);if(params.get('new')==='1'){setThread(null);setMessages([]);setDraft('');}}
   if(tab==='mcp'){setAppsDefaultTab('mcp');setAppsOpen(true)}
   else if(tab==='1')setAppsOpen(true);
  },[]);

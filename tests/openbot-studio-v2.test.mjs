@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 const load=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 
 test('OpenBot has a proper standalone chat workspace, not the CRM card dashboard',()=>{
- const page=load('app/agentes/page.jsx');
+ const page=load('app/agentes/chat/page.jsx');
  const studio=load('components/openbot-studio.jsx');
  assert.match(page,/OpenBotStudio|OpenBotPage/);
  assert.match(studio,/Conversa|conversa/);
@@ -50,6 +50,6 @@ test('OpenBot and Grok-style bot behavior is grounded in real capabilities',()=>
 
 test('OpenBot never silently predownloads Qwen when opening the standalone messenger',()=>{
  const boot=load('components/qwen-preinstall-bootstrap.jsx');
- assert.match(boot,/pathname==='\/agentes'\|\|pathname==='\/openbot'/);
+ assert.match(boot,/pathname==='\/agentes\/chat'\|\|pathname==='\/openbot'/);
  assert.match(boot,/return;/);
 });

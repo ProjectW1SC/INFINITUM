@@ -1,4 +1,4 @@
 'use client';
 import SecuredWorkspace from '../../components/secured-workspace';
-import OpenBotStudio from '../../components/openbot-studio';
-export default function Page(){return <SecuredWorkspace active="OpenBot" fullscreen>{({db,session})=><OpenBotStudio db={db} session={session}/>}</SecuredWorkspace>}
+import AgentsCommandCenter from '../../components/agents-command-center';
+export default function Page(){return <SecuredWorkspace active="OpenBot" fullscreen>{({db,session})=><AgentsCommandCenter db={db} session={session}/>}</SecuredWorkspace>}
