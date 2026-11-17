@@ -21,15 +21,15 @@ const safeError=e=>String(e?.message||e||'Operação não concluída').slice(0,2
 const validTitle=t=>chatTitle(t).slice(0,120);
 const openbotLabel=id=>OPENBOT_BOTS.find(b=>b.key===id)?.name||'Killa';
 
-export default function OpenBotStudio({db,session}){
+export default function OpenBotStudio({db,session,initialBot,initialThreadId,startNew=false,embedded=false,onBack,activityRuns=[]}){
  const owner=session?.user?.id;
  const [models,setModels]=useState(starterModels);
  const [threads,setThreads]=useState([]),[profiles,setProfiles]=useState({});
- const [activeBot,setActiveBot]=useState('killa'),[thread,setThread]=useState(null);
+ const [activeBot,setActiveBot]=useState(initialBot||'killa'),[thread,setThread]=useState(null);
  const [messages,setMessages]=useState([]),[draft,setDraft]=useState('');
  const [selectedModel,setSelectedModel]=useState('rules');
  const [onlineConsent,setOnlineConsent]=useState(false),[localConsent,setLocalConsent]=useState(false);
- const [busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[loadingChat,setLoadingChat]=useState(false);
+ const [busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[loadingChat,setLoadingChat]=useState(false),[sidebarReady,setSidebarReady]=useState(false);
  const [notice,setNotice]=useState(''),[error,setError]=useState('');
  const [search,setSearch]=useState(''),[panel,setPanel]=useState('sobre'),[inspector,setInspector]=useState(true);
  const [mobileBots,setMobileBots]=useState(false),[settingsOpen,setSettingsOpen]=useState(false);
@@ -37,7 +37,7 @@ export default function OpenBotStudio({db,session}){
  const [pendingDelete,setPendingDelete]=useState(false);
  const [appsOpen,setAppsOpen]=useState(false);
  const [appsDefaultTab,setAppsDefaultTab]=useState('apps');
- const bottomRef=useRef(null),editorRef=useRef(null),sendLock=useRef(false),chatRequest=useRef(0);
+ const bottomRef=useRef(null),editorRef=useRef(null),sendLock=useRef(false),chatRequest=useRef(0),initialOpenedRef=useRef(false);
  const bot=findOpenBot(activeBot);
  const profile=profiles[activeBot]||null;
  const visibleThreads=useMemo(()=>threads.filter(x=>
@@ -75,13 +75,14 @@ export default function OpenBotStudio({db,session}){
    db.from('openbot_profiles').select('bot_key,instructions,model').eq('owner_id',owner).limit(30)
   ]);
   if(t.error||p.error)throw Error(t.error?.message||p.error?.message||'Histórico indisponível.');
-  setThreads(t.data||[]);
+  const threadRows=t.data||[];setThreads(threadRows);
   const overrides={};for(const q of p.data||[])overrides[q.bot_key]={instructions:q.instructions||'',model:q.model||'rules'};
   setProfiles(overrides);
+  return threadRows;
  },[db,owner]);
 
  useEffect(()=>{
-  if(!owner)return;
+  if(!owner){setLoading(false);setSidebarReady(true);return;}
   let alive=true;
   (async()=>{
    setLoading(true);setError('');
@@ -92,7 +93,7 @@ export default function OpenBotStudio({db,session}){
     const available=results[1].value.models||starterModels;setModels(available);
     if(available.some(m=>m.mode==='online'))setSelectedModel('auto');
    }else setNotice('Modelos online não puderam ser verificados. Os recursos locais continuam disponíveis.');
-   setLoading(false);
+   setLoading(false);setSidebarReady(true);
   })();
   return()=>{alive=false};
  },[owner,loadSidebar,api]);
@@ -126,6 +127,17 @@ export default function OpenBotStudio({db,session}){
   const last=threads.find(x=>x.bot_key===key);
   if(last)openThread(last);else newConversation(key);
  }
+
+ useEffect(()=>{
+  if(!embedded||!sidebarReady||initialOpenedRef.current)return;
+  initialOpenedRef.current=true;
+  const requested=OPENBOT_BOTS.some(item=>item.key===initialBot)?initialBot:'killa';
+  const exact=initialThreadId?threads.find(item=>item.id===initialThreadId&&item.bot_key===requested):null;
+  const latest=!startNew&&!exact?threads.find(item=>item.bot_key===requested):null;
+  const target=exact||latest;
+  if(target)void openThread(target);
+  else newConversation(requested);
+ },[embedded,sidebarReady,initialBot,initialThreadId,startNew,threads]);
 
  async function changeModel(model){
   if(busy)return;
@@ -231,19 +243,19 @@ export default function OpenBotStudio({db,session}){
   const params=new URLSearchParams(window.location.search);
   const tab=params.get('integrations');
   const requestedBot=params.get('bot');
-  if(requestedBot&&OPENBOT_BOTS.some(bot=>bot.key===requestedBot)){setActiveBot(requestedBot);if(params.get('new')==='1'){setThread(null);setMessages([]);setDraft('');}}
+  if(!initialBot&&requestedBot&&OPENBOT_BOTS.some(bot=>bot.key===requestedBot)){setActiveBot(requestedBot);if(params.get('new')==='1'){setThread(null);setMessages([]);setDraft('');}}
   if(tab==='mcp'){setAppsDefaultTab('mcp');setAppsOpen(true)}
   else if(tab==='1')setAppsOpen(true);
  },[]);
- return <div className={styles.studio}>
+ return <div className={styles.studio+' '+(embedded?styles.embedded:'')}>
   {appsOpen&&<OpenBotConnectedApps request={api} initialTab={appsDefaultTab} onClose={()=>setAppsOpen(false)}
    onUseData={text=>{
     setDraft(String(text||'').slice(0,3200));setAppsOpen(false);
     setNotice('Dados carregados no campo de mensagem. Revise antes de enviar ao modelo.');
     editorRef.current?.focus();
    }}/>} 
-  {mobileBots&&<button aria-label="Fechar menu lateral" className={styles.scrim} onClick={()=>setMobileBots(false)}/>}
-  <aside className={styles.sidebar+' '+(mobileBots?styles.sidebarOpen:'')} aria-label="Bots e conversas">
+  {!embedded&&mobileBots&&<button aria-label="Fechar menu lateral" className={styles.scrim} onClick={()=>setMobileBots(false)}/>}
+  {!embedded&&<aside className={styles.sidebar+' '+(mobileBots?styles.sidebarOpen:'')} aria-label="Bots e conversas">
    <div className={styles.brand}><div className={styles.brandIcon}><Bot size={22}/></div>
     <div><strong>OPENBOT</strong><small>W1 Capital · Killa AI</small></div></div>
    <button className={styles.newButton} type="button" onClick={()=>newConversation()}><Plus size={18}/> Nova conversa</button>
@@ -274,12 +286,12 @@ export default function OpenBotStudio({db,session}){
     <Link href="/dashboard"><ArrowLeft size={16}/> Voltar ao INFINITUM</Link>
     <Link href="/agentes/operacao"><SlidersHorizontal size={16}/> Agentes operacionais</Link>
    </div>
-  </aside>
+  </aside>}
 
   <main className={styles.main} aria-label="Conversa com agente">
    <header className={styles.chatHeader}>
     <div className={styles.chatIdentity}>
-     <button className={styles.mobileToggle} type="button" aria-label="Abrir bots" onClick={()=>setMobileBots(true)}><PanelLeftOpen size={19}/></button>
+     {embedded&&onBack?<button className={styles.backToTeam} type="button" onClick={onBack}><ArrowLeft size={16}/> Equipe</button>:!embedded?<button className={styles.mobileToggle} type="button" aria-label="Abrir bots" onClick={()=>setMobileBots(true)}><PanelLeftOpen size={19}/></button>:null}
      <span className={styles.avatar+' '+styles.headerAvatar} style={{'--agent':bot.color}}>{bot.short}</span>
      <div><strong>{bot.name}</strong><small>{bot.role} · Rascunhos sob revisão</small></div>
     </div>
@@ -361,9 +373,9 @@ export default function OpenBotStudio({db,session}){
      <button type="button" className={styles.outlineAction} onClick={()=>setSettingsOpen(x=>!x)}>
       <SlidersHorizontal size={16}/> {settingsOpen?'Fechar preferências':'Editar instruções do bot'}</button>
      {settingsOpen&&<div className={styles.settings}>
-      <label>Instruções adicionais<textarea rows={6} maxLength={1400} value={customInstruction}
+      <label>Memória de perfil e instruções adicionais<textarea rows={6} maxLength={1400} value={customInstruction}
        onChange={e=>setCustomInstruction(e.target.value)} placeholder="Como este agente deve responder?"/></label>
-      <p>As regras de segurança e de revisão não podem ser desativadas.</p>
+      <p>Preferências privadas deste perfil. O agente não transforma automaticamente mensagens lidas em fatos permanentes. As regras de segurança e revisão não podem ser desativadas.</p>
       <button type="button" onClick={saveProfile} disabled={savingSettings}>{savingSettings?'Salvando…':'Salvar instruções e motor'}</button>
      </div>}
      <h3>Configuração da conversa</h3>
@@ -373,9 +385,11 @@ export default function OpenBotStudio({db,session}){
      {pendingDelete&&<p className={styles.warning}>Exclusão definitiva do histórico desta conversa no Supabase. Nenhuma conversa do WhatsApp será alterada.</p>}
     </>}
     {panel==='atividade'&&<>
-     <h3>Atividade nesta conversa</h3>
-     <p className={styles.muted}>Histórico real, registrado no Supabase; não são ações de ferramentas ou automações.</p>
+     <h3>Execuções do agente</h3>
+     <p className={styles.muted}>Registros confirmados da fila operacional do INFINITUM. Conversas não são contadas como tarefas concluídas.</p>
      <div className={styles.statGrid}><div><strong>{currentThreadMessages}</strong><span>Mensagens</span></div><div><strong>{messages.filter(m=>m.role==='assistant').length}</strong><span>Respostas</span></div></div>
+     {!activityRuns.length?<p className={styles.muted}>Nenhuma execução registrada para este perfil.</p>:activityRuns.slice(0,8).map(r=><div className={styles.activityRow} key={r.id}><Activity size={14}/><span><strong>{String(r.task||'Execução registrada').slice(0,110)}</strong><small>{String(r.status||'Registrado')} · {timeLabel(r.created_at)}</small></span></div>)}
+     <h3>Mensagens desta conversa</h3>
      {!messages.length?<p className={styles.muted}>Nenhuma mensagem registrada.</p>:messages.slice(-10).reverse().map(m=>
       <div className={styles.activityRow} key={m.id}><Clock3 size={14}/>
        <span><strong>{m.role==='user'?'Pedido do operador':'Rascunho gerado'}</strong><small>{timeLabel(m.created_at)} · {m.source||bot.name}</small></span></div>)}
@@ -389,6 +403,8 @@ export default function OpenBotStudio({db,session}){
      <div className={styles.toolRow}><MessageSquare size={18}/><div><strong>ZapFast · WhatsApp</strong><small>Abre separadamente; não transfere a sessão nem envia mensagens</small></div>
       <a href={ZAPFAST_SINGLE_SESSION_URL} target="_blank" rel="noopener noreferrer"><ExternalLink size={15}/></a></div>
      <div className={styles.toolRow}><FileText size={18}/><div><strong>Operação jurídica</strong><small>Processos e atendimentos no CRM autorizado</small></div><Link href="/agentes/operacao"><ExternalLink size={15}/></Link></div>
+     <div className={styles.toolRow}><Activity size={18}/><div><strong>Fila de tarefas</strong><small>Prioridades, retornos e pendências registradas no CRM</small></div><Link href="/tarefas"><ExternalLink size={15}/></Link></div>
+     <div className={styles.toolRow}><ShieldCheck size={18}/><div><strong>Central de aprovações</strong><small>Revisão humana de propostas de alteração e permissões</small></div><Link href="/mcp/approve"><ExternalLink size={15}/></Link></div>
      <h3>Aprovações</h3>
      <div className={styles.inspectorStatus}><ShieldCheck size={15}/> {OPENBOT_APPROVAL==='manual_review_only'?'Revisão humana obrigatória':'Verificar configuração'}</div>
      <p className={styles.muted}>Execução em segundo plano e controle de computadores não estão habilitados nesta versão. Não são simulados.</p>

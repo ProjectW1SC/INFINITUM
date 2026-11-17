@@ -10,3 +10,37 @@
 @media(max-width:1120px){.workspace{grid-template-columns:68px 255px minmax(400px,1fr)}.activityPanel{display:none}.topbar{grid-template-columns:68px minmax(260px,1fr) auto}.brand{font-size:0}.brand>span{font-size:37px}.topActions{gap:7px;padding:0 10px}.secure{font-size:0;padding:8px}.user span{display:none}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.teamTiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:760px){.page{height:auto;min-height:100dvh;overflow:visible}.topbar{height:auto;min-height:64px;grid-template-columns:55px minmax(0,1fr) auto;padding-right:7px}.brand{border:0}.brand>span{font-size:31px}.heading{padding:8px 4px;gap:8px}.heading>span{width:34px;height:34px;border-radius:10px}.heading h1{font-size:18px}.heading p{display:none}.topActions{gap:2px;padding:0}.secure,.user span,.user>svg{display:none}.user b{width:30px;height:30px}.workspace{display:block;overflow:visible}.nav,.roster{display:none}.main{overflow:visible;padding:13px 10px 20px}.teamHead{gap:8px;padding-bottom:12px}.teamIcon{width:39px;height:39px;flex-basis:39px}.teamHead h2{font-size:15px}.teamHead p{font-size:9px}.teamAvatars img,.teamAvatars span{width:25px;height:25px}.tabs{gap:0}.tabs a,.tabs button{padding:0 9px;font-size:9px}.toolbar{gap:5px}.toolbar button,.toolbar>a{height:34px;padding:0 9px;font-size:9px}.grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.card{min-height:255px;padding:9px}.cardTop>img{width:59px;height:59px;flex-basis:59px}.ready{font-size:8px;padding:4px 6px}.card h3{font-size:13px}.role{font-size:8px}.mission p{font-size:9px}.meta{font-size:7px}.teamTiles{grid-template-columns:repeat(2,minmax(0,1fr))}.teams{padding:10px}.activityPanel{display:flex;border-left:0;border-top:1px solid #432a36;padding:14px 12px;max-height:460px}.activityList{max-height:300px}.modalList{grid-template-columns:1fr}}
 @media(max-width:420px){.grid{grid-template-columns:1fr}.card{min-height:0}.cardTop{min-height:65px}.cardTop>img{width:64px;height:64px;flex-basis:64px}.mission{min-height:0}.teamTiles{grid-template-columns:1fr 1fr}.user{display:none}}
+
+/* Inline agent conversations: keep the roster, replace the team grid with the chat. */
+.workspaceChat{grid-template-columns:76px 285px minmax(0,1fr)}
+.workspaceChat .activityPanel{display:none}
+.chatHost{min-width:0;min-height:0;height:100%;overflow:hidden;background:#0b090d;border-left:1px solid #432635}
+.historyHeading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:10px 4px 6px;color:#e8dce3;font-size:10px;font-weight:700}
+.historyHeading small{color:#a997a1;font-size:9px;font-weight:500}
+.historyList{max-height:126px;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:3px;padding:0 2px 5px}
+.historyList button{display:flex;align-items:center;gap:8px;min-width:0;text-align:left;padding:7px 8px;border:1px solid transparent;border-radius:8px;background:#171117;color:#cbbbc4}
+.historyList button:hover{border-color:#704056;background:#25131d}
+.historyList button>svg{flex:none;color:#e17b9d}
+.historyList button span{min-width:0;display:flex;flex-direction:column;gap:2px}
+.historyList button b,.historyList button small{display:block;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.historyList button b{font-size:9px;font-weight:600;color:#f1e7ed}
+.historyList button small{font-size:8px;color:#aa98a2}
+.historyList>p{font-size:9px;color:#a997a1;margin:5px}
+.cardActions button{height:30px;display:flex;align-items:center;justify-content:center;gap:6px;border:1px solid #69304a;border-radius:8px;background:linear-gradient(110deg,#72162f,#4a1428);color:#fff;font-size:9px;font-weight:650;flex:1;cursor:pointer}
+.cardActions button:last-child{flex:0 0 35px;background:#21151d;border-color:#4d3541}
+.modalList button{display:flex;align-items:center;gap:9px;padding:9px;border:1px solid #49323e;border-radius:10px;background:#171117;color:#f3eaf0;text-align:left;min-width:0}
+.modalList button:hover{border-color:#a75a79;background:#24131d}
+.modalList button span{min-width:0;flex:1}
+.modalList button b,.modalList button small{display:block}
+.modalList button b{font-size:11px}
+.modalList button small{font-size:8px;color:#b5a4ae;line-height:1.35;margin-top:3px}
+.modalList button svg{color:#e78ba8}
+@media(max-width:1450px){.workspaceChat{grid-template-columns:76px 285px minmax(0,1fr)}}
+@media(max-width:1120px){.workspaceChat{grid-template-columns:68px 255px minmax(0,1fr)}}
+@media(max-width:760px){.workspaceChat{display:block;overflow:visible}.workspaceChat .nav,.workspaceChat .roster{display:none}.workspaceChat .activityPanel{display:none}.chatHost{height:calc(100dvh - 64px);min-height:530px;border-left:0}}
+
+.cardAvatarButton{display:flex;flex:0 0 auto;align-items:center;justify-content:center;padding:0;border:0;background:transparent;border-radius:12px;cursor:pointer}
+.cardAvatarButton img{display:block;width:70px;height:70px;flex:0 0 70px;object-fit:cover;border-radius:12px;border:1px solid #704154;transition:transform .18s,border-color .18s}
+.cardAvatarButton:hover img{transform:scale(1.045);border-color:#e17b9d}
+.agentNameButton{padding:0;border:0;background:transparent;color:#fff;font:inherit;font-size:inherit;font-weight:750;text-align:left;cursor:pointer}
+.agentNameButton:hover{color:#f19ab7}
