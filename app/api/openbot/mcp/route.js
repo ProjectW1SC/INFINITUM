@@ -25,11 +25,13 @@ const toolsList=[
   inputSchema:{type:'object',properties:{query:{type:'string',minLength:3,maxLength:80}},required:['query'],additionalProperties:false}},
  {name:'composio_search_tools',description:'Pesquisa ações disponíveis nos plugins Instagram e WhatsApp Business conectados pelo Composio. Retorna nomes e esquemas das ferramentas; não executa nenhuma ação.',
   inputSchema:{type:'object',properties:{query:{type:'string',minLength:3,maxLength:240}},required:['query'],additionalProperties:false}},
- {name:'composio_execute_tool',description:'Executa uma ferramenta Instagram ou WhatsApp Business pelo Composio. Ações de escrita só são aceitas quando o cliente tem edição supervisionada e o Composio exige confirmação; se o cliente MCP não suportar aprovação, a ação é negada.',
+ {name:'composio_execute_tool',description:'Executa uma ferramenta Instagram ou WhatsApp Business pelo Composio. Escritas exigem edição supervisionada e confirmação do Composio. Se o resultado for input_required, peça a confirmação humana e repita a mesma tool e os mesmos argumentos com request_state e input_responses; nunca invente respostas.',
   inputSchema:{type:'object',properties:{
    tool_slug:{type:'string',pattern:'^(INSTAGRAM|WHATSAPP)_[A-Z0-9_]{3,150}$'},
    arguments:{type:'object',additionalProperties:true},
-   account:{type:'string',maxLength:200,description:'ID ca_... da conta conectada; obrigatório quando houver várias contas.'}
+   account:{type:'string',maxLength:200,description:'ID ca_... da conta conectada; obrigatório quando houver várias contas.'},
+   request_state:{type:'string',maxLength:12000,description:'Estado devolvido pelo Composio em input_required; repetir sem alterações.'},
+   input_responses:{type:'object',additionalProperties:true,description:'Respostas fornecidas pelo usuário à solicitação de aprovação do Composio.'}
   },required:['tool_slug','arguments'],additionalProperties:false}},
  {name:'openbot_connections_status',description:'Lista provedores já autorizados no OpenBot, apenas metadados, nunca tokens.',
   inputSchema:{type:'object',properties:{},additionalProperties:false}},
@@ -128,7 +130,10 @@ async function callTool(ctx,name,args){
   if(!/^(INSTAGRAM|WHATSAPP)_[A-Z0-9_]{3,150}$/.test(slug))throw bad('Ação fora dos plugins Instagram e WhatsApp Business.',403);
   if(isComposioWriteTool(slug)&&ctx.edit_scope!=='reviewed_edit')
    throw bad('Ação de escrita bloqueada. Habilite edição supervisionada para este cliente MCP; o Composio ainda exigirá aprovação.',403);
-  const result=await executeComposioTool(ctx.user.id,slug,args.arguments||{},{account:args.account||''},adminClient());
+  if(args.input_responses&&!args.request_state)throw bad('input_responses exige o request_state original devolvido pelo Composio.',400);
+  const result=await executeComposioTool(ctx.user.id,slug,args.arguments||{},{
+   account:args.account||'',requestState:args.request_state||'',inputResponses:args.input_responses
+  },adminClient());
   return toContent({result,writeApproval:'As ações de escrita exigem aprovação do Composio. Se o cliente MCP não oferecer confirmação interativa, a execução será negada.',noCredentialsReturned:true});
  }
  if(name==='crm_propose_edit')return toContent(await proposeEdit(ctx,args));

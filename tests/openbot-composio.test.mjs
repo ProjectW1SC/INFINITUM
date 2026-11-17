@@ -59,3 +59,23 @@ test('Connected apps UI starts Composio Connect Links and shows remote account s
  assert.match(s,/redirectUrl/);
  assert.match(s,/composioAccounts/);
 });
+
+test('Composio write approvals can resume only with the original request state and human input responses',()=>{
+ const s=read('app/api/openbot/mcp/route.js');
+ assert.match(s,/request_state/);
+ assert.match(s,/input_responses/);
+ assert.match(s,/args\.request_state/);
+ assert.match(s,/args\.input_responses/);
+ assert.match(s,/mesma tool e os mesmos argumentos/i);
+});
+
+test('Composio write classification defaults to write unless a tool is clearly read-only',async()=>{
+ const {isComposioWriteTool}=await import('../lib/openbot-composio.mjs');
+ assert.equal(isComposioWriteTool('INSTAGRAM_GET_USER_INFO'),false);
+ assert.equal(isComposioWriteTool('WHATSAPP_WHO_AM_I'),false);
+ assert.equal(isComposioWriteTool('WHATSAPP_LIST_BUSINESS_ACCOUNTS'),false);
+ assert.equal(isComposioWriteTool('WHATSAPP_SET_TWO_STEP_VERIFICATION'),true);
+ assert.equal(isComposioWriteTool('WHATSAPP_ENABLE_WEBHOOK_SUBSCRIPTIONS'),true);
+ assert.equal(isComposioWriteTool('WHATSAPP_SEND_MESSAGE'),true);
+ assert.equal(isComposioWriteTool('WHATSAPP_UNRECOGNIZED_ACTION'),true);
+});
