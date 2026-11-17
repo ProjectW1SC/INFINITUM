@@ -72,5 +72,6 @@ test('launcher shows signed release notes and keeps download choice with the ope
  assert.equal(elements.get('download-now').hidden,false);
  assert.equal(elements.get('download-background').hidden,false);
  await elements.get('download-background').click();
- assert.equal(calls.length,1);\n assert.equal(calls[0].installAfterDownload,false);
+ assert.equal(calls.length,1);
+ assert.equal(calls[0].installAfterDownload,false);
 });
