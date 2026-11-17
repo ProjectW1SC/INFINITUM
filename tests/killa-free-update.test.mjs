@@ -25,6 +25,10 @@ test('free signed manifest rejects tampering, downgrade and unsigned main ZIP',(
  assert.equal(versionIsNewer('1.0.1','1.0.0'),true);
  assert.equal(versionIsNewer('0.9.9','1.0.0'),false);
  assert.equal(releaseArtifactUrl('1.2.3'),payload().asset.url);
+ const withNotes=payload();withNotes.releaseNotes='<b>Correção</b>\\n- Atualização GitHub';
+ const clean=validateReleaseMetadata(withNotes,'1.0.0');
+ assert.equal(clean.releaseNotes,'Correção\\n- Atualização GitHub');
+ assert.ok(clean.releaseNotes.length<6000);
  assert.match(publicKeyFingerprint(pub),/^[a-f0-9]{64}$/);
 });
 
