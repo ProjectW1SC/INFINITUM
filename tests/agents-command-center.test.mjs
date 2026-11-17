@@ -24,8 +24,9 @@ test('embedded OpenBot receives the selected agent and saved conversation and ca
 });
 test('agent roster exposes recent private conversations and opens the selected thread in place',()=>{
  const u=load('components/agents-command-center.jsx');
+ const chat=load('components/openbot-studio.jsx');
  assert.match(u,/openbot_threads/);
- assert.match(u,/openbot_messages/);
+ assert.match(chat,/openbot_messages/);
  assert.match(u,/initialThreadId/);
  assert.match(u,/Histórico de conversas/);
 });
