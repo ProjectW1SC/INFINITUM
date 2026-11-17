@@ -1,7 +1,7 @@
 'use client';
 import {useCallback,useEffect,useMemo,useState} from 'react';
 import Link from 'next/link';
-import {Activity,AlertTriangle,ArrowRight,Bell,BriefcaseBusiness,CheckCircle2,ChevronDown,Copy,Filter,Grid2X2,Headset,Home,Layers,Link2,MessageSquare,MoreHorizontal,Play,Plus,RefreshCw,Search,Settings,ShieldCheck,Sparkles,Star,Users,Workflow,Zap,Plug,BarChart3,X,Scale} from 'lucide-react';
+import {Activity,AlertTriangle,ArrowRight,Bell,BriefcaseBusiness,CheckCircle2,ChevronDown,Filter,Grid2X2,Headset,Home,Layers,Link2,MessageSquare,MoreHorizontal,Play,Plus,RefreshCw,Search,Settings,ShieldCheck,Sparkles,Star,Users,Workflow,Zap,Plug,BarChart3,X,Scale} from 'lucide-react';
 import {OPENBOT_BOTS} from '../lib/openbot-studio-config.mjs';
 import OpenBotStudio from './openbot-studio.jsx';
 import s from './agents-command-center.module.css';
