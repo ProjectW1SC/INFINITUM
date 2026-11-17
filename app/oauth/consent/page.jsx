@@ -45,6 +45,7 @@ export default function KillaOAuthConsent(){
  const {db,session,loading}=useWorkspaceSession();
  const [authorizationId,setAuthorizationId]=useState('');
  const [approvedClients,setApprovedClients]=useState([]),[mfaOk,setMfaOk]=useState(false);
+ const [confirmNewClient,setConfirmNewClient]=useState(false);
  const [mfaFactorId,setMfaFactorId]=useState(''),[mfaCode,setMfaCode]=useState('');
  const [pendingRedirect,setPendingRedirect]=useState('');
  const [details,setDetails]=useState(null),[notice,setNotice]=useState('');
@@ -107,10 +108,19 @@ export default function KillaOAuthConsent(){
   finally{setMfaBusy(false)}
  }
  async function decide(approved){
-  if(!db?.auth?.oauth||!authorizationId||busy||(approved&&!clientApproved))return;
+  if(!db?.auth?.oauth||!authorizationId||busy||(approved&&(!mfaOk||(!clientApproved&&!confirmNewClient))))return;
   setBusy(true);setNotice('');
   try{
-   if(approved&&SHARED_LEXIS_DB)await recordMfaGrant(db,authorizationId);
+   if(approved&&!clientApproved){
+    if(!/^[a-zA-Z0-9._:-]{5,200}$/.test(clientId))throw Error('ID público OAuth inválido.');
+    const grant=await db.from('openbot_mcp_grants').upsert({
+     owner_id:session.user.id,client_id:clientId,enabled:true,
+     approved_at:new Date().toISOString(),
+     expires_at:new Date(Date.now()+30*86400000).toISOString()
+    },{onConflict:'owner_id,client_id'});
+    if(grant.error)throw Error('Não foi possível autorizar o cliente para leitura: '+grant.error.message);
+   }
+   if(approved&&SHARED_LEXIS_DB)await recordMfaGrant(db,authorizationId,clientId,session.user.id);
    const result=approved?
     await db.auth.oauth.approveAuthorization(authorizationId):
     await db.auth.oauth.denyAuthorization(authorizationId);
@@ -129,7 +139,11 @@ export default function KillaOAuthConsent(){
    {clientId?
     <><p>Aplicativo: <strong>{details.client?.name||'Cliente MCP'}</strong></p>
      <p>ID OAuth: <code>{clientId}</code></p>
-     {!approvedClients.includes(clientId)&&<p role="alert">Este aplicativo ainda não está na lista de clientes OAuth autorizados em <a href="/mcp/setup">/mcp/setup</a>. Copie o ID exato e peça autorização ao administrador.</p>}
+     {!approvedClients.includes(clientId)&&<label style={{display:'flex',gap:10,alignItems:'flex-start',padding:12,
+        border:'1px solid #8a6077',borderRadius:9,color:'#f7dfeb'}}>
+       <input type="checkbox" checked={confirmNewClient} onChange={e=>setConfirmNewClient(e.target.checked)}/>
+       Autorizo este cliente OAuth a consultar meus dados de CRM por 30 dias, sem permissão para enviar mensagens, editar registros ou executar ações externas.
+      </label>}
      <p>Permissões solicitadas: {String(details.scope||'não informadas')}</p>
      <p>Destino de retorno: {details.redirect_uri}</p>
     </>
@@ -148,7 +162,7 @@ export default function KillaOAuthConsent(){
    </div>}
    {clientId&&<><p>Confirme somente se reconhece este aplicativo. O acesso permanece limitado às regras da sua empresa.</p>
     <div style={{display:'flex',gap:12,flexWrap:'wrap'}}>
-     <button type="button" disabled={busy||!clientApproved} onClick={()=>decide(true)}>Autorizar leitura</button>
+     <button type="button" disabled={busy||!mfaOk||(!clientApproved&&!confirmNewClient)} onClick={()=>decide(true)}>Autorizar leitura</button>
      <button type="button" disabled={busy} onClick={()=>decide(false)}>Negar acesso</button>
     </div></>}
   </section>}
