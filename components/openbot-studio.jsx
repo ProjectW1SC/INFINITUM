@@ -228,7 +228,12 @@ export default function OpenBotStudio({db,session}){
  const currentThreadMessages=messages.length;
  useEffect(()=>{if(new URLSearchParams(window.location.search).get('integrations')==='1')setAppsOpen(true)},[]);
  return <div className={styles.studio}>
-  {appsOpen&&<OpenBotConnectedApps request={api} onClose={()=>setAppsOpen(false)}/> }
+  {appsOpen&&<OpenBotConnectedApps request={api} onClose={()=>setAppsOpen(false)}
+   onUseData={text=>{
+    setDraft(String(text||'').slice(0,3200));setAppsOpen(false);
+    setNotice('Dados carregados no campo de mensagem. Revise antes de enviar ao modelo.');
+    editorRef.current?.focus();
+   }}/>} 
   {mobileBots&&<button aria-label="Fechar menu lateral" className={styles.scrim} onClick={()=>setMobileBots(false)}/>}
   <aside className={styles.sidebar+' '+(mobileBots?styles.sidebarOpen:'')} aria-label="Bots e conversas">
    <div className={styles.brand}><div className={styles.brandIcon}><Bot size={22}/></div>
