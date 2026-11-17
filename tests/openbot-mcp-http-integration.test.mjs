@@ -23,14 +23,13 @@ test('OAuth state expires after ten minutes, not reusable beyond expiry',()=>{
 test('Google OAuth requests read-only scopes, PKCE and exact approved callback',()=>{
  const url=new URL(authorizationUrl('google',{
   clientId:'public-demo',redirectUri:'https://agentinfinitum.vercel.app/api/openbot/integrations/oauth/callback',
-  state:'sealed',challenge:'pkce'
+  state:'sealed',challenge:'pkce',connectorId:'gmail'
  }));
  assert.equal(url.hostname,'accounts.google.com');
  assert.equal(url.searchParams.get('code_challenge_method'),'S256');
  assert.match(url.searchParams.get('scope'),/gmail\.readonly/);
- assert.match(url.searchParams.get('scope'),/drive\.metadata\.readonly/);
- assert.match(url.searchParams.get('scope'),/spreadsheets\.readonly/);
- assert.doesNotMatch(url.searchParams.get('scope'),/gmail\.send|drive\.file|spreadsheets\.write/);
+ assert.doesNotMatch(url.searchParams.get('scope'),/drive\.metadata\.readonly|spreadsheets\.readonly|calendar\.events\.readonly/);
+ assert.doesNotMatch(url.searchParams.get('scope'),/gmail\.send|drive\.file|spreadsheets\.write|calendar\.events(?:\s|$)/);
 });
 test('never label unconfigured providers as connected',()=>{
  const c=connectorCatalog({});
