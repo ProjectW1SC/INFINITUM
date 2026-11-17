@@ -6,7 +6,7 @@ import {Puzzle,Plug,HardDrive,Table2,Mail,Instagram,MessageCircle,Building2,Gith
 import {ZAPFAST_SINGLE_SESSION_URL} from '../lib/openbot-workspace-policy.mjs';
 import css from './openbot-connected-apps.module.css';
 
-const ICONS={drive:HardDrive,sheets:Table2,gmail:Mail,instagram:Instagram,whatsapp:MessageCircle,
+const ICONS={drive:HardDrive,sheets:Table2,gmail:Mail,instagram:Instagram,instagram_meta:Instagram,whatsapp:MessageCircle,zapfast:MessageCircle,
  crm:Building2,github:Github,outlook:AtSign,calendar:CalendarDays,meet:Video,chat:MessageSquare,youtube:Youtube,slack:Plug};
 const GROUPS=['Google Workspace','Mensagens','Redes sociais','Trabalho','Desenvolvimento','Equipe'];
 const safe=(error)=>String(error?.message||error||'Conexão indisponível').slice(0,240);
@@ -14,7 +14,7 @@ const age=v=>v?new Date(v).toLocaleDateString('pt-BR'):'não verificado';
 const SERVICE_LABELS={drive:'Google Drive',sheets:'Google Sheets',gmail:'Gmail',calendar:'Google Calendar',meet:'Google Meet',chat:'Google Chat',chat_messages:'Mensagens do Google Chat',youtube:'YouTube',instagram:'Instagram'};
 
 export default function OpenBotConnectedApps({request,onClose,onUseData,initialTab='apps'}){
- const [tab,setTab]=useState(initialTab),[catalog,setCatalog]=useState([]),[accounts,setAccounts]=useState([]);
+ const [tab,setTab]=useState(initialTab),[catalog,setCatalog]=useState([]),[accounts,setAccounts]=useState([]),[composioAccounts,setComposioAccounts]=useState([]);
  const [mcp,setMcp]=useState(null),[loading,setLoading]=useState(true),[working,setWorking]=useState('');
  const [error,setError]=useState(''),[notice,setNotice]=useState(''),[selected,setSelected]=useState('');
  const [preview,setPreview]=useState(null),[crmQuery,setCrmQuery]=useState(''),[crmResult,setCrmResult]=useState(null);
@@ -22,17 +22,19 @@ export default function OpenBotConnectedApps({request,onClose,onUseData,initialT
  const [editScope,setEditScope]=useState('read'),[editRequests,setEditRequests]=useState([]);
  const [confirmEditId,setConfirmEditId]=useState('');
  const connector=useMemo(()=>catalog.find(c=>c.id===selected),[catalog,selected]);
- const connectorAccounts=useMemo(()=>accounts.filter(a=>a.provider===connector?.provider),[accounts,connector?.provider]);
+ const connectorAccounts=useMemo(()=>connector?.mode==='composio'?composioAccounts.filter(a=>a.toolkit===connector.composioToolkit):accounts.filter(a=>a.provider===connector?.provider),[accounts,composioAccounts,connector?.provider,connector?.mode,connector?.composioToolkit]);
  const groupItems=group=>catalog.filter(c=>c.category===group);
  const refresh=useCallback(async()=>{
   try{
    setError('');
-   const [apps,mcpInfo,pending]=await Promise.allSettled([
+   const [apps,mcpInfo,pending,composio]=await Promise.allSettled([
     request('/api/openbot/integrations'),request('/api/openbot/mcp/settings'),
-    request('/api/openbot/mcp/edits')
+    request('/api/openbot/mcp/edits'),request('/api/openbot/composio')
    ]);
    if(apps.status==='fulfilled'){setCatalog(apps.value.connectors||[]);setAccounts(apps.value.accounts||[])}
    else setError('Não foi possível ler as conexões: '+safe(apps.reason));
+   if(composio.status==='fulfilled')setComposioAccounts(composio.value.apps||[]);
+   else setComposioAccounts([]);
    if(pending.status==='fulfilled')setEditRequests(pending.value.proposals||[]);
    if(mcpInfo.status==='fulfilled')setMcp(mcpInfo.value);
    else setNotice('MCP indisponível nesta sessão: '+safe(mcpInfo.reason));
@@ -65,6 +67,31 @@ export default function OpenBotConnectedApps({request,onClose,onUseData,initialT
   }catch(e){setError(safe(e))}
   finally{setWorking('')}
  }
+ async function beginComposio(connector){
+  if(!connector?.composioToolkit||working)return;
+  setWorking(connector.id);setError('');setNotice('');
+  try{
+   const result=await request('/api/openbot/composio',{method:'POST',
+    body:JSON.stringify({toolkit:connector.composioToolkit})});
+   if(!result.redirectUrl)throw Error('Composio não devolveu o link de autorização.');
+   openExternal(result.redirectUrl);
+   setNotice('Conclua a autorização na página do Composio. Depois volte e clique em Atualizar.');
+  }catch(e){setError(safe(e))}
+  finally{setWorking('')}
+ }
+ async function disconnectComposio(account){
+  const id=account?.connectedAccountId;
+  if(!id||working)return;
+  if(confirmRemove!==id){setConfirmRemove(id);return}
+  setWorking(id);setError('');setNotice('');
+  try{
+   const result=await request('/api/openbot/composio',{method:'DELETE',
+    body:JSON.stringify({connectedAccountId:id})});
+   setComposioAccounts(old=>old.filter(x=>x.connectedAccountId!==id));
+   setConfirmRemove('');setNotice(result.notice||'Conta Composio desconectada.');
+  }catch(e){setError(safe(e))}
+  finally{setWorking('')}
+ }
  async function disconnect(account){
   if(working)return;
   if(confirmRemove!==account.id){setConfirmRemove(account.id);return}
@@ -90,7 +117,7 @@ export default function OpenBotConnectedApps({request,onClose,onUseData,initialT
   if(working||!connector)return;
   setWorking(account.id);setError('');setPreview(null);
   try{
-   const service=connector.id;
+   const service=connector.id==='instagram_meta'?'instagram':connector.id;
    const result=await request('/api/openbot/integrations/data?service='+encodeURIComponent(service)
     +'&connection_id='+encodeURIComponent(account.id));
    setPreview(result);
@@ -154,9 +181,10 @@ export default function OpenBotConnectedApps({request,onClose,onUseData,initialT
   navigator.clipboard.writeText(text).then(()=>setNotice('Endereço copiado.'))
    .catch(()=>setError('Não foi possível copiar.'));
  }
- const activeAccounts=c=>accounts.filter(a=>a.provider===c.provider&&a.status==='connected');
+ const activeAccounts=c=>c.mode==='composio'?composioAccounts.filter(a=>a.toolkit===c.composioToolkit&&a.connected):accounts.filter(a=>a.provider===c.provider&&a.status==='connected');
  const hasConnectorScopes=(c,a)=>!c.scopes?.length||c.scopes.every(scope=>(a.scopes||[]).includes(scope));
  const statusOf=c=>{
+  if(c.mode==='composio')return !c.configured?['Configuração necessária','off']:activeAccounts(c).length?['Conectado','good']:['Pronto para conectar','ready'];
   if(c.mode==='native')return ['Ativo','good'];
   if(c.mode==='separate')return ['Separado','neutral'];
   if(c.mode==='planned')return ['Ainda indisponível','off'];
@@ -200,6 +228,24 @@ export default function OpenBotConnectedApps({request,onClose,onUseData,initialT
        <p className={css.info}>O WhatsApp usa uma sessão isolada no ZapFast. O OpenBot não copia credenciais, não altera número e não envia mensagens.</p>
        <button className={css.primary} onClick={openZapFast}><MessageCircle size={16}/> Abrir WhatsApp · ZapFast</button>
        <a className={css.secondaryLink} href={new URL('/trocar-numero',ZAPFAST_SINGLE_SESSION_URL).toString()} target="_blank" rel="noopener noreferrer">Trocar número no ZapFast <ExternalLink size={14}/></a>
+      </>:connector.mode==='composio'?<>
+       <p className={css.info}>A conexão é feita pelo Composio em nuvem. A chave da API fica somente na Vercel; o navegador e o EXE não recebem credenciais privadas.</p>
+       {connector.composioToolkit==='whatsapp'&&<p className={css.warning}>Este conector exige uma conta WhatsApp Business (WABA). Ele não conecta um WhatsApp pessoal por QR Code. Para QR Code e número pessoal, use o ZapFast remoto.</p>}
+       <div className={css.subheading}><h3>Contas autorizadas no Composio</h3><span>{connectorAccounts.length} registro(s)</span></div>
+       {connectorAccounts.map(a=><div key={a.connectedAccountId} className={css.account}>
+        <div><strong>{a.alias||a.name||'Conta conectada'}</strong><small>{a.toolkit} · {a.status==='ACTIVE'?'Conectada':a.status}</small>
+         <small>ID da conta: {a.connectedAccountId}</small></div>
+        <div className={css.accountActions}>
+         <button disabled={!!working} onClick={()=>refresh()}><RefreshCw size={14}/> Atualizar estado</button>
+         <button disabled={!!working} onClick={()=>disconnectComposio(a)} className={css.danger}>{confirmRemove===a.connectedAccountId?'Confirmar remoção':'Desconectar'}</button>
+        </div>
+       </div>)}
+       {!connectorAccounts.length&&<p className={css.info}>Nenhuma conta autorizada. Clique abaixo para iniciar o OAuth seguro do Composio.</p>}
+       <button className={css.primary} disabled={!!working||!connector.configured} onClick={()=>beginComposio(connector)}>
+        {working===connector.id?<Loader2 className={css.spin} size={16}/>:<Plug size={16}/>}
+        {connectorAccounts.length?'Conectar outra conta':'Conectar com Composio'}
+       </button>
+       <p className={css.muted}>As conexões ficam vinculadas ao usuário autenticado no INFINITUM e são mantidas pelo Composio. O servidor roda na Vercel, não neste computador.</p>
       </>:connector.mode==='planned'?<p className={css.info}>Integração ainda sem OAuth implementado. Não há botão de conexão fictício.</p>:<>
        <div className={css.subheading}><h3>Suas contas {connector.provider==='google'?'Google':'Meta'}</h3>
         <span>{connectorAccounts.length} registro(s)</span></div>
