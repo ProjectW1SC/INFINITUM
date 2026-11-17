@@ -29,6 +29,7 @@
       "runtime-policy.mjs",
       "package.json",
       "launcher-policy.mjs",
+      "lifecycle-policy.mjs",
       "launcher-preload.cjs",
       "launcher.html",
       "launcher.css",
