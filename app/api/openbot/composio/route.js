@@ -11,7 +11,8 @@ export async function GET(request){
  try{
   const {user}=await officeAuth(request);
   if(!composioConfigured())return officeJson({ok:true,configured:false,apps:[],toolkits:COMPOSIO_TOOLKITS});
-  const apps=await listComposioToolkits(user.id);
+  const admin=adminClient();
+  const apps=await listComposioToolkits(user.id,admin);
   return officeJson({ok:true,configured:true,apps,toolkits:COMPOSIO_TOOLKITS});
  }catch(e){return safeOfficeError(e)}
 }
@@ -26,10 +27,10 @@ export async function POST(request){
   const nonce=newOAuthNonce();
   const callbackUrl=ORIGIN+'/api/openbot/composio/callback?state='+encodeURIComponent(nonce);
   const alias='infinitum-'+toolkit+'-'+randomBytes(4).toString('hex');
-  const link=await startComposioConnection(user.id,toolkit,callbackUrl,alias);
+  const admin=adminClient();
+  const link=await startComposioConnection(user.id,toolkit,callbackUrl,alias,admin);
   if(!/^ca_[A-Za-z0-9_-]{6,180}$/.test(link.connectedAccountId))
    throw Object.assign(Error('Composio não retornou o identificador da conta conectada.'),{status:502});
-  const admin=adminClient();
   const saved=await admin.from('openbot_composio_states').insert({
    nonce,owner_id:user.id,toolkit,expected_account_id:link.connectedAccountId,
    expires_at:new Date(Date.now()+10*60_000).toISOString()
@@ -44,7 +45,7 @@ export async function DELETE(request){
  try{
   const {user}=await officeAuth(request);
   const body=await request.json().catch(()=>({}));
-  const result=await deleteComposioAccount(user.id,body.connectedAccountId);
+  const result=await deleteComposioAccount(user.id,body.connectedAccountId,adminClient());
   return officeJson({ok:true,removed:result.removed,
    notice:'Conta removida do Composio e credencial externa revogada.'});
  }catch(e){return safeOfficeError(e)}
