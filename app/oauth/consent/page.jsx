@@ -46,6 +46,7 @@ export default function KillaOAuthConsent(){
  const [authorizationId,setAuthorizationId]=useState('');
  const [approvedClients,setApprovedClients]=useState([]),[mfaOk,setMfaOk]=useState(false);
  const [confirmNewClient,setConfirmNewClient]=useState(false);
+ const [allowReviewedEdits,setAllowReviewedEdits]=useState(false);
  const [mfaFactorId,setMfaFactorId]=useState(''),[mfaCode,setMfaCode]=useState('');
  const [pendingRedirect,setPendingRedirect]=useState('');
  const [details,setDetails]=useState(null),[notice,setNotice]=useState('');
@@ -115,6 +116,7 @@ export default function KillaOAuthConsent(){
     if(!/^[a-zA-Z0-9._:-]{5,200}$/.test(clientId))throw Error('ID público OAuth inválido.');
     const grant=await db.from('openbot_mcp_grants').upsert({
      owner_id:session.user.id,client_id:clientId,enabled:true,
+     edit_scope:allowReviewedEdits?'reviewed_edit':'read',
      approved_at:new Date().toISOString(),
      expires_at:new Date(Date.now()+30*86400000).toISOString()
     },{onConflict:'owner_id,client_id'});
@@ -144,6 +146,10 @@ export default function KillaOAuthConsent(){
        <input type="checkbox" checked={confirmNewClient} onChange={e=>setConfirmNewClient(e.target.checked)}/>
        Autorizo este cliente OAuth a consultar meus dados de CRM por 30 dias, sem permissão para enviar mensagens, editar registros ou executar ações externas.
       </label>}
+     {!approvedClients.includes(clientId)&&confirmNewClient&&<label style={{display:'flex',gap:9,alignItems:'flex-start',marginTop:12}}>
+      <input type="checkbox" checked={allowReviewedEdits} onChange={e=>setAllowReviewedEdits(e.target.checked)}/>
+      Permitir também que este agente <strong>proponha alterações</strong> em notas, retornos, prioridades e responsáveis. Cada mudança exigirá minha aprovação e MFA no OpenBot; nada será aplicado automaticamente.
+     </label>}
      <p>Permissões solicitadas: {String(details.scope||'não informadas')}</p>
      <p>Destino de retorno: {details.redirect_uri}</p>
     </>
