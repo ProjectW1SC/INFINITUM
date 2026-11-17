@@ -144,3 +144,12 @@
 @media(max-width:920px){.inspector{position:absolute;z-index:22;right:0;top:0;height:100%;box-shadow:-12px 0 32px #0009}.studio{position:relative}.sidebar{width:248px;min-width:248px;max-width:248px}.threadItem strong{width:169px}}
 @media(max-width:690px){.studio{min-height:100dvh}.sidebar{position:absolute;z-index:31;left:0;top:0;transform:translateX(-100%);height:100%;width:min(290px,86vw);max-width:min(290px,86vw);min-width:0;box-shadow:18px 0 40px #0009;transition:transform .18s ease}.sidebarOpen{transform:translateX(0)}.scrim{display:block;position:absolute;z-index:29;inset:0;background:#0009;border:0;width:100%;height:100%;cursor:pointer}.mobileToggle{display:grid;flex:none}.chatHeader{height:59px;padding:0 12px}.headerAvatar{width:35px;height:35px}.messageStack{padding:18px 12px;gap:18px}.bubble{padding:12px 13px}.userMessage .bubble{max-width:89%}.botMessage .bubble{max-width:calc(100% - 42px)}.messageContent{font-size:13px}.composerWrap{padding:10px 10px 8px}.composerFooter{flex-wrap:wrap;padding:8px}.modelPicker select{max-width:calc(100vw - 190px)}.disclaimer{font-size:9px!important}.welcome{padding:18px 15px 32px}.inspector{width:min(300px,87vw);min-width:0;max-width:87vw}}
 @media(prefers-reduced-motion:reduce){.spin{animation:none}.sidebar{transition:none}}
+
+
+/* Connected-apps hub lives inside the same authenticated desktop/web messenger. */
+.studio{position:relative}
+.appsEntry{width:100%;display:flex;align-items:center;justify-content:flex-start;gap:9px;min-height:36px;
+ padding:9px 11px;border:1px solid #654762!important;border-radius:9px;background:#30283b!important;
+ color:#f3d9ea!important;font-size:12px!important;text-decoration:none!important}
+.appsEntry:hover{background:#50314c!important;border-color:#a57592!important}
+.inspectorFoot .appsEntry{flex:1;min-width:0;justify-content:center;font-size:11px!important}
