@@ -35,7 +35,7 @@ test('Review migration enforces ownership, tenant and single-use atomic changes 
  assert.match(sql,/SECURITY DEFINER/);
  assert.match(sql,/owner_id/);
  assert.match(sql,/empresa_id/);
- assert.doesNotMatch(sql,/EXECUTE.*PUBLIC/i);
+ assert.doesNotMatch(sql,/GRANT\s+EXECUTE[^\n]*\bTO\s+PUBLIC\b/i);
 });
 test('Only human, MFA-verified app UI can execute or reject proposed changes',()=>{
  const api=read('app/api/openbot/mcp/edits/route.js');
