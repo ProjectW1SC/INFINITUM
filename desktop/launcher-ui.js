@@ -28,10 +28,10 @@ function render(value){
  ids.launch.disabled=['installing','opening'].includes(phase);
  ids.check.disabled=['checking','downloading','installing','opening'].includes(phase)||value.signed!==true;
 }
-function connect(id,api){
+function connect(id,api,{renderResult=true}={}){
  ids[id].addEventListener('click',async()=>{
   ids[id].disabled=true;
-  try{const state=await api();if(state&&typeof state==='object')render(state)}
+  try{const result=await api();if(renderResult&&result&&typeof result==='object')render(result)}
   catch{
    ids.message.textContent='Operação não concluída. Confira a instalação ou conexão.';
   }finally{if(id!=='install'&&id!=='launch')ids[id].disabled=false}
@@ -47,6 +47,6 @@ if(bridge){
  connect('releases',bridge.releases);
  connect('admin',bridge.openAdmin);
  connect('store',bridge.openStore);
- connect('zapfast',bridge.openZapFast);
+ connect('zapfast',bridge.openZapFast,{renderResult:false});
  if(ids.auto)ids.auto.addEventListener('change',()=>bridge.setAutoUpdate(ids.auto.checked).then(render).catch(()=>{ids.auto.checked=!ids.auto.checked}));
 }else{ids.message.textContent='Instalação inválida: ponte segura indisponível.'}

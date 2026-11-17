@@ -10,6 +10,7 @@ import {setTimeout as sleep} from 'node:timers/promises';
 import {validateDesktopConfig,safeStandaloneEnvironment,isLocalAppNavigation,
  isSafeExternalNavigation,isSafeZapFastNavigation,DESKTOP_ZAPFAST_URL,shouldRunSignedUpdater,DESKTOP_ENTRY_PATH} from './runtime-policy.mjs';
 import {safeLauncherSnapshot,normalizeUpdateProgress,canInstallSignedUpdate,isSignedUpdateConfiguration} from './launcher-policy.mjs';
+import {secondInstanceAction,canReuseLocalServer} from './lifecycle-policy.mjs';
 
 const CONFIG_ENDPOINT='https://agentinfinitum.vercel.app/api/openbot/desktop-config';
 let nextProcess=null,port=0,desktopConfig=null,window=null,launcherWindow=null,zapFastWindow=null,shuttingDown=false,localNonce='';
@@ -17,7 +18,15 @@ let updater=null,freeUpdater=null,updateCheck=null,appOpen=null;
 let autoUpdateEnabled=true;
 let launcherState=safeLauncherSnapshot({phase:'loading',version:app.getVersion(),message:'Inicializando canal de atualizações seguro.',signed:false,autoInstall:true});
 if(!app.requestSingleInstanceLock())app.quit();
-else app.on('second-instance',()=>{if(window){window.show();window.focus()}});
+else app.on('second-instance',()=>{
+ const action=secondInstanceAction({
+  crmOpen:!!(window&&!window.isDestroyed()),
+  launcherOpen:!!(launcherWindow&&!launcherWindow.isDestroyed())
+ });
+ if(action==='focus-crm'){window.show();window.focus();return;}
+ if(action==='focus-launcher'){launcherWindow.show();launcherWindow.focus();return;}
+ void app.whenReady().then(()=>openLauncherWindow()).catch(()=>{});
+});
 app.setAppUserModelId('br.com.w1capital.infinitum.killa');
 
 async function loadPublicConfiguration(){
@@ -89,6 +98,20 @@ async function startLocalNext(){
   await sleep(300);
  }
  throw Error('O servidor local não ficou disponível na porta privada.');
+}
+function nextProcessIsAlive(){
+ return !!nextProcess&&nextProcess.exitCode===null&&nextProcess.signalCode===null;
+}
+async function localNextIsReady(){
+ if(!canReuseLocalServer({processAlive:nextProcessIsAlive(),port,nonce:localNonce}))return false;
+ try{
+  const response=await fetch('http://127.0.0.1:'+port+'/api/desktop/health',{
+   signal:AbortSignal.timeout(1200),redirect:'error',cache:'no-store'
+  });
+  if(!response.ok)return false;
+  const answer=await response.json();
+  return answer?.ready===true&&answer?.nonce===localNonce;
+ }catch{return false;}
 }
 function pushLauncher(changes){
  launcherState=safeLauncherSnapshot({...launcherState,...changes});
@@ -224,6 +247,9 @@ async function setupSignedUpdater(){
  }
 }
 async function openLauncherWindow(){
+ if(launcherWindow&&!launcherWindow.isDestroyed()){
+  launcherWindow.show();launcherWindow.focus();return;
+ }
  launcherWindow=new BrowserWindow({
   width:950,height:710,minWidth:850,minHeight:610,
   backgroundColor:'#0b0a0f',show:false,autoHideMenuBar:true,
@@ -336,6 +362,22 @@ async function launchLocalCRM(target=DESKTOP_ENTRY_PATH){
  if(appOpen){await appOpen;
   if(window&&target!==DESKTOP_ENTRY_PATH)await window.loadURL('http://127.0.0.1:'+port+target);
   return launcherState;
+ }
+ if(nextProcess){
+  if(nextProcessIsAlive()){
+   if(!await localNextIsReady())return pushLauncher({phase:'error',
+    message:'O servidor local anterior ainda está ativo, mas não respondeu ao teste de segurança. Feche o INFINITUM e tente novamente.'});
+   try{
+    await openAppWindow(target);
+    if(launcherWindow&&!launcherWindow.isDestroyed())launcherWindow.close();
+    return launcherState;
+   }catch{
+    if(window&&!window.isDestroyed())window.close();
+    return pushLauncher({phase:'error',
+     message:'Não foi possível reabrir o INFINITUM. O servidor local permaneceu protegido.'});
+   }
+  }
+  nextProcess=null;port=0;localNonce='';
  }
  appOpen=(async()=>{
   pushLauncher({phase:'opening',message:'Iniciando servidor local autorizado, sem Vercel.'});
