@@ -30,3 +30,15 @@ test('agent roster exposes recent private conversations and opens the selected t
  assert.match(u,/initialThreadId/);
  assert.match(u,/Histórico de conversas/);
 });
+
+test('embedded agent activity is backed by the real task ledger and profile preferences remain user-scoped',()=>{
+ const center=load('components/agents-command-center.jsx');
+ const chat=load('components/openbot-studio.jsx');
+ assert.match(center,/office_agent_runs/);
+ assert.match(center,/activityRuns=/);
+ assert.match(chat,/activityRuns=\[\]/);
+ assert.match(chat,/openbot_profiles/);
+ assert.match(chat,/Memória de perfil/);
+ assert.match(chat,/Fila de tarefas/);
+ assert.match(chat,/Central de aprovações/);
+});
