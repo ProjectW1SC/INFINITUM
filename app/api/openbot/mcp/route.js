@@ -1,5 +1,6 @@
 import {officeAuth,safeOfficeError} from '../../../../lib/office-server.mjs';
 import {readConnectedData} from '../integrations/data/route.js';
+import {validateEditProposal} from '../../../../lib/openbot-mcp-edit-policy.mjs';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 
@@ -22,6 +23,15 @@ const toolsList=[
   inputSchema:{type:'object',properties:{query:{type:'string',minLength:3,maxLength:80}},required:['query'],additionalProperties:false}},
  {name:'openbot_connections_status',description:'Lista provedores já autorizados no OpenBot, apenas metadados, nunca tokens.',
   inputSchema:{type:'object',properties:{},additionalProperties:false}},
+ {name:'crm_propose_edit',description:'PROPOR uma edição supervisionada no CRM. Não altera dados até o operador revisar e aprovar com MFA no OpenBot. Apenas notas, retornos, responsáveis e prioridades.',
+  inputSchema:{type:'object',properties:{
+   target_table:{type:'string',enum:['office_clients','office_cases','office_deadlines','crm_clients']},
+   target_id:{type:'string',format:'uuid'},field_name:{type:'string'},
+   new_value:{type:'string',minLength:1,maxLength:2400},
+   reason:{type:'string',minLength:12,maxLength:480}
+  },required:['target_table','target_id','field_name','new_value','reason'],additionalProperties:false}},
+ {name:'crm_pending_edits',description:'Consulta estado das propostas de edição do próprio usuário, sem aplicar nenhuma.',
+  inputSchema:{type:'object',properties:{},additionalProperties:false}},
  ...[['drive','Drive: lista arquivos'],['sheets','Sheets: lista planilhas'],
  ['gmail','Gmail: lista marcadores'],['instagram','Instagram: lista contas profissionais']]
  .map(([service,label])=>({
@@ -34,11 +44,11 @@ async function authorize(request){
  const {db,user,claims}=await officeAuth(request,{allowOAuth:true});
  const clientId=claims.client_id;
  if(!/^[a-zA-Z0-9._:-]{5,200}$/.test(clientId||''))throw bad('Cliente OAuth inválido.');
- const result=await db.from('openbot_mcp_grants').select('id,enabled,expires_at')
+ const result=await db.from('openbot_mcp_grants').select('id,enabled,expires_at,edit_scope')
   .eq('owner_id',user.id).eq('client_id',clientId).eq('enabled',true)
   .gt('expires_at',new Date().toISOString()).maybeSingle();
  if(result.error||!result.data)throw bad('MausBot não foi autorizado neste CRM ou a permissão expirou.');
- return {db,user,clientId};
+ return {db,user,clientId,edit_scope:result.data.edit_scope||'read'};
 }
 async function findClients({db,user},query){
  const q=norm(query);if(q.length<3)throw bad('A pesquisa precisa de três caracteres.',400);
@@ -70,7 +80,39 @@ async function findProcesses({db,user},query){
   {source:i?'crm_processes':'office_cases',error:'Sem autorização ou fonte indisponível'}),
   judicialLookupPerformed:false,asOf:new Date().toISOString()};
 }
+async function proposeEdit(ctx,args){
+ if(ctx.edit_scope!=='reviewed_edit')throw bad('O cliente OAuth só tem leitura. Habilite Edição supervisionada no OpenBot, com MFA.',403);
+ const p=validateEditProposal(args);
+ const memberships=await ctx.db.from('usuarios').select('empresa_id').eq('auth_user_id',ctx.user.id).limit(2);
+ if(memberships.error||memberships.data?.length!==1||!memberships.data[0].empresa_id)
+  throw bad('Empresa vinculada não confirmada.',403);
+ const empresa=memberships.data[0].empresa_id;
+ let query=ctx.db.from(p.target_table).select('id,updated_at,'+p.field_name)
+  .eq('id',p.target_id).eq('empresa_id',empresa);
+ if(p.target_table!=='crm_clients')query=query.eq('owner_id',ctx.user.id);
+ const record=await query.maybeSingle();
+ if(record.error||!record.data)throw bad('Registro inexistente ou sem acesso para edição.',403);
+ const proposal=await ctx.db.from('openbot_mcp_edit_requests').insert({
+  owner_id:ctx.user.id,empresa_id:empresa,client_id:ctx.clientId,target_table:p.target_table,
+  target_id:p.target_id,field_name:p.field_name,new_value:p.new_value,reason:p.reason,
+  expected_updated_at:record.data.updated_at
+ }).select('id,target_table,target_id,field_name,new_value,reason,status,expires_at').single();
+ if(proposal.error||!proposal.data)throw bad('Não foi possível criar a proposta: '+(proposal.error?.message||'erro de acesso'),503);
+ return {proposal:proposal.data,applied:false,approvalRequired:true,
+  reviewUrl:'https://agentinfinitum.vercel.app/openbot?integrations=mcp',
+  notice:'Aguardando confirmação humana com MFA. Nenhum registro foi alterado.'};
+}
+async function pendingEdits(ctx){
+ const r=await ctx.db.from('openbot_mcp_edit_requests')
+  .select('id,target_table,target_id,field_name,new_value,reason,status,expires_at,created_at,reviewed_at')
+  .eq('owner_id',ctx.user.id).order('created_at',{ascending:false}).limit(30);
+ if(r.error)throw bad('Não foi possível consultar propostas.',503);
+ return {proposals:r.data||[],editScope:ctx.edit_scope};
+}
 async function callTool(ctx,name,args){
+ if(name==='crm_propose_edit')return toContent(await proposeEdit(ctx,args));
+ if(name==='crm_pending_edits')return toContent(await pendingEdits(ctx));
+
  const serviceMap={openbot_drive_list:'drive',openbot_sheets_list:'sheets',
   openbot_gmail_list:'gmail',openbot_instagram_list:'instagram'};
  if(Object.hasOwn(serviceMap,name)){
