@@ -36,6 +36,7 @@ export default function OpenBotStudio({db,session}){
  const [customInstruction,setCustomInstruction]=useState(''),[savingSettings,setSavingSettings]=useState(false);
  const [pendingDelete,setPendingDelete]=useState(false);
  const [appsOpen,setAppsOpen]=useState(false);
+ const [appsDefaultTab,setAppsDefaultTab]=useState('apps');
  const bottomRef=useRef(null),editorRef=useRef(null),sendLock=useRef(false),chatRequest=useRef(0);
  const bot=findOpenBot(activeBot);
  const profile=profiles[activeBot]||null;
@@ -226,9 +227,13 @@ export default function OpenBotStudio({db,session}){
 
  const canSend=!!draft.trim()&&consentReady&&!busy&&!loadingChat;
  const currentThreadMessages=messages.length;
- useEffect(()=>{if(new URLSearchParams(window.location.search).get('integrations')==='1')setAppsOpen(true)},[]);
+ useEffect(()=>{
+  const tab=new URLSearchParams(window.location.search).get('integrations');
+  if(tab==='mcp'){setAppsDefaultTab('mcp');setAppsOpen(true)}
+  else if(tab==='1')setAppsOpen(true);
+ },[]);
  return <div className={styles.studio}>
-  {appsOpen&&<OpenBotConnectedApps request={api} onClose={()=>setAppsOpen(false)}
+  {appsOpen&&<OpenBotConnectedApps request={api} initialTab={appsDefaultTab} onClose={()=>setAppsOpen(false)}
    onUseData={text=>{
     setDraft(String(text||'').slice(0,3200));setAppsOpen(false);
     setNotice('Dados carregados no campo de mensagem. Revise antes de enviar ao modelo.');
