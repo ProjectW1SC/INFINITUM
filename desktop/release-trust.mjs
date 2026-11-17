@@ -10,8 +10,8 @@ export const ALLOWED_RELEASE_HOSTS=new Set([
 function rejected(reason){throw Error(reason)}
 export function cleanReleaseNotes(value){
  if(typeof value!=='string')return '';
- return value.replace(/\\r/g,'').replace(/<[^>]*>/g,'').replace(/[<>]/g,'')
-  .split('\\n').slice(0,32).map(line=>line.trim().slice(0,220)).join('\\n').slice(0,6000);
+ return value.replace(/\r/g,'').replace(/<[^>]*>/g,'').replace(/[<>]/g,'')
+  .split('\n').slice(0,32).map(line=>line.trim().slice(0,220)).join('\n').slice(0,6000);
 }
 export function validVersion(value){
  return typeof value==='string'&&VERSION.test(value);
