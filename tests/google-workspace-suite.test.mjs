@@ -46,7 +46,7 @@ test('Google service reader exposes real read-only Gmail messages, Calendar even
  for(const service of ['calendar','meet','chat','chat_messages','youtube'])
   assert.ok(route.includes("service==='"+service+"'"),'missing service '+service);
  assert.match(route,/gmail\.googleapis\.com\/gmail\/v1\/users\/me\/messages/);
- assert.match(route,/www\.googleapis\.com\\/calendar\\/v3\\/calendars\\/primary\\/events/);
+ assert.ok(route.includes('https://www.googleapis.com/calendar/v3/calendars/primary/events'));
  assert.match(route,/meet\.googleapis\.com\/v2\/spaces/);
  assert.match(route,/chat\.googleapis\.com\/v1\/spaces/);
  assert.match(route,/youtube\/v3\/channels/);
