@@ -41,7 +41,9 @@ test('desktop uses the production CRM identity and secure remote relay',()=>{
  const server=read('app/api/openbot/relay/route.js');
  assert.match(policy,/segjskjlbeydlljnefai\.supabase\.co/);
  assert.match(policy,/NEXT_PUBLIC_LEXIS_SHARED_DB:'1'/);
- assert.match(main,/agentinfinitum\.vercel\.app\/api\/openbot\/desktop-config/);
+ assert.match(main,/public-config\.json/);
+ assert.doesNotMatch(main,/agentinfinitum\.vercel\.app\/api\/openbot\/desktop-config/);
+ assert.ok(JSON.parse(read('desktop/package.json')).build.files.includes('public-config.json'));
  assert.match(server,/agentinfinitum\.vercel\.app/);
  assert.match(server,/officeAuth/);
  assert.match(server,/\/api\/superagente/);
