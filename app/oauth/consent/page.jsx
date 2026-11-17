@@ -5,6 +5,11 @@ import {useWorkspaceSession} from '../../../components/workspace-session-provide
 const SHARED_LEXIS_DB=process.env.NEXT_PUBLIC_LEXIS_SHARED_DB==='1';
 
 async function approvedClientsForUser(db,userId){
+ // Include explicit OpenBot/MausBot grants alongside the legacy Killa/INFINITUM MCP list.
+ const modern=await db.from('openbot_mcp_grants').select('client_id')
+  .eq('owner_id',userId).eq('enabled',true).gt('expires_at',new Date().toISOString()).limit(60);
+ const modernIds=modern.error?[]:(modern.data||[]).map(x=>x.client_id);
+
  if(SHARED_LEXIS_DB){
   const member=await db.from('usuarios').select('empresa_id').eq('auth_user_id',userId).limit(2);
   if(member.error||member.data?.length!==1||!member.data[0]?.empresa_id)
@@ -13,17 +18,23 @@ async function approvedClientsForUser(db,userId){
    .eq('empresa_id',member.data[0].empresa_id).limit(1).maybeSingle();
   if(settings.error)throw Error('Não foi possível ler a autorização MCP da empresa.');
   const config=settings.data?.config||{};
-  return config.mcp_enabled===true&&Array.isArray(config.mcp_allowed_client_ids)
-   ?config.mcp_allowed_client_ids:[];
+  return [...new Set([...modernIds,...(config.mcp_enabled===true&&Array.isArray(config.mcp_allowed_client_ids)?config.mcp_allowed_client_ids:[])])];
  }
  const settings=await db.from('killa_mcp_settings').select('mcp_enabled,allowed_client_ids')
   .eq('owner_id',userId).maybeSingle();
  if(settings.error)throw Error('Não foi possível ler a autorização MCP da conta.');
- return settings.data?.mcp_enabled===true&&Array.isArray(settings.data?.allowed_client_ids)
-  ?settings.data.allowed_client_ids:[];
+ return [...new Set([...modernIds,...(settings.data?.mcp_enabled===true&&Array.isArray(settings.data?.allowed_client_ids)?settings.data.allowed_client_ids:[])])];
 }
 
-async function recordMfaGrant(db,authorizationId){
+async function recordMfaGrant(db,authorizationId,clientId,userId){
+ if(clientId&&userId){
+  const modern=await db.from('openbot_mcp_grants').select('id')
+   .eq('owner_id',userId).eq('client_id',clientId).eq('enabled',true)
+   .gt('expires_at',new Date().toISOString()).maybeSingle();
+  // The new MCP checks its own time-limited grant on every tool request.
+  if(!modern.error&&modern.data)return {ok:true};
+ }
+
  const {data,error}=await db.rpc('killa_record_mcp_mfa_grant',{p_authorization_id:authorizationId});
  if(error||data?.ok!==true)
   throw Error(error?.message||data?.error||'Não foi possível registrar a confirmação MFA desta conexão.');
@@ -66,7 +77,7 @@ export default function KillaOAuthConsent(){
     setPendingRedirect(data.redirect_url);
     if(verified){
      try{
-      if(SHARED_LEXIS_DB)await recordMfaGrant(db,id);
+      if(SHARED_LEXIS_DB)await recordMfaGrant(db,id,String(data?.client?.id||data?.client_id||''),session.user.id);
       if(live)window.location.assign(data.redirect_url);
      }catch(e){if(live)setNotice(String(e?.message||e).slice(0,230))}
     }else{
@@ -89,7 +100,7 @@ export default function KillaOAuthConsent(){
     throw Error('O Supabase ainda não confirmou o nível AAL2. Digite um código novo.');
    setMfaOk(true);setMfaCode('');
    if(pendingRedirect){
-    if(SHARED_LEXIS_DB)await recordMfaGrant(db,authorizationId);
+    if(SHARED_LEXIS_DB)await recordMfaGrant(db,authorizationId,clientId,session.user.id);
     window.location.assign(pendingRedirect);
    }else setNotice('Segundo fator confirmado. Agora você pode autorizar a leitura.');
   }catch(e){setNotice(String(e?.message||e).slice(0,230))}
