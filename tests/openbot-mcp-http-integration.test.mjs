@@ -48,7 +48,8 @@ test('MausBot remote HTTP MCP implements standard read-only JSON RPC',()=>{
  assert.match(s,/protocolVersion/);
  assert.match(s,/openbot_mcp_grants/);
  assert.match(s,/officeAuth\(request,\{allowOAuth:true\}\)/);
- assert.doesNotMatch(s,/\.insert\(|\.update\(|\.delete\(/);
+ assert.match(s,/\.insert\(/); // Only inserts proposals for human review.
+ assert.doesNotMatch(s,/\.update\(|\.delete\(/);
  const meta=read('app/.well-known/oauth-protected-resource/api/openbot/mcp/route.js');
  assert.match(meta,/authorization_servers/);
 });
