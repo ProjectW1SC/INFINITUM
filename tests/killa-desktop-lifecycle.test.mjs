@@ -1,0 +1,22 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {secondInstanceAction,canReuseLocalServer} from '../desktop/lifecycle-policy.mjs';
+
+test('second instance focuses the CRM when its window still exists',()=>{
+ assert.equal(secondInstanceAction({crmOpen:true,launcherOpen:false}),'focus-crm');
+});
+
+test('second instance focuses the launcher when the CRM is closed but launcher remains',()=>{
+ assert.equal(secondInstanceAction({crmOpen:false,launcherOpen:true}),'focus-launcher');
+});
+
+test('second instance restores the launcher when only the independent ZapFast window remains',()=>{
+ assert.equal(secondInstanceAction({crmOpen:false,launcherOpen:false,zapFastOpen:true}),'open-launcher');
+});
+
+test('local Next server can be reused only with a live process and its valid private endpoint identity',()=>{
+ assert.equal(canReuseLocalServer({processAlive:true,port:54193,nonce:'a'.repeat(48)}),true);
+ assert.equal(canReuseLocalServer({processAlive:false,port:54193,nonce:'a'.repeat(48)}),false);
+ assert.equal(canReuseLocalServer({processAlive:true,port:80,nonce:'a'.repeat(48)}),false);
+ assert.equal(canReuseLocalServer({processAlive:true,port:54193,nonce:''}),false);
+});
