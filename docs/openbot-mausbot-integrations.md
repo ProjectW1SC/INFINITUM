@@ -86,6 +86,22 @@ Gmail e mensagens do Chat usam escopos restritos; Meet, Calendar, YouTube e outr
 ## Estado OAuth e limites de teste
 O projeto Google Cloud foi visto em modo **Testing**, tipo **External**, com \`corporacaow1capital@gmail.com\` na lista de usuários de teste. Nesse modo, apenas usuários de teste autorizam o app e os consentimentos de escopos de dados expiram após sete dias. Aumentar a lista de testadores não equivale a publicar/verificar o app. Para uso amplo, revisar branding, página inicial, política de privacidade, justificativas de escopo e processo de verificação do Google.
 
+## Composio: Instagram e WhatsApp Business (Vercel)
+
+O OpenBot usa a API do Composio no servidor remoto da Vercel. Configure somente:
+- `COMPOSIO_API_KEY` como variável **Sensitive** no projeto Vercel `projectw1sc-crm`, em Production, Preview e Development.
+- Não usar `NEXT_PUBLIC_COMPOSIO_API_KEY`, não incluir a chave no GitHub, no EXE, em logs ou no navegador.
+
+A central **OpenBot → Aplicativos conectados** inicia o Composio Connect Link para:
+- Instagram: exige conta profissional Business ou Creator.
+- WhatsApp: o toolkit Composio usa WhatsApp Business API e exige uma conta WABA; não conecta WhatsApp pessoal por QR Code. Para sessão QR pessoal, manter o ZapFast remoto como conector separado.
+
+O Composio armazena e atualiza os tokens OAuth. O INFINITUM guarda apenas o vínculo entre o usuário autenticado e a sessão/conta remota. As chamadas saem da Vercel; o PC e o EXE apenas usam o relay HTTPS autenticado.
+
+O MCP `/api/openbot/mcp` disponibiliza `composio_search_tools` e `composio_execute_tool`, restritas aos toolkits Instagram e WhatsApp. Ações de escrita exigem permissão de edição supervisionada e aprovação do Composio; quando o cliente MCP não suporta aprovação interativa, a execução deve ser negada. Nenhuma API key do Composio é enviada ao cliente MCP.
+
+A callback do Connect Link é `https://agentinfinitum.vercel.app/api/openbot/composio/callback`. O estado é de uso único, vinculado ao usuário e ao ID de conta devolvido pelo Composio.
+
 ## Ativação única de Instagram/Meta
 Crie e aprove um aplicativo no **Meta for Developers**, configure o mesmo redirect e ative os produtos/permissões de contas profissionais. Configure no servidor:
 - \`OPENBOT_META_APP_ID\`
