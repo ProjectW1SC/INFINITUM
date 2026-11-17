@@ -14,33 +14,39 @@ test('Google Workspace catalog exposes Drive, Sheets, Gmail, Calendar, Meet, Cha
   assert.equal(c.category,'Google Workspace');
  }
 });
-test('Google OAuth requests the minimal read-only scopes for every supported service',()=>{
- const required=[
-  'https://www.googleapis.com/auth/drive.metadata.readonly',
-  'https://www.googleapis.com/auth/spreadsheets.readonly',
-  'https://www.googleapis.com/auth/gmail.readonly',
-  'https://www.googleapis.com/auth/calendar.events.readonly',
-  'https://www.googleapis.com/auth/meetings.space.readonly',
-  'https://www.googleapis.com/auth/chat.spaces.readonly',
-  'https://www.googleapis.com/auth/chat.messages.readonly',
-  'https://www.googleapis.com/auth/youtube.readonly'
- ];
- for(const scope of required)assert.ok(GOOGLE_OAUTH_SCOPES.includes(scope),'missing '+scope);
- const url=new URL(authorizationUrl('google',{
-  clientId:'test.apps.googleusercontent.com',
-  redirectUri:'https://agentinfinitum.vercel.app/api/openbot/integrations/oauth/callback',
-  state:'sealed',challenge:'pkce'
- }));
- const requested=url.searchParams.get('scope').split(' ');
- for(const scope of required)assert.ok(requested.includes(scope));
- assert.doesNotMatch(requested.join(' '),/(?:gmail\.send|calendar\.events(?:\s|$)|chat\.messages(?:\s|$)|youtube\.upload|drive\.file)/);
+test('Google OAuth requests only the read-only scopes for the selected service',()=>{
+ const services={
+  drive:['drive.metadata.readonly'],
+  sheets:['drive.metadata.readonly','spreadsheets.readonly'],
+  gmail:['gmail.readonly'],
+  calendar:['calendar.events.readonly'],
+  meet:['meetings.space.readonly'],
+  chat:['chat.spaces.readonly','chat.messages.readonly'],
+  youtube:['youtube.readonly']
+ };
+ for(const [connectorId,scopes] of Object.entries(services)){
+  const url=new URL(authorizationUrl('google',{
+   clientId:'test.apps.googleusercontent.com',
+   redirectUri:'https://agentinfinitum.vercel.app/api/openbot/integrations/oauth/callback',
+   state:'sealed',challenge:'pkce',connectorId
+  }));
+  assert.equal(url.hostname,'accounts.google.com');
+  assert.equal(url.searchParams.get('code_challenge_method'),'S256');
+  const requested=url.searchParams.get('scope');
+  for(const scope of scopes)assert.ok(requested.includes(scope),'missing '+connectorId+' scope '+scope);
+  assert.match(requested,/openid/);
+  assert.doesNotMatch(requested,/gmail\\.send|drive\\.file|spreadsheets\\.write|calendar\\.events(?:\\s|$)|chat\\.messages(?:\\s|$)|youtube\\.upload/);
+  const unrelated=Object.entries(services).filter(([id])=>id!==connectorId).flatMap(([,list])=>list)
+   .filter(scope=>!scopes.includes(scope));
+  for(const scope of unrelated)assert.ok(!requested.includes(scope),'overbroad scope '+scope+' for '+connectorId);
+ }
 });
 test('Google service reader exposes real read-only Gmail messages, Calendar events, Meet spaces, Chat spaces/messages and YouTube uploads',()=>{
  const route=read('app/api/openbot/integrations/data/route.js');
  for(const service of ['calendar','meet','chat','chat_messages','youtube'])
   assert.ok(route.includes("service==='"+service+"'"),'missing service '+service);
  assert.match(route,/gmail\.googleapis\.com\/gmail\/v1\/users\/me\/messages/);
- assert.match(route,/calendar\.googleapis\.com\/calendar\/v3\/calendars\/primary\/events/);
+ assert.match(route,/www\.googleapis\.com\\/calendar\\/v3\\/calendars\\/primary\\/events/);
  assert.match(route,/meet\.googleapis\.com\/v2\/spaces/);
  assert.match(route,/chat\.googleapis\.com\/v1\/spaces/);
  assert.match(route,/youtube\/v3\/channels/);
