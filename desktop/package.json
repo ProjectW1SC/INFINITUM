@@ -28,6 +28,7 @@
       "preload.cjs",
       "runtime-policy.mjs",
       "package.json",
+      "public-config.json",
       "launcher-policy.mjs",
       "lifecycle-policy.mjs",
       "launcher-preload.cjs",
