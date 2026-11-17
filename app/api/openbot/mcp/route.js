@@ -123,7 +123,7 @@ async function callTool(ctx,name,args){
   if(!/^(INSTAGRAM|WHATSAPP)_[A-Z0-9_]{3,150}$/.test(slug))throw bad('Ação fora dos plugins Instagram e WhatsApp Business.',403);
   if(isComposioWriteTool(slug)&&ctx.edit_scope!=='reviewed_edit')
    throw bad('Ação de escrita bloqueada. Habilite edição supervisionada para este cliente MCP; o Composio ainda exigirá aprovação.',403);
-  const result=await executeComposioTool(ctx.user.id,slug,args.arguments||{},{},adminClient());
+  const result=await executeComposioTool(ctx.user.id,slug,args.arguments||{},{account:args.account||''},adminClient());
   return toContent({result,writeApproval:'As ações de escrita exigem aprovação do Composio. Se o cliente MCP não oferecer confirmação interativa, a execução será negada.',noCredentialsReturned:true});
  }
  if(name==='crm_propose_edit')return toContent(await proposeEdit(ctx,args));
@@ -191,7 +191,7 @@ export function OPTIONS(){
   'Access-Control-Allow-Headers':'Authorization, Content-Type, Accept, Mcp-Protocol-Version'}});
 }
 },
-   arguments:{type:'object',additionalProperties:true}},required:['tool_slug','arguments'],additionalProperties:false}},
+   arguments:{type:'object',additionalProperties:true},account:{type:'string',maxLength:200,description:'ID ca_... da conta conectada, obrigatório quando houver mais de uma conta no mesmo toolkit.'}},required:['tool_slug','arguments'],additionalProperties:false}},
  {name:'openbot_connections_status',description:'Lista provedores já autorizados no OpenBot, apenas metadados, nunca tokens.',
   inputSchema:{type:'object',properties:{},additionalProperties:false}},
  {name:'crm_propose_edit',description:'PROPOR uma edição supervisionada no CRM. Não altera dados até o operador revisar e aprovar com MFA no OpenBot. Apenas notas, retornos, responsáveis e prioridades.',
