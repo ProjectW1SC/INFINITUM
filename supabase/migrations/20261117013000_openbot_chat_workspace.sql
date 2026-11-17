@@ -40,6 +40,27 @@ GRANT SELECT,INSERT,UPDATE,DELETE ON public.openbot_threads TO authenticated;
 GRANT SELECT,INSERT,DELETE ON public.openbot_messages TO authenticated;
 GRANT SELECT,INSERT,UPDATE,DELETE ON public.openbot_profiles TO authenticated;
 
+-- Idempotent when the database schema was prepared before this version is deployed.
+DROP POLICY IF EXISTS openbot_threads_own_read ON public.openbot_threads;
+DROP POLICY IF EXISTS openbot_threads_own_insert ON public.openbot_threads;
+DROP POLICY IF EXISTS openbot_threads_own_update ON public.openbot_threads;
+DROP POLICY IF EXISTS openbot_threads_own_delete ON public.openbot_threads;
+DROP POLICY IF EXISTS openbot_messages_own_read ON public.openbot_messages;
+DROP POLICY IF EXISTS openbot_messages_own_insert ON public.openbot_messages;
+DROP POLICY IF EXISTS openbot_messages_own_delete ON public.openbot_messages;
+DROP POLICY IF EXISTS openbot_profiles_own_read ON public.openbot_profiles;
+DROP POLICY IF EXISTS openbot_profiles_own_insert ON public.openbot_profiles;
+DROP POLICY IF EXISTS openbot_profiles_own_update ON public.openbot_profiles;
+DROP POLICY IF EXISTS openbot_profiles_own_delete ON public.openbot_profiles;
+DROP POLICY IF EXISTS openbot_threads_no_oauth_insert ON public.openbot_threads;
+DROP POLICY IF EXISTS openbot_threads_no_oauth_update ON public.openbot_threads;
+DROP POLICY IF EXISTS openbot_threads_no_oauth_delete ON public.openbot_threads;
+DROP POLICY IF EXISTS openbot_messages_no_oauth_insert ON public.openbot_messages;
+DROP POLICY IF EXISTS openbot_messages_no_oauth_delete ON public.openbot_messages;
+DROP POLICY IF EXISTS openbot_profiles_no_oauth_insert ON public.openbot_profiles;
+DROP POLICY IF EXISTS openbot_profiles_no_oauth_update ON public.openbot_profiles;
+DROP POLICY IF EXISTS openbot_profiles_no_oauth_delete ON public.openbot_profiles;
+
 -- A user cannot access another user's private agent conversations or switch thread ownership.
 CREATE POLICY openbot_threads_own_read ON public.openbot_threads FOR SELECT TO authenticated
  USING(owner_id=(select auth.uid()));
