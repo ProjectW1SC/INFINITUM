@@ -48,8 +48,9 @@ async function readGmail(access){
   readApi('https://gmail.googleapis.com/gmail/v1/users/me/messages?'+new URLSearchParams({maxResults:'8',q:'in:inbox'}),access)
  ]);
  const messages=await Promise.all((list.messages||[]).slice(0,8).map(async item=>{
-  const detail=await readApi('https://gmail.googleapis.com/gmail/v1/users/me/messages/'+encodeURIComponent(item.id)+'?'+
-   new URLSearchParams({format:'metadata','metadataHeaders':'From','metadataHeaders':'Subject','metadataHeaders':'Date'}),access);
+  const metadataQuery=new URLSearchParams({format:'metadata'});
+  for(const name of ['From','Subject','Date'])metadataQuery.append('metadataHeaders',name);
+  const detail=await readApi('https://gmail.googleapis.com/gmail/v1/users/me/messages/'+encodeURIComponent(item.id)+'?'+metadataQuery,access);
   const headers=detail.payload?.headers||[];
   return {id:detail.id,name:header(headers,'Subject')||'(sem assunto)',
    from:header(headers,'From'),date:header(headers,'Date'),snippet:String(detail.snippet||'').slice(0,360),
