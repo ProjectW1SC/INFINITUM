@@ -1,8 +1,8 @@
 import {randomBytes} from 'node:crypto';
-import {officeAuth,officeJson,safeOfficeError} from '../../../../../lib/office-server.mjs';
-import {adminClient,newOAuthNonce} from '../../../../../lib/openbot-connection-server.mjs';
+import {officeAuth,officeJson,safeOfficeError} from '../../../../lib/office-server.mjs';
+import {adminClient,newOAuthNonce} from '../../../../lib/openbot-connection-server.mjs';
 import {COMPOSIO_TOOLKITS,composioConfigured,listComposioToolkits,startComposioConnection,deleteComposioAccount}
- from '../../../../../lib/openbot-composio.mjs';
+ from '../../../../lib/openbot-composio.mjs';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 const ORIGIN='https://agentinfinitum.vercel.app';
