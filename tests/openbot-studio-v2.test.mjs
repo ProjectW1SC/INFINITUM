@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const load=path=>readFileSync(new URL('../'+path,import.meta.url),'utf8');
 
-test('OpenBot has a proper standalone chat workspace, not the CRM card dashboard',()=>{
+test('legacy OpenBot chat entry routes into the unified agents workspace',()=>{
  const page=load('app/agentes/chat/page.jsx');
+ const center=load('components/agents-command-center.jsx');
  const studio=load('components/openbot-studio.jsx');
- assert.match(page,/OpenBotStudio|OpenBotPage/);
+ assert.match(page,/redirect/);
+ assert.match(center,/OpenBotStudio/);
  assert.match(studio,/Conversa|conversa/);
  assert.match(studio,/Nova conversa/);
  assert.match(studio,/Motor/);
