@@ -166,7 +166,7 @@ export default function OpenBotConnectedApps({request,onClose}){
       </>:connector.mode==='separate'?<>
        <p className={css.info}>O WhatsApp usa uma sessão isolada no ZapFast. O OpenBot não copia credenciais, não altera número e não envia mensagens.</p>
        <button className={css.primary} onClick={openZapFast}><MessageCircle size={16}/> Abrir WhatsApp · ZapFast</button>
-       <a className={css.secondaryLink} href={ZAPFAST_SINGLE_SESSION_URL+'/trocar-numero'} target="_blank" rel="noopener noreferrer">Trocar número no ZapFast <ExternalLink size={14}/></a>
+       <a className={css.secondaryLink} href={new URL('/trocar-numero',ZAPFAST_SINGLE_SESSION_URL).toString()} target="_blank" rel="noopener noreferrer">Trocar número no ZapFast <ExternalLink size={14}/></a>
       </>:connector.mode==='planned'?<p className={css.info}>Integração ainda sem OAuth implementado. Não há botão de conexão fictício.</p>:<>
        <div className={css.subheading}><h3>Suas contas {connector.provider==='google'?'Google':'Meta'}</h3>
         <span>{connectorAccounts.length} registro(s)</span></div>
