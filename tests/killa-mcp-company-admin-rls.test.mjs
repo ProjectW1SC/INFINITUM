@@ -20,9 +20,12 @@ test('company policy write RLS remains restricted to the authenticated user comp
  assert.match(migration,/updated_by\s*=\s*\(select auth\.uid\(\)\)/i);
 });
 
-test('MCP consent continues to require the exact allowlisted OAuth client and AAL2',()=>{
+test('MCP consent requires AAL2 and prior client approval or explicit new-client consent',()=>{
  const page=read('app/oauth/consent/page.jsx');
  assert.match(page,/approvedClients\.includes\(clientId\)/);
  assert.match(page,/currentLevel==='aal2'/);
- assert.match(page,/disabled=\{busy\|\|!clientApproved\}/);
+ assert.match(page,/disabled=\{busy\|\|!mfaOk\|\|\(!clientApproved&&!confirmNewClient\)\}/);
+ assert.match(page,/openbot_mcp_grants/);
+ const rls=read('supabase/migrations/20261117092000_openbot_mcp_require_mfa.sql');
+ assert.match(rls,/aal2/);
 });
