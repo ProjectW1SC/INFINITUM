@@ -73,7 +73,7 @@ Gmail e mensagens do Chat usam escopos restritos; Meet, Calendar, YouTube e outr
 3. Clique em **Conectar conta**. Cada serviço pede apenas as permissões de que precisa.
 4. Se a mesma conta Google já estiver conectada, use **Conceder permissão** para adicionar o escopo daquele serviço.
 5. Após o consentimento, volte ao OpenBot e clique em **Atualizar** e **Testar acesso**.
-6. Google Chat primeiro lista os espaços; em cada espaço, use **Ler mensagens** quando precisar consultar o conteúdo.
+6. Google Chat primeiro lista os espaços; em cada espaço, use **Ler mensagens** quando precisar consultar o conteúdo. A API Chat exige conta Google Workspace Business/Enterprise com Chat ativo; contas pessoais @gmail.com não atendem ao pré-requisito documentado. A API REST do Meet também exige conta Google Workspace com Meet ativado. Se a conta for pessoal, use os links de Meet presentes nos eventos do Calendar; a consulta direta de espaços Meet pode não estar disponível.
 7. Google Calendar mostra próximos eventos e links do Meet; o conector Meet lista os espaços de reunião acessíveis; YouTube mostra o canal e os últimos vídeos.
 
 ## Estado OAuth e limites de teste
