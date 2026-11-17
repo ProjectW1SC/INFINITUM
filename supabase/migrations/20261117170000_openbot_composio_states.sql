@@ -14,3 +14,14 @@ CREATE INDEX IF NOT EXISTS openbot_composio_states_owner_idx
  ON public.openbot_composio_states(owner_id,expires_at);
 ALTER TABLE public.openbot_composio_states ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.openbot_composio_states FROM PUBLIC,anon,authenticated;
+
+-- Persist one Composio session per INFINITUM user so approvals and tool state
+-- remain tied to the same remote session across Vercel requests.
+CREATE TABLE IF NOT EXISTS public.openbot_composio_sessions (
+ owner_id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+ session_id text NOT NULL UNIQUE CHECK(length(session_id) BETWEEN 6 AND 200),
+ created_at timestamptz NOT NULL DEFAULT now(),
+ updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.openbot_composio_sessions ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.openbot_composio_sessions FROM PUBLIC,anon,authenticated;
