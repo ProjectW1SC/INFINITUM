@@ -71,6 +71,10 @@ jobs:
           Review third-party notices before distributing a renamed binary.
           README
           du -sh w1-copy/* | tee w1-copy/SNAPSHOT_SIZES.txt
+      - name: Node 24 for REA
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.1'
       - name: REA static analysis (optional; no application secrets)
         continue-on-error: true
         shell: bash
