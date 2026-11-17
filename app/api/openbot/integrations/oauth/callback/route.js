@@ -67,7 +67,7 @@ export async function GET(request){
    .is('used_at',null).gt('expires_at',new Date().toISOString()).select('nonce').maybeSingle();
   if(used.error||!used.data)return safeRedirect('state_expired');
   const account=await exchange(provider,code,credentials,verifier,connectorId);
-  const old=await admin.from('openbot_connections').select('tokens_ciphertext')
+  const old=await admin.from('openbot_connections').select('tokens_ciphertext,scopes')
    .eq('owner_id',ownerId).eq('provider',provider).eq('external_account_id',account.externalAccountId).maybeSingle();
   if(old.error)throw Error('Falha ao consultar autorização anterior');
   let savedToken={...account.token};
@@ -75,8 +75,9 @@ export async function GET(request){
    try{const prior=decryptToken(old.data.tokens_ciphertext);
     if(prior?.refresh_token)savedToken.refresh_token=prior.refresh_token;}catch{}
   }
+  const grantedScopes=[...new Set([...(Array.isArray(old.data?.scopes)?old.data.scopes:[]),...account.scopes])];
   const payloadInsert={owner_id:ownerId,provider,external_account_id:account.externalAccountId,
-   display_name:account.displayName,email:account.email,scopes:account.scopes,status:'connected',
+   display_name:account.displayName,email:account.email,scopes:grantedScopes,status:'connected',
    tokens_ciphertext:encryptToken(savedToken),expires_at:account.expiresAt,
    last_checked_at:new Date().toISOString(),updated_at:new Date().toISOString()};
   const write=await admin.from('openbot_connections').upsert(payloadInsert,
