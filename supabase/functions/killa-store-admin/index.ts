@@ -16,7 +16,7 @@ const AUTH_SOURCE_ISSUER=AUTH_SOURCE_URL+'/auth/v1';
 const W1_COMPANY_ID='d37fd4bb-1c71-4dca-b97e-292355918d39';
 const STORE_USER_ID_PATTERN=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const GH_API='https://api.github.com/repos/'+PROJECT;
-const ALLOWED_WORKFLOWS=['ci.yml','killa-desktop-windows.yml','killa-desktop-free-release.yml'];
+const ALLOWED_WORKFLOWS=['ci.yml','killa-desktop-windows.yml','killa-desktop-free-release.yml','killa-desktop-auto-release.yml'];
 const VALID_VERSION=/^(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})\.(0|[1-9][0-9]{0,3})$/;
 const LIMIT=400000;const error=(code,status=403)=>Response.json({ok:false,error:code},{status});
 const secret=(name)=>Deno.env.get(name)||'';
