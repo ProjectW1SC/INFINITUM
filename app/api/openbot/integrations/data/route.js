@@ -37,16 +37,13 @@ async function googleRefresh(account,token,admin){
  if(save.error)throw Error('Não foi possível salvar o token renovado.');
  return updated;
 }
-export async function GET(request){
- try{
-  const {user}=await officeAuth(request);
-  const u=new URL(request.url),service=u.searchParams.get('service'),id=u.searchParams.get('connection_id')||'';
+export async function readConnectedData(userId,service,id){
   const provider=SERVICES[service];
   if(!provider||!/^[0-9a-f-]{36}$/i.test(id))throw Object.assign(Error('Serviço ou conexão inválidos.'),{status:400});
   const admin=adminClient();
   const row=await admin.from('openbot_connections')
    .select('id,owner_id,provider,display_name,expires_at,status,tokens_ciphertext')
-   .eq('id',id).eq('owner_id',user.id).eq('provider',provider).maybeSingle();
+   .eq('id',id).eq('owner_id',userId).eq('provider',provider).maybeSingle();
   if(row.error||!row.data)throw Object.assign(Error('Conta não encontrada para este usuário.'),{status:404});
   if(row.data.status!=='connected')throw Object.assign(Error('Esta conta precisa ser reconectada.'),{status:401});
   let token=decryptToken(row.data.tokens_ciphertext);
@@ -55,7 +52,6 @@ export async function GET(request){
   let data=[];
   try{
    if(service==='drive'){
-    const p=new URLSearchParams({page_size:'12'});
     const out=await readApi('https://www.googleapis.com/drive/v3/files?'+
      new URLSearchParams({pageSize:'12',fields:'nextPageToken,files(id,name,mimeType,webViewLink,modifiedTime)',
       orderBy:'modifiedTime desc',q:'trashed = false'}),token.access_token);
@@ -79,11 +75,18 @@ export async function GET(request){
    }
   }catch(error){
    if(error.status===401)await admin.from('openbot_connections').update({status:'needs_reconnect'})
-    .eq('owner_id',user.id).eq('id',id);
+    .eq('owner_id',userId).eq('id',id);
    throw error;
   }
-  return officeJson({ok:true,service,connection:{id:row.data.id,name:row.data.display_name},
+  return {ok:true,service,connection:{id:row.data.id,name:row.data.display_name},
    items:data,limitedTo:'metadados',checkedAt:new Date().toISOString(),
-   notice:'Prévia de dados autorizados; não foi enviado e-mail, postagem ou WhatsApp.'});
+   notice:'Prévia de dados autorizados; não foi enviado e-mail, postagem ou WhatsApp.'};
+}
+export async function GET(request){
+ try{
+  const {user}=await officeAuth(request);
+  const u=new URL(request.url);
+  const result=await readConnectedData(user.id,u.searchParams.get('service'),u.searchParams.get('connection_id')||'');
+  return officeJson(result);
  }catch(e){return safeOfficeError(e)}
 }
