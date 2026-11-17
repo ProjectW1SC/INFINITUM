@@ -3,6 +3,7 @@ const invoke=channel=>ipcRenderer.invoke(channel);
 contextBridge.exposeInMainWorld('killaLauncher',Object.freeze({
  getState:()=>invoke('launcher:get-state'),
  check:()=>invoke('launcher:check-update'),
+ download:options=>ipcRenderer.invoke('launcher:download-update',{installAfterDownload:options?.installAfterDownload===true}),
  launch:()=>invoke('launcher:launch'),
  install:()=>invoke('launcher:install-update'),
  releases:()=>invoke('launcher:open-downloads'),
