@@ -66,5 +66,5 @@ test('Composio write approvals can resume only with the original request state a
  assert.match(s,/input_responses/);
  assert.match(s,/args\.request_state/);
  assert.match(s,/args\.input_responses/);
- assert.match(s,/same tool and arguments|same action and arguments/i);
+ assert.match(s,/mesma tool e os mesmos argumentos/i);
 });
