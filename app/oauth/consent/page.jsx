@@ -16,13 +16,13 @@ async function approvedClientsForUser(db,userId){
    throw Error('Não foi possível confirmar a empresa vinculada à conta.');
   const settings=await db.from('office_agent_company_policies').select('config')
    .eq('empresa_id',member.data[0].empresa_id).limit(1).maybeSingle();
-  if(settings.error)throw Error('Não foi possível ler a autorização MCP da empresa.');
+  if(settings.error)return modernIds; // New OpenBot grants do not depend on legacy policies.
   const config=settings.data?.config||{};
   return [...new Set([...modernIds,...(config.mcp_enabled===true&&Array.isArray(config.mcp_allowed_client_ids)?config.mcp_allowed_client_ids:[])])];
  }
  const settings=await db.from('killa_mcp_settings').select('mcp_enabled,allowed_client_ids')
   .eq('owner_id',userId).maybeSingle();
- if(settings.error)throw Error('Não foi possível ler a autorização MCP da conta.');
+ if(settings.error)return modernIds;
  return [...new Set([...modernIds,...(settings.data?.mcp_enabled===true&&Array.isArray(settings.data?.allowed_client_ids)?settings.data.allowed_client_ids:[])])];
 }
 
