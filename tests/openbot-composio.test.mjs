@@ -68,3 +68,14 @@ test('Composio write approvals can resume only with the original request state a
  assert.match(s,/args\.input_responses/);
  assert.match(s,/mesma tool e os mesmos argumentos/i);
 });
+
+test('Composio write classification defaults to write unless a tool is clearly read-only',async()=>{
+ const {isComposioWriteTool}=await import('../lib/openbot-composio.mjs');
+ assert.equal(isComposioWriteTool('INSTAGRAM_GET_USER_INFO'),false);
+ assert.equal(isComposioWriteTool('WHATSAPP_WHO_AM_I'),false);
+ assert.equal(isComposioWriteTool('WHATSAPP_LIST_BUSINESS_ACCOUNTS'),false);
+ assert.equal(isComposioWriteTool('WHATSAPP_SET_TWO_STEP_VERIFICATION'),true);
+ assert.equal(isComposioWriteTool('WHATSAPP_ENABLE_WEBHOOK_SUBSCRIPTIONS'),true);
+ assert.equal(isComposioWriteTool('WHATSAPP_SEND_MESSAGE'),true);
+ assert.equal(isComposioWriteTool('WHATSAPP_UNRECOGNIZED_ACTION'),true);
+});
